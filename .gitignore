@@ -1,0 +1,33 @@
+# Secrets / local runtime
+.env
+.env.*
+!.env.example
+
+# Generated artifacts and local scratch data
+artifacts/
+.codegraph/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Local live data exports
+/data/live_*.csv
+/data/ops_content_calendar.csv
+/data/research_ops_calendar.csv
