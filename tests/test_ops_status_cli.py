@@ -59,6 +59,86 @@ class OpsStatusCliTest(unittest.TestCase):
         self.assertEqual(payload["summary"]["existing"], 4)
         self.assertGreaterEqual(payload["summary"]["missing"], 1)
 
+    def test_ops_status_marks_artifacts_stale_with_lane_thresholds(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = Path(tmp) / "artifacts"
+            (artifacts / "ops").mkdir(parents=True)
+            operator = artifacts / "ops" / "operator-digest.json"
+            operator.write_text(
+                json.dumps({"summary": {"pending_captions": 1}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            old_timestamp = 1780185600.0  # 2026-05-31T00:00:00+00:00
+            operator.touch()
+            import os
+
+            os.utime(operator, (old_timestamp, old_timestamp))
+
+            env = isolated_subprocess_env()
+            env["ARTIFACTS_DIR"] = str(artifacts)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "ops-status",
+                    "--now",
+                    "2026-06-02T08:00:00+00:00",
+                    "--max-age-hours",
+                    "operator_digest=24",
+                ],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        by_name = {item["name"]: item for item in payload["artifacts"]}
+        self.assertEqual(payload["summary"]["stale"], 1)
+        self.assertEqual(payload["summary"]["fresh"], 0)
+        self.assertTrue(by_name["operator_digest"]["freshness"]["stale"])
+        self.assertEqual(by_name["operator_digest"]["freshness"]["max_age_hours"], 24.0)
+        self.assertGreater(by_name["operator_digest"]["freshness"]["age_hours"], 24.0)
+
+    def test_ops_status_fail_on_stale_returns_nonzero(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = Path(tmp) / "artifacts"
+            (artifacts / "ops").mkdir(parents=True)
+            operator = artifacts / "ops" / "operator-digest.json"
+            operator.write_text(json.dumps({"summary": {}}, ensure_ascii=False), encoding="utf-8")
+            old_timestamp = 1780185600.0  # 2026-05-31T00:00:00+00:00
+            import os
+
+            os.utime(operator, (old_timestamp, old_timestamp))
+
+            env = isolated_subprocess_env()
+            env["ARTIFACTS_DIR"] = str(artifacts)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "ops-status",
+                    "--now",
+                    "2026-06-02T08:00:00+00:00",
+                    "--max-age-hours",
+                    "operator_digest=24",
+                    "--fail-on-stale",
+                ],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 1)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["summary"]["stale"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

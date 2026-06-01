@@ -138,6 +138,7 @@ bash -n /home/tantai/.hermes/scripts/fanpage-agent-*.sh
 python3 -m unittest tests.test_cron_wrapper_scripts tests.test_hermes_cron_status_cli -v
 python3 -m fanpage_agent.main hermes-cron-status
 python3 -m fanpage_agent.main ops-status
+python3 -m fanpage_agent.main ops-status --fail-on-stale
 hermes cron list
 ```
 
@@ -157,6 +158,7 @@ Expected for approval audit:
 delivery.sent_count: 1
 artifacts/approvals/approval-audit.json exists
 ops-status summary.missing: 0
+ops-status summary.stale: 0
 ```
 
 ## Runtime prerequisites

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import date
+import time
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fanpage_agent.adapters.llm_client import build_llm_client
@@ -79,6 +80,15 @@ EXPECTED_HERMES_CRON_JOBS = {
         "script": "fanpage-agent-approved-triage-replies.sh",
         "project_script": "scripts/run_approved_triage_replies.sh",
     },
+}
+
+OPS_ARTIFACT_FRESHNESS_HOURS = {
+    "daily_ops_latest": 30.0,
+    "operator_digest": 30.0,
+    "approval_audit": 30.0,
+    "weekly_report": 192.0,
+    "research_brief": 30.0,
+    "eval_latest": 30.0,
 }
 
 
@@ -384,7 +394,22 @@ def build_parser() -> argparse.ArgumentParser:
     report_delivery_parser.add_argument("--chat-id")
     add_store_backend_arg(report_delivery_parser)
 
-    subparsers.add_parser("ops-status")
+    ops_status_parser = subparsers.add_parser("ops-status")
+    ops_status_parser.add_argument(
+        "--max-age-hours",
+        action="append",
+        default=[],
+        help="Override freshness threshold, e.g. operator_digest=24 or operator_digest=24,weekly_report=192.",
+    )
+    ops_status_parser.add_argument(
+        "--now",
+        help="Timestamp used for freshness checks. Accepts ISO-8601 or Unix epoch seconds. Defaults to current time.",
+    )
+    ops_status_parser.add_argument(
+        "--fail-on-stale",
+        action="store_true",
+        help="Return exit code 1 when any existing artifact is stale.",
+    )
 
     hermes_cron_parser = subparsers.add_parser("hermes-cron-status")
     hermes_cron_parser.add_argument("--jobs-file", default=str(DEFAULT_HERMES_CRON_JOBS_FILE))
@@ -976,17 +1001,60 @@ def cmd_deliver_weekly_report(args: argparse.Namespace) -> int:
     return 0
 
 
-def _artifact_status(name: str, path: Path) -> dict:
+def _parse_timestamp(raw: str | None) -> float:
+    if not raw:
+        return time.time()
+    try:
+        return float(raw)
+    except ValueError:
+        normalized = raw.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+
+
+def _parse_freshness_thresholds(overrides: list[str] | None = None) -> dict[str, float]:
+    thresholds = dict(OPS_ARTIFACT_FRESHNESS_HOURS)
+    for raw in overrides or []:
+        for pair in raw.split(","):
+            if not pair.strip():
+                continue
+            if "=" not in pair:
+                raise ValueError(f"Invalid --max-age-hours value: {pair!r}. Expected name=hours.")
+            name, hours = pair.split("=", 1)
+            artifact_name = name.strip()
+            if artifact_name not in thresholds:
+                raise ValueError(
+                    f"Unknown artifact for --max-age-hours: {artifact_name!r}. "
+                    f"Expected one of: {', '.join(sorted(thresholds))}."
+                )
+            thresholds[artifact_name] = float(hours.strip())
+    return thresholds
+
+
+def _artifact_status(name: str, path: Path, *, now_timestamp: float, max_age_hours: float) -> dict:
     status = {
         "name": name,
         "path": str(path),
         "exists": path.exists(),
+        "freshness": {
+            "max_age_hours": max_age_hours,
+        },
     }
     if not path.exists():
+        status["freshness"].update({"stale": False, "reason": "missing"})
         return status
     stat = path.stat()
+    age_hours = max(0.0, (now_timestamp - stat.st_mtime) / 3600)
     status["size_bytes"] = stat.st_size
     status["modified_at"] = stat.st_mtime
+    status["freshness"].update(
+        {
+            "age_hours": round(age_hours, 3),
+            "stale": age_hours > max_age_hours,
+        }
+    )
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
@@ -1005,28 +1073,88 @@ def _artifact_status(name: str, path: Path) -> dict:
     return status
 
 
-def _latest_artifact(name: str, directory: Path, pattern: str) -> dict:
+def _latest_artifact(
+    name: str,
+    directory: Path,
+    pattern: str,
+    *,
+    now_timestamp: float,
+    max_age_hours: float,
+) -> dict:
     matches = sorted(directory.glob(pattern), key=lambda item: item.stat().st_mtime, reverse=True)
     if not matches:
-        return {"name": name, "path": str(directory / pattern), "exists": False}
-    return _artifact_status(name, matches[0])
+        return {
+            "name": name,
+            "path": str(directory / pattern),
+            "exists": False,
+            "freshness": {
+                "max_age_hours": max_age_hours,
+                "stale": False,
+                "reason": "missing",
+            },
+        }
+    return _artifact_status(name, matches[0], now_timestamp=now_timestamp, max_age_hours=max_age_hours)
 
 
-def build_ops_status_payload(settings: Settings) -> dict:
+def build_ops_status_payload(
+    settings: Settings,
+    *,
+    now_timestamp: float | None = None,
+    freshness_thresholds: dict[str, float] | None = None,
+) -> dict:
+    now = time.time() if now_timestamp is None else now_timestamp
+    thresholds = freshness_thresholds or dict(OPS_ARTIFACT_FRESHNESS_HOURS)
     artifacts = [
-        _latest_artifact("daily_ops_latest", settings.artifacts_dir / "ops", "daily-ops-*.json"),
-        _artifact_status("operator_digest", settings.artifacts_dir / "ops" / "operator-digest.json"),
-        _artifact_status("approval_audit", settings.artifacts_dir / "approvals" / "approval-audit.json"),
-        _artifact_status("weekly_report", settings.artifacts_dir / "reports" / "weekly-report.json"),
-        _artifact_status("research_brief", settings.artifacts_dir / "research" / "research-brief.json"),
-        _latest_artifact("eval_latest", settings.artifacts_dir / "evals", "eval-summary-*.json"),
+        _latest_artifact(
+            "daily_ops_latest",
+            settings.artifacts_dir / "ops",
+            "daily-ops-*.json",
+            now_timestamp=now,
+            max_age_hours=thresholds["daily_ops_latest"],
+        ),
+        _artifact_status(
+            "operator_digest",
+            settings.artifacts_dir / "ops" / "operator-digest.json",
+            now_timestamp=now,
+            max_age_hours=thresholds["operator_digest"],
+        ),
+        _artifact_status(
+            "approval_audit",
+            settings.artifacts_dir / "approvals" / "approval-audit.json",
+            now_timestamp=now,
+            max_age_hours=thresholds["approval_audit"],
+        ),
+        _artifact_status(
+            "weekly_report",
+            settings.artifacts_dir / "reports" / "weekly-report.json",
+            now_timestamp=now,
+            max_age_hours=thresholds["weekly_report"],
+        ),
+        _artifact_status(
+            "research_brief",
+            settings.artifacts_dir / "research" / "research-brief.json",
+            now_timestamp=now,
+            max_age_hours=thresholds["research_brief"],
+        ),
+        _latest_artifact(
+            "eval_latest",
+            settings.artifacts_dir / "evals",
+            "eval-summary-*.json",
+            now_timestamp=now,
+            max_age_hours=thresholds["eval_latest"],
+        ),
     ]
     existing = sum(1 for item in artifacts if item["exists"])
+    stale = sum(1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale"))
+    fresh = sum(1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale"))
     return {
         "artifacts_dir": str(settings.artifacts_dir),
+        "freshness_checked_at": now,
         "summary": {
             "existing": existing,
             "missing": len(artifacts) - existing,
+            "fresh": fresh,
+            "stale": stale,
         },
         "artifacts": artifacts,
     }
@@ -1034,9 +1162,14 @@ def build_ops_status_payload(settings: Settings) -> dict:
 
 def cmd_ops_status(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    payload = build_ops_status_payload(settings)
+    try:
+        now_timestamp = _parse_timestamp(args.now)
+        thresholds = _parse_freshness_thresholds(args.max_age_hours)
+    except ValueError as exc:
+        raise SystemExit(f"ops-status: {exc}") from exc
+    payload = build_ops_status_payload(settings, now_timestamp=now_timestamp, freshness_thresholds=thresholds)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 0
+    return 1 if args.fail_on_stale and payload["summary"]["stale"] else 0
 
 
 def _cron_schedule_display(job: dict) -> str:

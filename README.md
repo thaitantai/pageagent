@@ -171,6 +171,7 @@ Cron jobs thật đang được triển khai qua Hermes no-agent script jobs đ�
 hermes cron list
 python3 -m fanpage_agent.main hermes-cron-status
 python3 -m fanpage_agent.main ops-status
+python3 -m fanpage_agent.main ops-status --fail-on-stale
 ```
 
 Chi tiết mapping job/schedule/wrapper/runbook xem: [`docs/cron/hermes-jobs.md`](docs/cron/hermes-jobs.md).
@@ -179,7 +180,6 @@ Chi tiết mapping job/schedule/wrapper/runbook xem: [`docs/cron/hermes-jobs.md`
 
 - **P0:** Theo dõi lần chạy tự động đầu tiên của 9 cron jobs, kiểm tra `last_status`, output local và artifact freshness.
 - **P0:** Nếu job nào lỗi, pause job đó, đọc output/error, sửa wrapper hoặc dữ liệu nguồn rồi resume.
-- **P1:** Thêm freshness threshold vào `ops-status` để báo artifact quá cũ theo từng lane.
 - **P1:** Chuẩn hóa Telegram message ngắn hơn cho operator digest / approval audit, tập trung next-action.
 - **P2:** Thêm dashboard HTML/Markdown local tổng hợp cron health + artifact health.
 
