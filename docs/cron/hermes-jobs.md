@@ -72,8 +72,17 @@ Project scripts keep the real command flags, including `--save`, and read backen
 
 ## Inspect jobs
 
+Human-readable:
+
 ```bash
 hermes cron list
+```
+
+Machine-check deployment contract:
+
+```bash
+cd /home/tantai/.hermes/fanpage-agent
+python3 -m fanpage_agent.main hermes-cron-status
 ```
 
 Expected job settings:
@@ -82,17 +91,21 @@ Expected job settings:
 no_agent: true
 deliver: local
 workdir: /home/tantai/.hermes/fanpage-agent
+enabled: true
 ```
+
+`hermes-cron-status` verifies all 9 jobs, their schedule, wrapper script, `no_agent`, `deliver`, `workdir`, `enabled`, wrapper executable bit, and wrapper target.
 
 ## Manual run examples
 
-Run project wrappers directly:
+Run project wrappers directly. These may send Telegram when runtime env is configured:
 
 ```bash
 cd /home/tantai/.hermes/fanpage-agent
 scripts/run_daily_packet.sh
 scripts/run_operator_digest.sh
 scripts/run_weekly_report.sh
+scripts/run_approval_audit.sh
 ```
 
 Run a Hermes cron job by ID after listing jobs:
@@ -102,14 +115,48 @@ hermes cron list
 hermes cron run <job_id>
 ```
 
+Pause/resume a noisy or broken job:
+
+```bash
+hermes cron pause <job_id>
+hermes cron resume <job_id>
+```
+
+Remove a duplicate/wrong job only after listing to confirm the ID:
+
+```bash
+hermes cron list
+hermes cron remove <job_id>
+```
+
 ## Verify deployment
 
 ```bash
 cd /home/tantai/.hermes/fanpage-agent
 bash -n scripts/run_*.sh
-python3 -m unittest tests.test_cron_wrapper_scripts -v
+bash -n /home/tantai/.hermes/scripts/fanpage-agent-*.sh
+python3 -m unittest tests.test_cron_wrapper_scripts tests.test_hermes_cron_status_cli -v
+python3 -m fanpage_agent.main hermes-cron-status
 python3 -m fanpage_agent.main ops-status
 hermes cron list
+```
+
+## Live smoke procedure
+
+Use this only when live Telegram delivery is expected. Prefer one lane at a time.
+
+```bash
+cd /home/tantai/.hermes/fanpage-agent
+/home/tantai/.hermes/scripts/fanpage-agent-approval-audit.sh > /tmp/fanpage-approval-audit-smoke.json
+python3 -m fanpage_agent.main ops-status
+```
+
+Expected for approval audit:
+
+```text
+delivery.sent_count: 1
+artifacts/approvals/approval-audit.json exists
+ops-status summary.missing: 0
 ```
 
 ## Runtime prerequisites

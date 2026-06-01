@@ -30,6 +30,56 @@ DEFAULT_METRICS_FILE = ROOT_DIR / "data" / "post_metrics.csv"
 DEFAULT_COMMENT_FILE = ROOT_DIR / "data" / "comment_inbox.csv"
 DEFAULT_TRIAGE_FILE = ROOT_DIR / "data" / "comment_triage.csv"
 DEFAULT_CAMPAIGN_FILE = ROOT_DIR / "data" / "campaign_notes.json"
+DEFAULT_HERMES_CRON_JOBS_FILE = Path.home() / ".hermes" / "cron" / "jobs.json"
+DEFAULT_HERMES_SCRIPTS_DIR = Path.home() / ".hermes" / "scripts"
+
+EXPECTED_HERMES_CRON_JOBS = {
+    "fanpage-agent research brief": {
+        "schedule": "30 0 * * *",
+        "script": "fanpage-agent-research-brief.sh",
+        "project_script": "scripts/run_research_brief.sh",
+    },
+    "fanpage-agent daily packet": {
+        "schedule": "0 1 * * *",
+        "script": "fanpage-agent-daily-packet.sh",
+        "project_script": "scripts/run_daily_packet.sh",
+    },
+    "fanpage-agent approval queue": {
+        "schedule": "30 1 * * *",
+        "script": "fanpage-agent-approval-queue.sh",
+        "project_script": "scripts/run_approval_queue.sh",
+    },
+    "fanpage-agent operator digest": {
+        "schedule": "0 2 * * *",
+        "script": "fanpage-agent-operator-digest.sh",
+        "project_script": "scripts/run_operator_digest.sh",
+    },
+    "fanpage-agent weekly report": {
+        "schedule": "0 2 * * 1",
+        "script": "fanpage-agent-weekly-report.sh",
+        "project_script": "scripts/run_weekly_report.sh",
+    },
+    "fanpage-agent approval audit": {
+        "schedule": "0 3 * * *",
+        "script": "fanpage-agent-approval-audit.sh",
+        "project_script": "scripts/run_approval_audit.sh",
+    },
+    "fanpage-agent metrics backlog": {
+        "schedule": "30 3 * * *",
+        "script": "fanpage-agent-metrics-backlog.sh",
+        "project_script": "scripts/run_metrics_backlog.sh",
+    },
+    "fanpage-agent triage community": {
+        "schedule": "0 */2 * * *",
+        "script": "fanpage-agent-triage-community.sh",
+        "project_script": "scripts/run_triage_community.sh",
+    },
+    "fanpage-agent approved triage replies": {
+        "schedule": "15 */2 * * *",
+        "script": "fanpage-agent-approved-triage-replies.sh",
+        "project_script": "scripts/run_approved_triage_replies.sh",
+    },
+}
 
 
 def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:
@@ -335,6 +385,11 @@ def build_parser() -> argparse.ArgumentParser:
     add_store_backend_arg(report_delivery_parser)
 
     subparsers.add_parser("ops-status")
+
+    hermes_cron_parser = subparsers.add_parser("hermes-cron-status")
+    hermes_cron_parser.add_argument("--jobs-file", default=str(DEFAULT_HERMES_CRON_JOBS_FILE))
+    hermes_cron_parser.add_argument("--scripts-dir", default=str(DEFAULT_HERMES_SCRIPTS_DIR))
+    hermes_cron_parser.add_argument("--workdir", default=str(ROOT_DIR))
 
     eval_parser = subparsers.add_parser("eval-all")
     eval_parser.add_argument("--brand-file", required=True)
@@ -984,6 +1039,116 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cron_schedule_display(job: dict) -> str:
+    if job.get("schedule_display"):
+        return str(job["schedule_display"])
+    schedule = job.get("schedule")
+    if isinstance(schedule, dict):
+        return str(schedule.get("display") or schedule.get("expr") or "")
+    return str(schedule or "")
+
+
+def _load_hermes_jobs(jobs_file: Path) -> list[dict]:
+    if not jobs_file.exists():
+        return []
+    payload = json.loads(jobs_file.read_text(encoding="utf-8"))
+    jobs = payload.get("jobs", [])
+    if not isinstance(jobs, list):
+        return []
+    return [job for job in jobs if isinstance(job, dict)]
+
+
+def _check_wrapper(wrapper_path: Path, project_script: str) -> dict:
+    status = {
+        "path": str(wrapper_path),
+        "exists": wrapper_path.exists(),
+        "executable": wrapper_path.exists() and wrapper_path.stat().st_mode & 0o111 != 0,
+        "targets_project_script": False,
+    }
+    if wrapper_path.exists():
+        text = wrapper_path.read_text(encoding="utf-8")
+        status["targets_project_script"] = project_script in text
+    return status
+
+
+def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expected_workdir: str) -> dict:
+    jobs = _load_hermes_jobs(jobs_file)
+    jobs_by_name = {str(job.get("name", "")): job for job in jobs}
+    checks = []
+    for name, expected in EXPECTED_HERMES_CRON_JOBS.items():
+        job = jobs_by_name.get(name)
+        wrapper = _check_wrapper(scripts_dir / expected["script"], expected["project_script"])
+        errors: list[str] = []
+        if job is None:
+            errors.append("missing_job")
+            actual = {}
+        else:
+            actual = {
+                "job_id": job.get("id") or job.get("job_id"),
+                "schedule": _cron_schedule_display(job),
+                "script": job.get("script"),
+                "no_agent": job.get("no_agent"),
+                "deliver": job.get("deliver"),
+                "workdir": job.get("workdir"),
+                "enabled": job.get("enabled"),
+                "state": job.get("state"),
+                "last_status": job.get("last_status"),
+                "last_delivery_error": job.get("last_delivery_error"),
+            }
+            if actual["schedule"] != expected["schedule"]:
+                errors.append("wrong_schedule")
+            if actual["script"] != expected["script"]:
+                errors.append("wrong_script")
+            if actual["no_agent"] is not True:
+                errors.append("not_no_agent")
+            if actual["deliver"] != "local":
+                errors.append("wrong_deliver")
+            if actual["workdir"] != expected_workdir:
+                errors.append("wrong_workdir")
+            if actual["enabled"] is not True:
+                errors.append("not_enabled")
+            if actual["last_delivery_error"]:
+                errors.append("last_delivery_error")
+        if not wrapper["exists"]:
+            errors.append("missing_wrapper")
+        if wrapper["exists"] and not wrapper["executable"]:
+            errors.append("wrapper_not_executable")
+        if wrapper["exists"] and not wrapper["targets_project_script"]:
+            errors.append("wrapper_wrong_target")
+        checks.append({
+            "name": name,
+            "expected": expected,
+            "actual": actual,
+            "wrapper": wrapper,
+            "ok": not errors,
+            "errors": errors,
+        })
+    ok_count = sum(1 for item in checks if item["ok"])
+    return {
+        "jobs_file": str(jobs_file),
+        "jobs_file_exists": jobs_file.exists(),
+        "scripts_dir": str(scripts_dir),
+        "expected_workdir": expected_workdir,
+        "summary": {
+            "expected": len(EXPECTED_HERMES_CRON_JOBS),
+            "configured": sum(1 for item in checks if item["actual"]),
+            "ok": ok_count,
+            "failed": len(checks) - ok_count,
+        },
+        "checks": checks,
+    }
+
+
+def cmd_hermes_cron_status(args: argparse.Namespace) -> int:
+    payload = build_hermes_cron_status_payload(
+        jobs_file=Path(args.jobs_file),
+        scripts_dir=Path(args.scripts_dir),
+        expected_workdir=args.workdir,
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0 if payload["summary"]["failed"] == 0 else 1
+
+
 def cmd_eval_all(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
@@ -1099,6 +1264,8 @@ def main() -> int:
         return cmd_deliver_weekly_report(args)
     if args.command == "ops-status":
         return cmd_ops_status(args)
+    if args.command == "hermes-cron-status":
+        return cmd_hermes_cron_status(args)
     if args.command == "eval-all":
         return cmd_eval_all(args)
     if args.command == "preview-telegram":
