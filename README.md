@@ -163,6 +163,17 @@ python3 -m fanpage_agent.main deliver-triage-community \
   --limit 3
 ```
 
+## Hermes cron deployment
+
+Cron jobs thật đang được triển khai qua Hermes no-agent script jobs để tránh gửi trùng Telegram:
+
+```bash
+hermes cron list
+python3 -m fanpage_agent.main ops-status
+```
+
+Chi tiết mapping job/schedule/wrapper xem: [`docs/cron/hermes-jobs.md`](docs/cron/hermes-jobs.md).
+
 ## Ghi chú
 - Bản này đã có lane OpenAI-compatible thật.
 - Đã có eval-all tối thiểu.
