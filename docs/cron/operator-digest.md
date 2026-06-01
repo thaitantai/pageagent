@@ -91,14 +91,16 @@ export GOOGLE_SHEETS_TABS_PREFIX='fanpage_agent'
 
 ## Expected Telegram output
 
-Sends 1 message with:
+Sends 1 compact, next-action focused message with:
 
 - `Pending captions: N`
 - `Approved replies: N`
 - `Metrics backlog: N`
-- top pending caption items with `calendar_id` and draft caption ref
-- top approved reply items with `triage_id` and `draft_reply`
-- top metrics backlog items with `calendar_id`, `published_at`, and `permalink`
+- `Next:` section with the first pending caption approve/reject command
+- first approved reply follow-up as `reply <triage_id>`
+- first metrics follow-up as `record metrics for <calendar_id>`
+
+The formatter intentionally avoids verbose per-queue dumps so the Telegram digest is scannable on mobile.
 
 ## Artifact
 

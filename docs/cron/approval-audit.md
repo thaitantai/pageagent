@@ -9,7 +9,7 @@ Purpose: report approval workflow health so stale pending captions do not sit un
 - Overdue pending captions based on `--sla-days`
 - Approved/rejected counts
 - Recent rejection notes
-- Copy/paste approve/reject commands for overdue pending captions
+- Compact `Next:` section with copy/paste approve/reject commands for overdue pending captions
 
 ## Local command
 
@@ -63,7 +63,7 @@ Do not paste credentials into chat/logs.
 ## Expected output
 
 - CLI prints JSON with `summary`, `overdue_items`, `recent_rejections`.
-- Delivery sends 1 Telegram message.
+- Delivery sends 1 compact Telegram message focused on the next overdue approval actions.
 - `--save` writes `artifacts/approvals/approval-audit.json`.
 - `ops-status` includes the saved `approval_audit` artifact.
 

@@ -163,40 +163,30 @@ class TelegramFormatterService:
         recent_rejections = payload.get("recent_rejections", [])
         lines = [
             "## Approval Audit",
-            f"as of: {summary.get('as_of', '-')}",
-            f"SLA days: {summary.get('sla_days', 0)}",
-            f"total items: {summary.get('total_items', 0)}",
-            f"pending: {summary.get('pending', 0)}",
-            f"overdue pending: {summary.get('overdue_pending', 0)}",
-            f"approved: {summary.get('approved', 0)}",
-            f"rejected: {summary.get('rejected', 0)}",
-            "",
+            f"as of: {summary.get('as_of', '-')} | SLA: {summary.get('sla_days', 0)}d",
+            (
+                f"overdue pending: {summary.get('overdue_pending', 0)} | "
+                f"pending: {summary.get('pending', 0)} | "
+                f"approved: {summary.get('approved', 0)} | "
+                f"rejected: {summary.get('rejected', 0)}"
+            ),
+            "Next:",
         ]
-        lines.append("Overdue pending captions:")
         if overdue_items:
-            for index, item in enumerate(overdue_items[:5], start=1):
-                lines.extend(
-                    [
-                        f"{index}. {item.get('date', '-')} — {item.get('topic', '-')}",
-                        f"   calendar_id: {item.get('calendar_id', '-')}",
-                        f"   days pending: {item.get('days_pending', 0)}",
-                        f"   draft caption: {item.get('draft_caption_ref', '-') or '-'}",
-                        *self._caption_action_lines(item),
-                    ]
+            for index, item in enumerate(overdue_items[:3], start=1):
+                lines.append(
+                    f"{index}. {item.get('calendar_id', '-')} — {item.get('topic', '-')} "
+                    f"({item.get('date', '-')}, days pending: {item.get('days_pending', 0)})"
                 )
+                lines.extend(self._caption_action_summary_lines(item))
         else:
-            lines.append("- none")
+            lines.append("- no overdue captions")
         if recent_rejections:
-            lines.append("")
-            lines.append("Recent rejections:")
-            for index, item in enumerate(recent_rejections[:5], start=1):
-                lines.extend(
-                    [
-                        f"{index}. {item.get('date', '-')} — {item.get('topic', '-')}",
-                        f"   calendar_id: {item.get('calendar_id', '-')}",
-                        f"   notes: {item.get('notes', '-') or '-'}",
-                    ]
-                )
+            rejected = recent_rejections[0]
+            lines.append(
+                f"Recent rejection: {rejected.get('calendar_id', '-')} — "
+                f"{rejected.get('notes', '-') or '-'}"
+            )
         return "\n".join(lines).strip()
 
     def format_approved_triage_replies(self, payload: dict) -> str:
@@ -240,52 +230,34 @@ class TelegramFormatterService:
         metrics_items = payload.get("metrics_backlog", {}).get("items", [])
         lines = [
             "## Daily Operator Digest",
-            f"Pending captions: {summary.get('pending_captions', 0)}",
-            f"Approved replies: {summary.get('approved_replies', 0)}",
-            f"Metrics backlog: {summary.get('metrics_backlog', 0)}",
-            "",
+            (
+                f"Pending captions: {summary.get('pending_captions', 0)} | "
+                f"Approved replies: {summary.get('approved_replies', 0)} | "
+                f"Metrics backlog: {summary.get('metrics_backlog', 0)}"
+            ),
+            "Next:",
         ]
-        lines.append("Pending captions:")
+        next_index = 1
         if approval_items:
-            for index, item in enumerate(approval_items[:3], start=1):
-                lines.extend(
-                    [
-                        f"{index}. {item.get('date', '-')} — {item.get('topic', '-')}",
-                        f"   calendar_id: {item.get('calendar_id', '-')}",
-                        f"   draft caption: {item.get('draft_caption_ref', '-') or '-'}",
-                        *self._caption_action_lines(item),
-                    ]
-                )
-        else:
-            lines.append("- none")
-        lines.append("")
-        lines.append("Approved replies:")
+            item = approval_items[0]
+            lines.append(f"{next_index}. approve {item.get('calendar_id', '-')} — {item.get('topic', '-')}")
+            lines.extend(self._caption_action_summary_lines(item))
+            next_index += 1
         if approved_reply_items:
-            for index, item in enumerate(approved_reply_items[:3], start=1):
-                lines.extend(
-                    [
-                        f"{index}. [{item.get('priority', '-').upper()}] {item.get('category', '-')} via {item.get('source', '-')}",
-                        f"   triage_id: {item.get('triage_id', '-')}",
-                        f"   message: {item.get('message', '-')}",
-                        f"   draft_reply: {item.get('draft_reply', '-') or '-'}",
-                    ]
-                )
-        else:
-            lines.append("- none")
-        lines.append("")
-        lines.append("Metrics backlog:")
+            item = approved_reply_items[0]
+            lines.append(
+                f"{next_index}. reply {item.get('triage_id', '-')} — "
+                f"[{item.get('priority', '-').upper()}] {item.get('message', '-')} -> {item.get('draft_reply', '-') or '-'}"
+            )
+            next_index += 1
         if metrics_items:
-            for index, item in enumerate(metrics_items[:3], start=1):
-                lines.extend(
-                    [
-                        f"{index}. {item.get('date', '-')} — {item.get('topic', '-')}",
-                        f"   calendar_id: {item.get('calendar_id', '-')}",
-                        f"   published_at: {item.get('published_at', '-')}",
-                        f"   permalink: {item.get('permalink', '-') or '-'}",
-                    ]
-                )
-        else:
-            lines.append("- none")
+            item = metrics_items[0]
+            lines.append(
+                f"{next_index}. record metrics for {item.get('calendar_id', '-')} — "
+                f"{item.get('topic', '-')} published {item.get('published_at', '-')}"
+            )
+        if next_index == 1:
+            lines.append("- nothing pending")
         return "\n".join(lines).strip()
 
     def format_metrics_backlog(self, payload: dict) -> str:
@@ -353,6 +325,15 @@ class TelegramFormatterService:
         if not verification:
             return "verification: N/A"
         return "verification: PASS" if verification.get("passed") else "verification: FAIL"
+
+    @staticmethod
+    def _caption_action_summary_lines(item: dict) -> list[str]:
+        calendar_id = item.get("calendar_id", "") or "<CALENDAR_ID>"
+        draft_caption_ref = item.get("draft_caption_ref", "") or "<CAPTION_FILE>"
+        return [
+            f"approve: python3 -m fanpage_agent.main approve-caption --calendar-id {calendar_id} --caption-file {draft_caption_ref} --approved-by <NAME> --approved-at <ISO_TIME>",
+            f"reject: python3 -m fanpage_agent.main reject-caption --calendar-id {calendar_id} --reason <REASON> --rejected-at <ISO_TIME>",
+        ]
 
     @staticmethod
     def _caption_action_lines(item: dict) -> list[str]:

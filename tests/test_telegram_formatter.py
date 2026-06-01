@@ -190,6 +190,36 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         self.assertIn("days pending: 4", rendered)
         self.assertIn("approve-caption --calendar-id cal-old", rendered)
 
+    def test_format_approval_audit_is_compact_and_next_action_focused(self) -> None:
+        payload = {
+            "summary": {
+                "total_items": 3,
+                "pending": 2,
+                "overdue_pending": 1,
+                "approved": 1,
+                "rejected": 0,
+                "sla_days": 2,
+                "as_of": "2026-06-24",
+            },
+            "overdue_items": [
+                {
+                    "calendar_id": "cal-old",
+                    "topic": "Old pending caption",
+                    "date": "2026-06-20",
+                    "days_pending": 4,
+                    "draft_caption_ref": "artifacts/captions/cal-old.json",
+                }
+            ],
+        }
+
+        rendered = TelegramFormatterService().format_approval_audit(payload)
+
+        self.assertLessEqual(len(rendered.splitlines()), 9)
+        self.assertIn("Next:", rendered)
+        self.assertIn("approve-caption --calendar-id cal-old", rendered)
+        self.assertNotIn("actions:", rendered)
+        self.assertNotIn("total items:", rendered)
+
     def test_format_approved_triage_replies_contains_copy_paste_instructions(self) -> None:
         payload = {
             "summary": {
@@ -252,6 +282,40 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         self.assertIn("approve-caption --calendar-id cal-1", rendered)
         self.assertIn("triage-1", rendered)
         self.assertIn("cal-2", rendered)
+
+    def test_format_operator_digest_is_compact_and_next_action_focused(self) -> None:
+        payload = {
+            "summary": {
+                "pending_captions": 1,
+                "approved_replies": 1,
+                "metrics_backlog": 1,
+            },
+            "approval_queue": {
+                "items": [
+                    {"calendar_id": "cal-1", "topic": "Routine sáng", "draft_caption_ref": "artifacts/captions/cal-1.json"}
+                ]
+            },
+            "approved_replies": {
+                "items": [
+                    {"triage_id": "triage-1", "message": "Chi phí?", "draft_reply": "Dạ bạn inbox nhé", "priority": "high"}
+                ]
+            },
+            "metrics_backlog": {
+                "items": [
+                    {"calendar_id": "cal-2", "topic": "Routine tối", "published_at": "2026-06-25T10:00:00"}
+                ]
+            },
+        }
+
+        rendered = TelegramFormatterService().format_operator_digest(payload)
+
+        self.assertLessEqual(len(rendered.splitlines()), 12)
+        self.assertIn("Next:", rendered)
+        self.assertIn("approve-caption --calendar-id cal-1", rendered)
+        self.assertIn("reply triage-1", rendered)
+        self.assertIn("record metrics for cal-2", rendered)
+        self.assertNotIn("actions:", rendered)
+        self.assertNotIn("draft_reply:", rendered)
 
     def test_format_metrics_backlog_contains_pending_metric_items(self) -> None:
         payload = {
