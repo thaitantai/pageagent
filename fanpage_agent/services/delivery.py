@@ -41,7 +41,10 @@ class DeliveryService:
 
     def deliver_community_triage(self, triage_payload: dict, chat_id: str | None = None) -> dict:
         message = self.formatter.format_community_triage(triage_payload)
-        result = self.telegram_client.send_message(message, chat_id=chat_id)
+        # Community/triage payloads often contain underscores, brackets, URLs, etc.
+        # Using Telegram Markdown parse_mode can easily 400 on unescaped entities.
+        # For operational digests, prefer plain text for reliability.
+        result = self.telegram_client.send_message(message, chat_id=chat_id, parse_mode=None)
         return {
             "sent_count": 1,
             "results": [result],
@@ -49,7 +52,7 @@ class DeliveryService:
 
     def deliver_approved_triage_replies(self, payload: dict, chat_id: str | None = None) -> dict:
         message = self.formatter.format_approved_triage_replies(payload)
-        result = self.telegram_client.send_message(message, chat_id=chat_id)
+        result = self.telegram_client.send_message(message, chat_id=chat_id, parse_mode=None)
         return {
             "sent_count": 1,
             "results": [result],

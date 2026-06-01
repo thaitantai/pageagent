@@ -14,14 +14,16 @@ class TelegramClient:
             raise RuntimeError("TELEGRAM_BOT_TOKEN is required for Telegram delivery")
         self.base_url = settings.telegram_base_url.rstrip("/")
 
-    def send_message(self, text: str, chat_id: str | None = None) -> dict:
+    def send_message(self, text: str, chat_id: str | None = None, parse_mode: str | None = "Markdown") -> dict:
         target_chat_id = chat_id or self.settings.telegram_chat_id
         if not target_chat_id:
             raise RuntimeError("TELEGRAM_CHAT_ID is required for Telegram delivery")
-        payload = {
+        payload: dict = {
             "chat_id": target_chat_id,
             "text": text,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         request = Request(
             f"{self.base_url}/bot{self.settings.telegram_bot_token}/sendMessage",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),

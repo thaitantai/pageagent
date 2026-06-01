@@ -57,6 +57,19 @@ class TelegramClientTest(unittest.TestCase):
         body = json.loads(request.data.decode("utf-8"))
         self.assertEqual(body["chat_id"], "123456")
         self.assertEqual(body["text"], "hello from test")
+        self.assertEqual(body["parse_mode"], "Markdown")
+
+    @patch("fanpage_agent.adapters.telegram_client.urlopen")
+    def test_send_message_without_parse_mode_sends_plain_text(self, mock_urlopen) -> None:
+        mock_urlopen.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 1}})
+        client = TelegramClient(self.settings)
+
+        client.send_message("hello", parse_mode=None)
+
+        request = mock_urlopen.call_args.args[0]
+        body = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(body["chat_id"], "123456")
+        self.assertEqual(body["text"], "hello")
         self.assertNotIn("parse_mode", body)
 
     def test_requires_telegram_bot_token(self) -> None:
