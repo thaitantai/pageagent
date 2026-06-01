@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 
 class TelegramFormatterService:
     def format_weekly_plan(self, payload: dict) -> str:
@@ -87,9 +89,14 @@ class TelegramFormatterService:
         by_priority = summary.get("by_priority", {})
         by_status = summary.get("by_status", {})
         items = payload.get("items", [])
+        now = self._parse_now(payload.get("now") or payload.get("generated_at"))
         ranked_items = sorted(
             items,
-            key=lambda item: ({"urgent": 0, "high": 1, "normal": 2, "low": 3}.get(item.get("priority", "normal"), 9), item.get("category", "")),
+            key=lambda item: (
+                {"urgent": 0, "high": 1, "normal": 2, "low": 3}.get(item.get("priority", "normal"), 9),
+                self._created_at_sort_key(item.get("created_at")),
+                item.get("category", ""),
+            ),
         )
         lines = [
             "## Community Triage",
@@ -110,13 +117,18 @@ class TelegramFormatterService:
             lines.append("")
             lines.append("top items:")
             for index, item in enumerate(ranked_items[:3], start=1):
+                age = self._age_hours(item.get("created_at"), now=now)
+                age_hint = f" | age: {age:.1f}h" if age is not None else ""
                 lines.extend(
                     [
-                        f"{index}. [{item.get('priority', '-').upper()}] {item.get('category', '-')} via {item.get('source', '-')}",
-                        f"   triage_id: {item.get('triage_id', '-')}",
-                        f"   status: {item.get('status', '-')}",
-                        f"   message: {item.get('message', '-')}",
-                        f"   action: {item.get('recommended_action', '-')}",
+                        f"{index}. [{item.get('priority', '-').upper()}] {item.get('category', '-')} via {item.get('source', '-')}" ,
+                        f"   triage_id: {item.get('triage_id', '-')}" ,
+                        f"   status: {item.get('status', '-')}" ,
+                        f"   assigned_to: {item.get('assigned_to', '-') or '-'}" ,
+                        f"   created_at: {item.get('created_at', '-')}{age_hint}" ,
+                        f"   message: {item.get('message', '-')}" ,
+                        f"   action: {item.get('recommended_action', '-')}" ,
+                        *self._triage_action_lines(item),
                     ]
                 )
         return "\n".join(lines).strip()
@@ -344,3 +356,64 @@ class TelegramFormatterService:
             f"   approve: python3 -m fanpage_agent.main approve-caption --calendar-id {calendar_id} --caption-file {draft_caption_ref} --approved-by <NAME> --approved-at <ISO_TIME>",
             f"   reject: python3 -m fanpage_agent.main reject-caption --calendar-id {calendar_id} --reason <REASON> --rejected-at <ISO_TIME>",
         ]
+
+    @staticmethod
+    def _parse_now(value: object) -> datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+        if isinstance(value, str) and value.strip():
+            raw = value.strip()
+            try:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                return datetime.now(timezone.utc)
+        return datetime.now(timezone.utc)
+
+    @staticmethod
+    def _created_at_sort_key(created_at: object) -> str:
+        # Oldest first; unknown timestamps sink to the end.
+        if not isinstance(created_at, str) or not created_at.strip():
+            return "9999"
+        return created_at
+
+    @staticmethod
+    def _age_hours(created_at: object, now: datetime) -> float | None:
+        if not isinstance(created_at, str) or not created_at.strip():
+            return None
+        raw = created_at.strip()
+        try:
+            created = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                created = datetime.fromisoformat(raw + "T00:00:00+00:00")
+            except ValueError:
+                return None
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        delta = now - created
+        return delta.total_seconds() / 3600.0
+
+    @staticmethod
+    def _triage_action_lines(item: dict) -> list[str]:
+        triage_id = item.get("triage_id", "") or "<TRIAGE_ID>"
+        status = str(item.get("status", "") or "new")
+
+        if status in {"new", "pending"}:
+            return [
+                "   actions:",
+                f"   approve: python3 -m fanpage_agent.main approve-triage-reply --triage-id {triage_id} --approved-by <NAME> --approved-at <ISO_TIME>",
+                f"   reject: python3 -m fanpage_agent.main reject-triage-reply --triage-id {triage_id} --reason <REASON> --rejected-at <ISO_TIME>",
+            ]
+        if status == "approved":
+            return [
+                "   after sending:",
+                f"   python3 -m fanpage_agent.main mark-triage-reply-sent --triage-id {triage_id} --sent-at <ISO_TIME> --reply-permalink <URL>",
+            ]
+        if status == "sent":
+            return [
+                "   after resolved:",
+                f"   python3 -m fanpage_agent.main resolve-triage-item --triage-id {triage_id} --resolved-at <ISO_TIME>",
+            ]
+        return []
