@@ -46,19 +46,30 @@
   ],
   "tone_of_voice": {
     "brand_traits": [
-      "tính từ: vd: ấm, rõ, không khoa trương"
+      "Tính từ mô tả giọng văn (3-6 từ) — vd: ấm, rõ, đồng cảm, không khoa trương, dễ hiểu",
+      "Mỗi từ là 1 trait riêng biệt, không phải câu",
+      "Quan trọng: đây là DNA giọng văn — mọi caption sẽ được LLM bám vào các trait này"
     ],
     "writing_rules": [
-      "Quy tắc viết #1",
-      "Quy tắc viết #2"
+      "Quy tắc viết #1 — càng cụ thể càng tốt (vd: 'Dùng câu ngắn, tối đa 2-3 dòng mỗi đoạn')",
+      "Quy tắc #2 — các quy tắc bắt đầu bằng 'Không'/'Tránh'/'Đừng' sẽ được validator tự động check (vd: 'Không dùng từ chuyên môn không giải thích')",
+      "Quy tắc #3 (vd: 'Xưng 'tôi' — giọng cá nhân, gần gũi')",
+      "Quy tắc #4 (vd: 'Kết thúc mỗi bài bằng 1 câu hỏi mở')",
+      "Quy tắc #5 (vd: 'Đưa ví dụ cụ thể, không chung chung')"
     ],
     "things_to_avoid": [
-      "Điều tránh #1",
-      "Điều tránh #2"
+      "Điều cần tránh trong nội dung — càng cụ thể càng tốt",
+      "VD: 'Giật gân', 'Phóng đại kết quả', 'Từ ngữ tiêu cực'",
+      "Mỗi mục sẽ được tone validator check trước khi publish",
+      "VD: 'So sánh với đối thủ'",
+      "VD: 'Cam kết kết quả không thực tế'"
     ],
     "sample_phrases": [
-      "Ví dụ câu mẫu 1",
-      "Ví dụ câu mẫu 2"
+      "Câu mẫu thể hiện giọng văn — LLM sẽ dùng làm style reference",
+      "VD: 'Nếu bạn đang gặp tình trạng này, đừng lo — chúng tôi sẽ hướng dẫn từng bước'",
+      "VD: 'Có những dấu hiệu tưởng nhỏ nhưng lại rất quan trọng bạn nên biết'",
+      "VD: 'Một trong những câu hỏi chúng tôi nhận nhiều nhất là…'",
+      "Càng nhiều mẫu (5-10) càng giúp LLM nắm được 'chất' giọng văn của bạn"
     ]
   },
   "content_pillars": [

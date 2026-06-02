@@ -79,38 +79,73 @@ class MockLLMClient:
         fmt: str,
     ) -> CaptionPackage:
         cta = self._pick_cta(profile, objective)
-        base_traits = profile.tone_of_voice.brand_traits[:2]
-        variants = [
-            CaptionVariant(
-                label="A",
-                hook=f"Nếu bạn đang gặp chuyện này: {topic}",
-                caption=f"{topic}. Điều quan trọng là hiểu đúng vấn đề trước khi chọn cách xử lý. {profile.brand_summary}",
-                cta=cta,
-                tone_tags=base_traits,
-                visual_brief=f"{fmt} với headline ngắn, làm rõ chủ đề {topic}.",
-            ),
-            CaptionVariant(
-                label="B",
-                hook=f"Sai lầm nhiều người gặp khi nói về {topic}",
-                caption=f"Không phải lúc nào vấn đề cũng đến từ một nguyên nhân. Với {topic}, nên nhìn từ thói quen và dấu hiệu cụ thể.",
-                cta=cta,
-                tone_tags=base_traits,
-                visual_brief=f"{fmt} so sánh before/after theo hướng giáo dục, không phóng đại.",
-            ),
-            CaptionVariant(
-                label="C",
-                hook=f"3 điều nên kiểm tra khi bạn gặp {topic}",
-                caption=f"Khi gặp {topic}, hãy bắt đầu từ quan sát đơn giản, sau đó mới quyết định có cần tư vấn kỹ hơn hay không.",
-                cta=cta,
-                tone_tags=base_traits,
-                visual_brief=f"{fmt} dạng checklist 3 ý, ưu tiên dễ đọc trên mobile.",
-            ),
-        ]
+        traits = profile.tone_of_voice.brand_traits
+        rules = profile.tone_of_voice.writing_rules
+        avoid = profile.tone_of_voice.things_to_avoid
+        sample = profile.tone_of_voice.sample_phrases
+
+        # Build dos from writing_rules (positive phrasing) + commonsense defaults
+        dos_rules = list(rules) if rules else ["Giữ câu ngắn", "Nhấn lợi ích thực tế", "Dùng CTA đã duyệt"]
+        # Build donts from things_to_avoid + commonsense defaults
+        donts_rules = list(avoid) if avoid else ["Không claim tuyệt đối", "Không giật gân", "Không dùng banned phrases"]
+
+        # Default tone tags from brand traits
+        # All tone tags must come from brand_traits so they pass tone validation
+        tone_a = [traits[0], traits[1 % len(traits)]] if traits else ["rõ ràng"]
+        tone_b = [traits[1 % len(traits)], traits[2 % len(traits)]] if len(traits) >= 2 else (traits[:1] + ["rõ ràng"])[:2]
+        tone_c = [traits[2 % len(traits)], traits[3 % len(traits)]] if len(traits) >= 3 else (traits[:1] + [traits[-1]])[:2]
+
+        # Default sample-based hooks
+        hook_a = f"Về {topic}, có một điều ít ai nói đến"
+        hook_b = f"{topic} — bạn đã thử cách này chưa?"
+        hook_c = f"{topic}: điều quan trọng nhất cần nhớ"
+
+        caption_a = (
+            f"{topic}. "
+            f"{profile.brand_summary} "
+            f"Điều thực sự quan trọng là hiểu rõ bản chất vấn đề, không phải chạy theo số đông."
+        )
+        caption_b = (
+            f"Nhiều người nghĩ {topic} chỉ đơn giản là… nhưng thực tế còn nhiều hơn thế. "
+            f"Bạn đã bao giờ dừng lại và tự hỏi: liệu mình đang làm đúng chưa? "
+            f"{profile.brand_summary}"
+        )
+        caption_c = (
+            f"Hãy cùng nhìn nhận {topic} một cách thực tế. "
+            f"{profile.brand_summary} "
+            f"Bài học rút ra: hiểu đúng gốc rễ vấn đề để có quyết định tốt hơn."
+        )
+
         return CaptionPackage(
             topic=topic,
-            variants=variants,
-            dos=["Giữ câu ngắn", "Nhấn lợi ích thực tế", "Dùng CTA đã duyệt"],
-            donts=["Không claim tuyệt đối", "Không giật gân", "Không dùng banned phrases"],
+            variants=[
+                CaptionVariant(
+                    label="A",
+                    hook=hook_a,
+                    caption=caption_a,
+                    cta=cta,
+                    tone_tags=tone_a,
+                    visual_brief=f"{fmt} với headline ngắn, làm rõ chủ đề {topic}. Tone: {', '.join(tone_a)}.",
+                ),
+                CaptionVariant(
+                    label="B",
+                    hook=hook_b,
+                    caption=caption_b,
+                    cta=cta,
+                    tone_tags=tone_b,
+                    visual_brief=f"{fmt} so sánh before/after theo hướng giáo dục. Tone: {', '.join(tone_b)}.",
+                ),
+                CaptionVariant(
+                    label="C",
+                    hook=hook_c,
+                    caption=caption_c,
+                    cta=cta,
+                    tone_tags=tone_c,
+                    visual_brief=f"{fmt} dạng checklist, ưu tiên dễ đọc trên mobile. Tone: {', '.join(tone_c)}.",
+                ),
+            ],
+            dos=dos_rules[:5],
+            donts=donts_rules[:5],
         )
 
     @staticmethod
@@ -420,14 +455,19 @@ class OpenAICompatibleClient:
     @staticmethod
     def _weekly_plan_system_prompt() -> str:
         return (
-            "Bạn là planner cho fanpage. Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
+            "Bạn là planner cho fanpage. TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT — "
+            "mọi đề xuất chủ đề, hook, góc tiếp cận phải trung thành với brand_traits và writing_rules của brand. "
+            "Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
             "Bám brand voice, tránh generic, tránh claim quá mức, và đảm bảo đủ schema WeeklyPlan."
         )
 
     @staticmethod
     def _caption_system_prompt() -> str:
         return (
-            "Bạn là content writer cho fanpage. Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
+            "Bạn là content writer cho fanpage. TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT — "
+            "giọng văn quyết định caption. Bám chặt brand_traits, writing_rules, và sample_phrases trong brand_context. "
+            "Sample phrases là tham chiếu giọng — hãy bắt chước phong cách, không sao chép nội dung. "
+            "Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
             "Caption phải cụ thể, có CTA đúng objective, tránh generic, tránh overclaim, và đúng schema CaptionPackage."
         )
 
@@ -456,8 +496,10 @@ class OpenAICompatibleClient:
                 for item in profile.content_pillars[:3]
             ],
             "tone_of_voice": {
-                "brand_traits": profile.tone_of_voice.brand_traits[:3],
-                "things_to_avoid": profile.tone_of_voice.things_to_avoid[:3],
+                "brand_traits": profile.tone_of_voice.brand_traits,
+                "writing_rules": profile.tone_of_voice.writing_rules,
+                "things_to_avoid": profile.tone_of_voice.things_to_avoid,
+                "sample_phrases": profile.tone_of_voice.sample_phrases[:3],
             },
             "approved_cta_patterns": [
                 {"objective": item.objective, "cta_text": item.cta_text}

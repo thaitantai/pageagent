@@ -32,10 +32,29 @@
     }
   ],
   "tone_of_voice": {
-    "brand_traits": ["ấm", "rõ", "không khoa trương"],
-    "writing_rules": ["Dùng câu ngắn", "Ưu tiên thực tế", "Không hù dọa"],
-    "things_to_avoid": ["Giật gân", "Phóng đại"],
-    "sample_phrases": ["Nếu bạn đang gặp tình trạng này", "Điều quan trọng là hiểu đúng vấn đề"]
+    "brand_traits": ["ấm", "rõ", "không khoa trương", "đồng cảm", "dễ hiểu"],
+    "writing_rules": [
+      "Dùng câu ngắn, tối đa 2-3 dòng mỗi đoạn",
+      "Ưu tiên thực tế — đưa ví dụ cụ thể, không chung chung",
+      "Không hù dọa — dùng ngôn ngữ trấn an, tích cực",
+      "Xưng 'chúng tôi' — thể hiện vai trò chuyên môn, không xa cách",
+      "Kết thúc mỗi bài bằng 1 câu hỏi mở hoặc CTA rõ ràng",
+      "Trích dẫn kiến thức y khoa nhưng diễn giải bằng ngôn từ đời thường"
+    ],
+    "things_to_avoid": [
+      "Giật gân",
+      "Phóng đại kết quả",
+      "Từ chuyên môn khó hiểu không giải thích",
+      "So sánh tay nghề cá nhân",
+      "Cam kết kết quả tuyệt đối"
+    ],
+    "sample_phrases": [
+      "Nếu bạn đang gặp tình trạng này, đừng lo — chúng tôi sẽ hướng dẫn từng bước",
+      "Điều quan trọng là hiểu đúng vấn đề trước khi chọn cách xử lý",
+      "Có những dấu hiệu tưởng nhỏ nhưng lại là 'tín hiệu đỏ' bạn nên biết",
+      "Một trong những câu hỏi chúng tôi nhận nhiều nhất: 'Liệu em có thể…'",
+      "Trong y khoa, không có giải pháp 'một cỡ cho tất cả' — và đó là điều tốt"
+    ]
   },
   "content_pillars": [
     {
