@@ -1020,7 +1020,12 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
         history_csv=args.history_file,
     )
 
-    service = ScheduledPublishService(store=store, brand_id=profile.brand_id)
+    service = ScheduledPublishService(
+        store=store,
+        brand_id=profile.brand_id,
+        verifier=VerifierService(),
+        brand_profile=profile,
+    )
     result = service.publish_due(reference_date=args.reference_date)
     payload = result.to_dict()
     print(json.dumps(payload, ensure_ascii=False, indent=2))
