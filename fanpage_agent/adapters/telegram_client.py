@@ -35,6 +35,9 @@ class TelegramClient:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            # Retry with plain text if markdown parsing fails
+            if parse_mode and "can't parse entities" in detail:
+                return self.send_message(text, chat_id=chat_id, parse_mode=None)
             raise RuntimeError(f"Telegram HTTP error {exc.code}: {detail[:500]}") from exc
         except URLError as exc:
             raise RuntimeError(f"Telegram connection error: {exc}") from exc
