@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
 from fanpage_agent.config import Settings
@@ -19,6 +20,11 @@ from fanpage_agent.services.evals import EvalService
 from fanpage_agent.services.planner import PlannerService
 from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.telegram_formatter import TelegramFormatterService
+from fanpage_agent.services.auto_approval import (
+    AutoApprovalConfig,
+    AutoApprovalEngine,
+)
+from fanpage_agent.services.scheduled_publish import ScheduledPublishService
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
 from fanpage_agent.utils import dump_json
@@ -365,6 +371,22 @@ def build_parser() -> argparse.ArgumentParser:
     publish_parser.add_argument("--engagement-rate", type=float, default=0.0)
     publish_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
     add_store_backend_arg(publish_parser)
+
+    # ── process-pending: auto-approve eligible items ──────────
+    process_parser = subparsers.add_parser("process-pending")
+    process_parser.add_argument("--brand-file", required=True)
+    process_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    process_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    process_parser.add_argument("--no-verify", action="store_true")
+    process_parser.add_argument("--skip-ban", action="store_true")
+    process_parser.add_argument("--skip-duplicate", action="store_true")
+
+    # ── scheduled-publish: publish approved + due items ───────
+    scheduled_parser = subparsers.add_parser("scheduled-publish")
+    scheduled_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    scheduled_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    scheduled_parser.add_argument("--reference-date")
+    scheduled_parser.add_argument("--brand-file", default=str(ROOT_DIR / "data" / "sample" / "brand_profile.json"))
 
     record_metrics_parser = subparsers.add_parser("record-post-metrics")
     record_metrics_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
@@ -964,6 +986,47 @@ def cmd_publish_post(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_process_pending(args: argparse.Namespace) -> int:
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    profile = load_brand_profile(args.brand_file)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+    verifier = VerifierService()
+
+    config = AutoApprovalConfig(
+        skip_banned_phrases=not args.skip_ban,
+        skip_duplicate_topics=not args.skip_duplicate,
+        require_verification_pass=not args.no_verify,
+    )
+    engine = AutoApprovalEngine(
+        brand_profile=profile,
+        store=store,
+        verifier=verifier,
+        config=config,
+    )
+    result = engine.process_pending()
+    payload = result.to_dict()
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_scheduled_publish(args: argparse.Namespace) -> int:
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    profile = load_brand_profile(args.brand_file)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+
+    service = ScheduledPublishService(store=store, brand_id=profile.brand_id)
+    result = service.publish_due(reference_date=args.reference_date)
+    payload = result.to_dict()
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_record_post_metrics(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     payload = build_store(settings=settings, args=args).record_post_metrics(
@@ -1389,6 +1452,10 @@ def main() -> int:
         return cmd_reject_caption(args)
     if args.command == "publish-post":
         return cmd_publish_post(args)
+    if args.command == "process-pending":
+        return cmd_process_pending(args)
+    if args.command == "scheduled-publish":
+        return cmd_scheduled_publish(args)
     if args.command == "record-post-metrics":
         return cmd_record_post_metrics(args)
     if args.command == "weekly-report":

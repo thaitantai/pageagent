@@ -127,6 +127,24 @@ class LocalSheetStore:
         self._write_calendar_rows(rows)
         return row
 
+    def _approve_calendar_item(
+        self,
+        calendar_id: str,
+        approved_by: str,
+        final_caption_ref: str,
+        approved_at: str,
+        approval_status: str = "approved",
+    ) -> dict[str, str]:
+        rows = self._read_calendar_rows()
+        row = self._find_calendar_row(rows, calendar_id)
+        row["approval_status"] = approval_status
+        row["approved_by"] = approved_by
+        row["final_caption_ref"] = final_caption_ref
+        row["status"] = approval_status
+        row["last_updated"] = approved_at
+        self._write_calendar_rows(rows)
+        return row
+
     def reject_calendar_item(self, calendar_id: str, reason: str, rejected_at: str) -> dict[str, str]:
         rows = self._read_calendar_rows()
         row = self._find_calendar_row(rows, calendar_id)
