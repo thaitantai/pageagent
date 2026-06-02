@@ -1,111 +1,145 @@
 {
   "brand_id": "brand_real",
-  "brand_name": "Điền tên brand của bạn",
-  "industry": "ngành của bạn (vd: healthcare, education, lifestyle, technology)",
-  "business_goal": "Mục tiêu kinh doanh tổng thể",
-  "fanpage_goals": ["reach", "engagement", "lead"],
-  "brand_summary": "Mô tả ngắn về brand — tone, phong cách, giá trị cốt lõi.",
+  "brand_name": "Chưa nghĩ ra",
+  "industry": "healthcare, skincare",
+  "business_goal": "Tạo dựng cộng đồng mang lại giá trị, sau đó affiliate marketing",
+  "fanpage_goals": ["giá_tri", "affiliate"],
+  "brand_summary": "Tạo những bài viết có giá trị mang lại cho cộng đồng, thu hút khán giả, từ đó phát triển và affiliate.",
   "usp": [
-    "Lợi thế cạnh tranh #1",
-    "Lợi thế cạnh tranh #2",
-    "Lợi thế cạnh tranh #3"
+    "Giá cả phải chăng — sản phẩm phù hợp túi tiền GenZ",
+    "Cộng đồng review thật — không quảng cáo trá hình",
+    "Kiến thức chuyên môn dễ hiểu — giúp khán giả tự chọn đúng sản phẩm"
   ],
   "target_audiences": [
     {
-      "segment_name": "Tên phân khúc (vd: Sinh viên 18-24, Nhân viên văn phòng, Mẹ bỉm)",
+      "segment_name": "GenZ / 18-25 tuổi",
       "pain_points": [
-        "Nỗi đau #1",
-        "Nỗi đau #2"
+        "Nỗi đau / vấn đề về da và sức khỏe",
+        "Cần giải pháp thực tế, không quảng cáo"
       ],
       "desired_outcomes": [
-        "Kết quả mong muốn #1",
-        "Kết quả mong muốn #2"
+        "Giải pháp cho nỗi đau/sức khỏe",
+        "Kiến thức hữu ích để tự chăm sóc"
       ],
       "objections": [
-        "Phản đối / rào cản #1",
-        "Phản đối / rào cản #2"
+        "Nghi ngờ thông tin từ người lạ",
+        "Ngại chi tiền nếu chưa thấy giá trị"
       ],
-      "preferred_content_formats": ["post_short", "carousel"]
+      "preferred_content_formats": ["post_short", "carousel", "reels"]
     }
   ],
   "products_services": [
     {
-      "name": "Tên sản phẩm / dịch vụ",
-      "category": "loại (vd: product, service, consulting, digital)",
+      "name": "Affiliate — Brand skincare",
+      "category": "affiliate",
       "benefits": [
-        "Lợi ích #1",
-        "Lợi ích #2"
+        "Sản phẩm skincare phù hợp da dầu/mụn/nhạy cảm",
+        "Giá phải chăng, dễ tiếp cận cho GenZ"
       ],
       "proof_points": [
-        "Bằng chứng #1"
+        "Review từ cộng đồng thật"
       ],
       "do_not_claim": [
-        "Điều KHÔNG được hứa / claim"
+        "Không cam kết hiệu quả tuyệt đối",
+        "Không claim trị bệnh"
+      ]
+    },
+    {
+      "name": "Affiliate — Brand sắc đẹp & sức khỏe",
+      "category": "affiliate",
+      "benefits": [
+        "Sản phẩm chăm sóc sức khỏe tổng thể",
+        "Thực phẩm chức năng, vitamin, bổ sung"
+      ],
+      "proof_points": [
+        "Giới thiệu dựa trên nhu cầu thực tế của cộng đồng"
+      ],
+      "do_not_claim": [
+        "Không cam kết kết quả y khoa"
       ]
     }
   ],
   "tone_of_voice": {
     "brand_traits": [
-      "Tính từ mô tả giọng văn (3-6 từ) — vd: ấm, rõ, đồng cảm, không khoa trương, dễ hiểu",
-      "Mỗi từ là 1 trait riêng biệt, không phải câu",
-      "Quan trọng: đây là DNA giọng văn — mọi caption sẽ được LLM bám vào các trait này"
+      "chân thật",
+      "ấm áp",
+      "dễ hiểu",
+      "chuyên môn",
+      "gần gũi"
     ],
     "writing_rules": [
-      "Quy tắc viết #1 — càng cụ thể càng tốt (vd: 'Dùng câu ngắn, tối đa 2-3 dòng mỗi đoạn')",
-      "Quy tắc #2 — các quy tắc bắt đầu bằng 'Không'/'Tránh'/'Đừng' sẽ được validator tự động check (vd: 'Không dùng từ chuyên môn không giải thích')",
-      "Quy tắc #3 (vd: 'Xưng 'tôi' — giọng cá nhân, gần gũi')",
-      "Quy tắc #4 (vd: 'Kết thúc mỗi bài bằng 1 câu hỏi mở')",
-      "Quy tắc #5 (vd: 'Đưa ví dụ cụ thể, không chung chung')"
+      "Viết ngắn gọn, xúc tích nhưng đủ giá trị",
+      "Không phóng đại, không tâng bốc",
+      "Xưng hô gần gũi (mình / bạn)",
+      "Đưa thông tin chuyên môn nhưng diễn giải dễ hiểu",
+      "Kết thúc bằng câu hỏi mở để kích thích tương tác"
     ],
     "things_to_avoid": [
-      "Điều cần tránh trong nội dung — càng cụ thể càng tốt",
-      "VD: 'Giật gân', 'Phóng đại kết quả', 'Từ ngữ tiêu cực'",
-      "Mỗi mục sẽ được tone validator check trước khi publish",
-      "VD: 'So sánh với đối thủ'",
-      "VD: 'Cam kết kết quả không thực tế'"
+      "Giật gân (clickbait)",
+      "Hứa hẹn kết quả không thực tế",
+      "Ngôn ngữ tiêu cực, vi phạm",
+      "Từ chuyên môn không giải thích",
+      "So sánh trực tiếp với đối thủ"
     ],
     "sample_phrases": [
-      "Câu mẫu thể hiện giọng văn — LLM sẽ dùng làm style reference",
-      "VD: 'Nếu bạn đang gặp tình trạng này, đừng lo — chúng tôi sẽ hướng dẫn từng bước'",
-      "VD: 'Có những dấu hiệu tưởng nhỏ nhưng lại rất quan trọng bạn nên biết'",
-      "VD: 'Một trong những câu hỏi chúng tôi nhận nhiều nhất là…'",
-      "Càng nhiều mẫu (5-10) càng giúp LLM nắm được 'chất' giọng văn của bạn"
+      "Mình từng nghĩ da dầu thì không cần dưỡng ẩm — hóa ra sai to.",
+      "Review thật từ hội bạn đã dùng: sản phẩm này có thực sự đáng tiền?",
+      "Bạn đang gặp tình trạng này? Đừng lo — mình đã tổng hợp giải pháp ở dưới.",
+      "Có những dấu hiệu tưởng nhỏ nhưng lại rất quan trọng — bạn đã biết chưa?",
+      "Một câu hỏi mình nhận nhiều nhất tuần qua: 'da mụn có nên tẩy tế bào chết không?'"
     ]
   },
   "content_pillars": [
     {
-      "pillar_name": "trụ cột #1 (vd: education, trust, entertainment)",
-      "goal": "engagement",
-      "description": "Mô tả nội dung trụ cột này.",
+      "pillar_name": "giáo_dục",
+      "goal": "giá_tri",
+      "description": "Chia sẻ kiến thức chuyên môn về da và sức khỏe, giúp khán giả hiểu đúng vấn đề của mình",
       "example_angles": [
-        "góc tiếp cận #1",
-        "góc tiếp cận #2"
+        "Nguyên nhân gây ra vấn đề da thường gặp",
+        "Giải thích thành phần / cơ chế đơn giản",
+        "Phân biệt đúng-sai trong skincare"
       ],
       "allowed_formats": ["post_short", "carousel"]
     },
     {
-      "pillar_name": "trụ cột #2",
-      "goal": "authority",
-      "description": "Mô tả nội dung trụ cột này.",
+      "pillar_name": "đồng_hành",
+      "goal": "engagement",
+      "description": "Câu chuyện, trải nghiệm thực tế — tạo kết nối cảm xúc với cộng đồng",
       "example_angles": [
-        "góc tiếp cận #1",
-        "góc tiếp cận #2"
+        "Hành trình cải thiện da/sức khỏe",
+        "Chia sẻ từ khách hàng thật",
+        "Q&A theo chủ đề"
       ],
-      "allowed_formats": ["post_short", "post_long"]
+      "allowed_formats": ["post_short", "reels"]
+    },
+    {
+      "pillar_name": "sản_phẩm",
+      "goal": "affiliate",
+      "description": "Giới thiệu sản phẩm giải pháp — gắn với nỗi đau thực tế của khán giả",
+      "example_angles": [
+        "Sản phẩm này giải quyết vấn đề gì?",
+        "So sánh / review thực tế",
+        "Cách dùng đúng để đạt hiệu quả"
+      ],
+      "allowed_formats": ["post_short", "carousel", "review"]
     }
   ],
   "approved_cta_patterns": [
-    {"objective": "reach", "cta_text": "CTA mẫu cho reach", "notes": "ghi chú"},
-    {"objective": "engagement", "cta_text": "CTA mẫu cho engagement", "notes": "ghi chú"},
-    {"objective": "lead", "cta_text": "CTA mẫu cho lead", "notes": "ghi chú"}
+    {"objective": "giá_tri", "cta_text": "Bạn đã gặp tình trạng này chưa? Chia sẻ bên dưới nhé!", "notes": "Kích thích chia sẻ kinh nghiệm"},
+    {"objective": "engagement", "cta_text": "Có ai từng…? Like nếu bạn thấy hữu ích!", "notes": "Tăng tương tác"},
+    {"objective": "affiliate", "cta_text": "Tìm hiểu thêm tại [link] — mình đã dùng thử và thấy hiệu quả", "notes": "Affiliate nhẹ nhàng, không ép mua"}
   ],
   "banned_phrases": [
-    "cụm từ cấm #1",
-    "cụm từ cấm #2"
+    "cam kết khỏi sau 1 liệu trình",
+    "thần dược",
+    "kỳ diệu",
+    "chữa khỏi 100%",
+    "bảo hành kết quả"
   ],
   "compliance_notes": [
-    "Lưu ý tuân thủ #1",
-    "Lưu ý tuân thủ #2"
+    "Không claim chữa bệnh trừ khi có bằng chứng y khoa",
+    "Affiliate cần gắn nhãn rõ ràng",
+    "Không dùng hình ảnh trước-sau phóng đại"
   ],
   "approval_flow": {
     "content_owner": "Tai",
@@ -114,8 +148,8 @@
     "public_post_requires_human_approval": true,
     "comment_reply_requires_human_approval": true,
     "escalation_rules": [
-      "Khiếu nại",
-      "Yêu cầu giá cụ thể"
+      "Khiếu nại về sản phẩm",
+      "Yêu cầu tư vấn sức khỏe cụ thể"
     ]
   }
 }
