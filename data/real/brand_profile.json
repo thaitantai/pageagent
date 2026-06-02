@@ -1,0 +1,110 @@
+{
+  "brand_id": "brand_real",
+  "brand_name": "Điền tên brand của bạn",
+  "industry": "ngành của bạn (vd: healthcare, education, lifestyle, technology)",
+  "business_goal": "Mục tiêu kinh doanh tổng thể",
+  "fanpage_goals": ["reach", "engagement", "lead"],
+  "brand_summary": "Mô tả ngắn về brand — tone, phong cách, giá trị cốt lõi.",
+  "usp": [
+    "Lợi thế cạnh tranh #1",
+    "Lợi thế cạnh tranh #2",
+    "Lợi thế cạnh tranh #3"
+  ],
+  "target_audiences": [
+    {
+      "segment_name": "Tên phân khúc (vd: Sinh viên 18-24, Nhân viên văn phòng, Mẹ bỉm)",
+      "pain_points": [
+        "Nỗi đau #1",
+        "Nỗi đau #2"
+      ],
+      "desired_outcomes": [
+        "Kết quả mong muốn #1",
+        "Kết quả mong muốn #2"
+      ],
+      "objections": [
+        "Phản đối / rào cản #1",
+        "Phản đối / rào cản #2"
+      ],
+      "preferred_content_formats": ["post_short", "carousel"]
+    }
+  ],
+  "products_services": [
+    {
+      "name": "Tên sản phẩm / dịch vụ",
+      "category": "loại (vd: product, service, consulting, digital)",
+      "benefits": [
+        "Lợi ích #1",
+        "Lợi ích #2"
+      ],
+      "proof_points": [
+        "Bằng chứng #1"
+      ],
+      "do_not_claim": [
+        "Điều KHÔNG được hứa / claim"
+      ]
+    }
+  ],
+  "tone_of_voice": {
+    "brand_traits": [
+      "tính từ: vd: ấm, rõ, không khoa trương"
+    ],
+    "writing_rules": [
+      "Quy tắc viết #1",
+      "Quy tắc viết #2"
+    ],
+    "things_to_avoid": [
+      "Điều tránh #1",
+      "Điều tránh #2"
+    ],
+    "sample_phrases": [
+      "Ví dụ câu mẫu 1",
+      "Ví dụ câu mẫu 2"
+    ]
+  },
+  "content_pillars": [
+    {
+      "pillar_name": "trụ cột #1 (vd: education, trust, entertainment)",
+      "goal": "engagement",
+      "description": "Mô tả nội dung trụ cột này.",
+      "example_angles": [
+        "góc tiếp cận #1",
+        "góc tiếp cận #2"
+      ],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "trụ cột #2",
+      "goal": "authority",
+      "description": "Mô tả nội dung trụ cột này.",
+      "example_angles": [
+        "góc tiếp cận #1",
+        "góc tiếp cận #2"
+      ],
+      "allowed_formats": ["post_short", "post_long"]
+    }
+  ],
+  "approved_cta_patterns": [
+    {"objective": "reach", "cta_text": "CTA mẫu cho reach", "notes": "ghi chú"},
+    {"objective": "engagement", "cta_text": "CTA mẫu cho engagement", "notes": "ghi chú"},
+    {"objective": "lead", "cta_text": "CTA mẫu cho lead", "notes": "ghi chú"}
+  ],
+  "banned_phrases": [
+    "cụm từ cấm #1",
+    "cụm từ cấm #2"
+  ],
+  "compliance_notes": [
+    "Lưu ý tuân thủ #1",
+    "Lưu ý tuân thủ #2"
+  ],
+  "approval_flow": {
+    "content_owner": "Tai",
+    "approver": "Manager",
+    "approval_sla_hours": 12,
+    "public_post_requires_human_approval": true,
+    "comment_reply_requires_human_approval": true,
+    "escalation_rules": [
+      "Khiếu nại",
+      "Yêu cầu giá cụ thể"
+    ]
+  }
+}

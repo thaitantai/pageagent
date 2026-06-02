@@ -4,9 +4,9 @@ set -euo pipefail
 PROJECT_DIR="/home/tantai/.hermes/fanpage-agent"
 cd "$PROJECT_DIR"
 
-CALENDAR_FILE="${CALENDAR_FILE:-data/content_calendar.csv}"
-HISTORY_FILE="${HISTORY_FILE:-data/post_history.csv}"
-METRICS_FILE="${METRICS_FILE:-data/post_metrics.csv}"
+CALENDAR_FILE="${CALENDAR_FILE:-data/real/content_calendar.csv}"
+HISTORY_FILE="${HISTORY_FILE:-data/real/post_history.csv}"
+METRICS_FILE="${METRICS_FILE:-data/real/post_metrics.csv}"
 AS_OF="${AS_OF:-$(date +%F)}"
 SLA_DAYS="${SLA_DAYS:-2}"
 LIMIT="${LIMIT:-5}"

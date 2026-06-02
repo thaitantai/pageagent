@@ -4,9 +4,9 @@ set -euo pipefail
 PROJECT_DIR="/home/tantai/.hermes/fanpage-agent"
 cd "$PROJECT_DIR"
 
-BRAND_FILE="${BRAND_FILE:-data/sample/brand_profile.json}"
-COMMENT_FILE="${COMMENT_FILE:-data/comment_inbox.csv}"
-TRIAGE_FILE="${TRIAGE_FILE:-data/comment_triage.csv}"
+BRAND_FILE="${BRAND_FILE:-data/real/brand_profile.json}"
+COMMENT_FILE="${COMMENT_FILE:-data/real/comment_inbox.csv}"
+TRIAGE_FILE="${TRIAGE_FILE:-data/real/comment_triage.csv}"
 STATUS="${STATUS:-new}"
 LIMIT="${LIMIT:-5}"
 

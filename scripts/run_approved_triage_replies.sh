@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_DIR="/home/tantai/.hermes/fanpage-agent"
 cd "$PROJECT_DIR"
 
-TRIAGE_FILE="${TRIAGE_FILE:-data/comment_triage.csv}"
+TRIAGE_FILE="${TRIAGE_FILE:-data/real/comment_triage.csv}"
 STATUS="${STATUS:-approved}"
 LIMIT="${LIMIT:-5}"
 

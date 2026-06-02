@@ -6,13 +6,13 @@ cd "$PROJECT_DIR"
 
 RUN_DATE="${RUN_DATE:-$(date +%F)}"
 DAYS="${DAYS:-1}"
-BRAND_FILE="${BRAND_FILE:-data/sample/brand_profile.json}"
+BRAND_FILE="${BRAND_FILE:-data/real/brand_profile.json}"
 
-CALENDAR_FILE="${CALENDAR_FILE:-data/content_calendar.csv}"
-HISTORY_FILE="${HISTORY_FILE:-data/post_history.csv}"
-METRICS_FILE="${METRICS_FILE:-data/post_metrics.csv}"
-COMMENT_FILE="${COMMENT_FILE:-data/comment_inbox.csv}"
-CAMPAIGN_FILE="${CAMPAIGN_FILE:-data/campaign_notes.json}"
+CALENDAR_FILE="${CALENDAR_FILE:-data/real/content_calendar.csv}"
+HISTORY_FILE="${HISTORY_FILE:-data/real/post_history.csv}"
+METRICS_FILE="${METRICS_FILE:-data/real/post_metrics.csv}"
+COMMENT_FILE="${COMMENT_FILE:-data/real/comment_inbox.csv}"
+CAMPAIGN_FILE="${CAMPAIGN_FILE:-data/real/campaign_notes.json}"
 
 STORE_ARGS=()
 if [[ -n "${STORE_BACKEND:-}" ]]; then
