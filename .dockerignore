@@ -1,0 +1,17 @@
+# Exclude from Docker build context
+.git/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.local
+artifacts/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.codegraph/
+.idea/
+.vscode/
+.DS_Store

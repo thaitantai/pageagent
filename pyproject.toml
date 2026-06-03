@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 fanpage-agent = "fanpage_cli:main"
+fanpage-manager = "fanpage_agent.manager_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["fanpage_agent*", "fanpage_cli*"]
