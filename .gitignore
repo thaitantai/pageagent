@@ -35,5 +35,8 @@ env/
 /data/ops_content_calendar.csv
 /data/research_ops_calendar.csv
 
+# Service account keys (Google, etc.)
+*encoded-*.json
+
 # Runtime logs
 logs/

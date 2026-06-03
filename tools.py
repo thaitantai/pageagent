@@ -25,6 +25,7 @@ from fanpage_agent.loaders.brand_loader import load_brand_profile
 from fanpage_agent.models import BrandProfile
 from fanpage_agent.services.calendar_gap_service import CalendarGapService
 from fanpage_agent.services.community_triage import CommunityTriageService
+from fanpage_agent.services.content_stats import compute_content_stats
 from fanpage_agent.services.daily_ops import DailyOpsService
 from fanpage_agent.services.image_gen import build_image_service
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
@@ -108,6 +109,20 @@ TOOL_DEFINITIONS: list[dict] = [
                     "reason": {"type": "string", "description": "Why you're checking status (e.g. 'cycle start', 'after action')"},
                 },
                 "required": ["reason"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fill_calendar_gaps",
+            "description": "Auto-detect empty days in calendar and fill them: plan → write caption → verify → auto-approve. Lighter than run_daily — only fills 3 days forward, max 3 items.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lookahead_days": {"type": "integer", "description": "Days to scan forward (default 3)"},
+                    "max_items": {"type": "integer", "description": "Max items to fill (default 3)"},
+                },
             },
         },
     },
@@ -274,6 +289,19 @@ TOOL_DEFINITIONS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "content_stats",
+            "description": "Get content performance stats — which pillars/formats are performing best. Use this to decide what to write next.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days_back": {"type": "integer", "description": "Number of days to look back (default 14)"},
+                },
+            },
+        },
+    },
 ]
 
 
@@ -283,6 +311,29 @@ TOOL_DEFINITIONS: list[dict] = [
 def _make_tool_ops_status(reason: str = "status check") -> dict:
     s = _settings()
     return build_ops_status_payload(s)
+
+
+def _make_tool_fill_calendar_gaps(lookahead_days: int = 3, max_items: int = 3) -> dict:
+    s = _settings()
+    profile = _profile(s)
+    store = _local_store()
+    llm_client = build_llm_client(s)
+    planner = PlannerService(llm_client=llm_client)
+    writer = WriterService(llm_client=llm_client)
+    verifier = VerifierService()
+    service = CalendarGapService(
+        planner=planner,
+        writer=writer,
+        verifier=verifier,
+        artifacts_dir=s.artifacts_dir / "captions",
+    )
+    result = service.fill_gaps(
+        profile=profile,
+        store=store,
+        lookahead_days=lookahead_days,
+        max_items=max_items,
+    )
+    return result.to_dict()
 
 
 def _make_tool_list_calendar_items() -> dict:
@@ -441,12 +492,18 @@ def _make_tool_send_telegram_message(text: str) -> dict:
     return {"sent": True}
 
 
+def _make_tool_content_stats(days_back: int = 14) -> dict:
+    store = _local_store()
+    return compute_content_stats(store, days_back=days_back)
+
+
 # ── wire registry ──────────────────────────────────────────────
 
 TOOL_REGISTRY: dict[str, Any] = {}
 
 REGISTRY_BUILDERS: dict[str, Any] = {
     "ops_status": (_make_tool_ops_status, {}),
+    "fill_calendar_gaps": (_make_tool_fill_calendar_gaps, {"lookahead_days": 3, "max_items": 3}),
     "list_triage_items": (_make_tool_list_triage_items, {}),
     "triage_community": (_make_tool_triage_community, {"max_items": 10}),
     "approve_triage_reply": (_make_tool_approve_triage_reply, {"item_id": ""}),
@@ -460,6 +517,7 @@ REGISTRY_BUILDERS: dict[str, Any] = {
     "record_post_metrics": (_make_tool_record_post_metrics, {}),
     "fetch_fb_comments": (_make_tool_fetch_fb_comments, {}),
     "send_telegram_message": (_make_tool_send_telegram_message, {"text": ""}),
+    "content_stats": (_make_tool_content_stats, {"days_back": 14}),
 }
 
 for name, (fn, _) in REGISTRY_BUILDERS.items():

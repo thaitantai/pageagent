@@ -155,6 +155,7 @@ class AgentConfig:
 
     allowed_actions: list[str] = field(default_factory=lambda: [
         "ops_status",
+        "fill_calendar_gaps",
         "list_calendar_items",
         "list_triage_items",
         "triage_community",
@@ -168,6 +169,7 @@ class AgentConfig:
         "record_post_metrics",
         "fetch_fb_comments",
         "send_telegram_message",
+        "content_stats",
     ])
 
     @classmethod

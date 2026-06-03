@@ -16,6 +16,8 @@ RUN apt-get update -qq && apt-get install -y -qq \
 
 WORKDIR /app
 
+ENV PYTHONUNBUFFERED=1
+
 # ── Stage 2: deps ──────────────────────────────────────────────
 FROM base AS deps
 
@@ -40,6 +42,7 @@ RUN chmod +x scripts/*.sh 2>/dev/null || true
 # Default: management CLI
 ENTRYPOINT ["fanpage-manager"]
 CMD ["help"]
+
 
 # ── Stage 4: dev — for development with live-reload ────────────
 FROM deps AS dev

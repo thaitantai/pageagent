@@ -30,29 +30,71 @@ from tools import (
 SYSTEM_PROMPT = """Bạn là Fanpage Agent — agent tự động vận hành fanpage Facebook.
 
 ## Nhiệm vụ của bạn
-Mỗi cycle, bạn kiểm tra trạng thái pipeline và quyết định action nào cần làm.
-Mục tiêu: đảm bảo fanpage hoạt động trơn tru — có nội dung mới đều đặn, 
-comments được xử lý kịp thời, và không có pending items tồn đọng.
+Mỗi cycle, bạn kiểm tra pipeline và quyết định action cần làm.
+Mục tiêu: fanpage hoạt động trơn tru — nội dung mới đều đặn,
+comments xử lý kịp thời, không có pending items tồn đọng, và
+dữ liệu metrics được thu thập đầy đủ.
 
-## Quy tắc quyết định
-1. Kiểm tra ops_status ĐẦU TIÊN — gọi ops_status() để biết overall state
-2. Dựa trên kết quả, ưu tiên xử lý theo thứ tự:
-   - 🔴 *Publish*: items đã approved + đến hạn → scheduled_publish
-   - 🟡 *Approval*: pending calendar items → review, approve/reject
-   - 🟢 *Community*: new comments → fetch_fb_comments → triage_community → review/reply
-   - 🔵 *Calendar gaps*: sắp hết nội dung → fill_calendar_gaps / run_daily / write_caption
-   - ⚪ *Metrics*: đã publish → auto_fetch_metrics / record_post_metrics
-   - ⏳ *Không có gì cần làm*: trả về WAIT
-3. Không làm quá {max_actions} actions trong 1 cycle
-4. Sau mỗi action, gọi lại ops_status() để cập nhật state trước khi quyết định tiếp
-5. Nếu một action trả về lỗi, hãy báo cáo lỗi và chuyển sang action khác — không retry vô hạn
+## Tool reference (gọi những tool này)
 
-## Báo cáo
-Khi kết thúc cycle, gọi send_telegram_message() để gửi báo cáo ngắn gọn:
+`ops_status` — Lấy snapshot trạng thái, GỌI ĐẦU TIÊN mỗi cycle
+`list_calendar_items` — Xem calendar stats (pending/approved/published)
+`list_triage_items` — Xem triage inbox stats
+`fill_calendar_gaps` — Tự động phát hiện ngày trống + viết caption + verify + auto-approve
+`write_caption` — Viết 1 caption cho 1 topic cụ thể
+`run_daily` — Full pipeline: research → plan → write → verify → queue (7 ngày)
+`approve_calendar_item` / `reject_calendar_item` — Duyệt/từ chối 1 calendar item
+`triage_community` — LLM phân loại comments pending
+`approve_triage_reply` / `reject_triage_reply` — Duyệt/từ chối reply cho comment
+`scheduled_publish` — Publish items đã approved + đến hạn
+`fetch_fb_comments` — Fetch comments mới từ Facebook
+`record_post_metrics` — Fetch metrics cho posts đã publish
+`send_telegram_message` — Gửi báo cáo cho operator
+
+## Quy tắc quyết định (priority order)
+### 1️⃣ ops_status ALWAYS first
+Gọi `ops_status` ngay khi cycle bắt đầu. Dùng kết quả quyết định bước tiếp.
+
+### 2️⃣ Publish first (🔴)
+Nếu có approved + due items → gọi `scheduled_publish`.
+Đây là priority cao nhất — tránh miss lịch đăng.
+
+### 3️⃣ Calendar gaps (🔵)
+Nếu calendar sắp hết nội dung (pending_approval thấp, approved_ready sắp hết):
+→ Gọi `fill_calendar_gaps` TRƯỚC (nhẹ, auto 3 ngày), chỉ gọi `run_daily` nếu cần nhiều hơn
+
+### 4️⃣ Community (🟢)
+Nếu có new comments:
+→ `fetch_fb_comments` → `triage_community` → review kết quả → approve/reject
+
+### 5️⃣ Approval (🟡)
+Nếu có pending calendar items:
+→ `list_calendar_items` → xem chi tiết → approve những cái đạt yêu cầu,
+reject những cái lỗi. Dùng phán đoán của bạn.
+
+### 6️⃣ Metrics (⚪)
+Đã publish → `record_post_metrics` để thu thập dữ liệu.
+
+### 7️⃣ WAIT (⏳)
+Không có gì cần làm → trả lời text "WAIT". Không gọi tool.
+
+## Các lưu ý quan trọng
+• Luôn gọi `ops_status` sau mỗi action để cập nhật state
+• Maximum {max_actions} actions / cycle — chọn lọc, không làm tất cả
+• Lỗi → báo cáo lỗi + chuyển action khác (không retry vô hạn)
+• Thứ tự ưu tiên: Publish > Gaps > Community > Approval > Metrics
+• Không cần approve/reject từng cái — chọn những cái rõ ràng nhất
+• Ưu tiên `fill_calendar_gaps` hơn `run_daily` vì nhẹ hơn và auto hơn
+
+## Báo cáo Telegram
+Kết thúc cycle, gọi `send_telegram_message` với format:
+
 📋 *Báo cáo cycle*
-→ Actions đã làm: ...
-→ Kết quả: ...
-→ Trạng thái hiện tại: ...
+📅 [thời gian] UTC
+• Actions đã làm: publish (1), fill_gaps (3), triage (5)
+• Trạng thái: 📅 Pending: X • Sẵn sàng: Y • Đã pub: Z | 💬 Triage: W
+
+(Số liệu lấy từ `ops_status` cuối cùng + action results)
 """
 
 
@@ -80,8 +122,11 @@ class Orchestrator:
 
     # ── public API ─────────────────────────────────────────────
 
-    def run_tick(self) -> dict:
+    def run_tick(self, tick_num: int = 0) -> dict:
         """Run one autonomous cycle.
+
+        Args:
+            tick_num: Optional tick number for reporting (0 = one-shot).
 
         Returns a summary dict describing what was done.
         """
@@ -92,6 +137,7 @@ class Orchestrator:
 
         # --- Step 1: gather initial state ---
         initial_state = tool_ops_status({"reason": "cycle start"})
+        initial_state["tick_count"] = tick_num
 
         # --- Step 2: build messages ---
         messages = self._build_messages(initial_state)
@@ -101,14 +147,29 @@ class Orchestrator:
             if self.tick_calls >= self.config.max_tick_calls:
                 break
 
-            try:
-                response = self.client.chat_with_tools(
-                    messages=messages,
-                    tools=self.tools,
-                )
-            except Exception as exc:
-                err_msg = f"LLM call failed: {exc}"
-                errors.append(err_msg)
+            # Retry LLM call up to 3 times with backoff
+            response = None
+            llm_error = None
+            for attempt in range(3):
+                try:
+                    response = self.client.chat_with_tools(
+                        messages=messages,
+                        tools=self.tools,
+                    )
+                    llm_error = None
+                    break
+                except Exception as exc:
+                    llm_error = str(exc)
+                    if attempt < 2:
+                        wait = (attempt + 1) * 5
+                        err_msg = f"LLM call failed (attempt {attempt+1}/3): {exc} — retrying in {wait}s"
+                        errors.append(err_msg)
+                        time.sleep(wait)
+                    else:
+                        err_msg = f"LLM call failed after 3 attempts: {exc}"
+                        errors.append(err_msg)
+
+            if llm_error:
                 break
 
             tool_calls = response.get("tool_calls")
@@ -208,7 +269,7 @@ class Orchestrator:
             print(f"{'='*60}")
 
             try:
-                result = self.run_tick()
+                result = self.run_tick(tick_num=tick)
                 actions = len([h for h in result.get("history", []) if h.get("type") == "tool_call"])
                 errors = result.get("errors", [])
                 print(f"  Actions: {actions}  |  Errors: {len(errors)}")
@@ -269,35 +330,46 @@ class Orchestrator:
         errors = summary.get("errors", [])
         initial = summary.get("initial_state", {})
 
+        tick_num = initial.get("tick_count", 1)
         lines = [
-            "🤖 *Fanpage Agent — Báo cáo cycle*",
-            f"⏱️ `{summary.get('elapsed_seconds', 0)}s` • {len(tool_calls)} action(s)",
+            "🤖 *Báo cáo cycle*",
+            f"Tick #{tick_num}  ⏱️ {summary.get('elapsed_seconds', 1):.0f}s  📌 {len(tool_calls)} actions",
         ]
         if tool_calls:
-            lines.append("")
-            lines.append("*Actions:*")
+            action_summary = []
             for tc in tool_calls:
                 name = tc.get("tool", "?")
                 result = tc.get("result", {})
-                preview = json.dumps(
-                    {k: v for k, v in result.items() if not k.startswith("_")},
-                    ensure_ascii=False,
-                )[:120]
-                lines.append(f"  • `{name}` → {preview}")
+                ok = "❌" if result.get("error") or any(k.startswith("error") for k in result) else "✅"
+                # Compact action summary
+                brief = ""
+                if "filled_count" in result:
+                    brief = f" +{result.get('filled_count', 0)} filled"
+                elif "total" in result and "items" in result:
+                    brief = f" {result.get('total', 0)} items"
+                elif result.get("sent"):
+                    brief = " sent"
+                elif result.get("approved"):
+                    brief = f" {result.get('approved', '')}"
+                action_summary.append(f"{ok}`{name}`{brief}")
+            lines.append("")
+            lines.append("▸ " + " • ".join(action_summary))
 
         if errors:
             lines.append("")
-            lines.append(f"⚠️ *Lỗi:* {len(errors)}")
-            for e in errors[:3]:
+            lines.append(f"⚠️ *{len(errors)} lỗi:*")
+            for e in errors[:2]:
                 lines.append(f"  • {e}")
 
-        # Calendar state
+        # Compact state
         cal = initial.get("calendar", {})
         com = initial.get("community", {})
+        pub = cal.get("published", "?")
+        pend = cal.get("pending_approval", "?")
+        ready = cal.get("approved_ready", "?")
+        triage = com.get("pending_triage", 0)
         lines.append("")
-        lines.append("*Trạng thái:*")
-        lines.append(f"  📅 Pending: {cal.get('pending_approval', '?')} • Sẵn sàng: {cal.get('approved_ready', '?')} • Đã pub: {cal.get('published', '?')}")
-        lines.append(f"  💬 Triage pending: {com.get('pending_triage', '?')}")
+        lines.append(f"📅 P:{pend} R:{ready} P:{pub}  💬 T:{triage}")
 
         text = "\n".join(lines)
 

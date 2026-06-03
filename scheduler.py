@@ -1,22 +1,38 @@
-"""Scheduler — daemon and one-shot entry points for the standalone agent.
+"""Scheduler — daemon loop for autonomous tick execution.
 
-Usage:
-    python -m scheduler tick        # one cycle
-    python -m scheduler daemon      # infinite loop
+Designed to run inside a Docker container (fanpage-agent-daemon).
 """
 
 from __future__ import annotations
 
-import json
-import signal
-import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from agent import Orchestrator
-from fanpage_agent.config import Settings
-from config import AgentConfig
+from agent import AgentConfig, Orchestrator
+from config import Settings
+
+
+# ── Compatibility wrappers for fanpage_cli ─────────────────────
+
+
+def load_config(path: str) -> AgentConfig:
+    """Load AgentConfig from a JSON file."""
+    import json
+
+    with open(path) as f:
+        data = json.load(f)
+    return AgentConfig(**data)
+
+
+def daemon(agent_config: AgentConfig | None = None) -> None:
+    """Legacy wrapper for run_daemon."""
+    interval = agent_config.tick_interval_seconds if agent_config else 7200
+    run_daemon(agent_config=agent_config, tick_interval=interval)
+
+
+# ── Core API ───────────────────────────────────────────────────
 
 
 def tick(agent_config: AgentConfig | None = None) -> dict:
@@ -27,72 +43,67 @@ def tick(agent_config: AgentConfig | None = None) -> dict:
     return orchestrator.run_tick()
 
 
-def daemon(agent_config: AgentConfig | None = None) -> None:
-    """Run daemon (infinite loop)."""
+def run_daemon(
+    agent_config: AgentConfig | None = None,
+    tick_interval: int = 7200,
+) -> None:
+    """Run daemon loop: tick → sleep → repeat.
+
+    Args:
+        agent_config: Optional AgentConfig override.
+        tick_interval: Seconds between ticks (default 7200 = 2h).
+    """
     root = Path(__file__).resolve().parent
     settings = Settings.from_env(root_dir=root)
     orchestrator = Orchestrator(settings=settings, agent_config=agent_config)
 
-    shutdown = False
+    tick = 0
+    retry_delay = 60  # shorter retry after failed tick
 
-    def _signal_handler(signum: int, _frame: Any) -> None:
-        nonlocal shutdown
-        print(f"\nReceived signal {signum}, shutting down gracefully...")
-        shutdown = True
+    while True:
+        tick += 1
+        now = datetime.now(timezone.utc)
 
-    signal.signal(signal.SIGINT, _signal_handler)
-    signal.signal(signal.SIGTERM, _signal_handler)
+        print(f"\n{'=' * 60}")
+        print(f"  Tick #{tick}  |  {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        print(f"{'=' * 60}")
 
-    orchestrator.run_daemon()
+        try:
+            result = orchestrator.run_tick(tick_num=tick)
+            actions = len(
+                [h for h in result.get("history", []) if h.get("type") == "tool_call"]
+            )
+            errors = result.get("errors", [])
+            print(f"  Actions: {actions}  |  Errors: {len(errors)}")
+            if errors:
+                for e in errors[:3]:
+                    print(f"  ⚠ {e}")
+            # Reset retry on success
+            retry_delay = 60
+            sleep_time = tick_interval
+        except Exception as exc:
+            print(f"  ❌ Tick failed: {exc}")
+            sleep_time = retry_delay
+            # Exponential backoff: 60s → 120s → 240s → max 900s (15 min)
+            retry_delay = min(retry_delay * 2, 900)
 
-
-def load_config(config_path: str | Path | None = None) -> AgentConfig:
-    """Load agent config from a JSON file, or return defaults."""
-    if config_path is None:
-        default = Path.home() / ".hermes" / "fanpage-agent" / "agent_config.json"
-        if default.exists():
-            config_path = default
-        else:
-            return AgentConfig()
-
-    path = Path(config_path)
-    if not path.exists():
-        print(f"Config file not found: {path}, using defaults", file=sys.stderr)
-        return AgentConfig()
-
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return AgentConfig(**raw)
-
-
-# ── CLI entry point ────────────────────────────────────────────
+        print(f"  Sleeping {sleep_time}s...")
+        time.sleep(sleep_time)
 
 
 def main() -> None:
-    """CLI entry point: ``python -m scheduler <mode>``."""
-    args = sys.argv[1:] if len(sys.argv) > 1 else ["tick"]
-    mode = args[0].lower()
+    """Entry point for the daemon."""
+    import sys
 
-    config_path = None
-    if "--config" in args:
-        idx = args.index("--config")
-        if idx + 1 < len(args):
-            config_path = args[idx + 1]
+    interval = 7200
+    if len(sys.argv) > 1:
+        try:
+            interval = int(sys.argv[1])
+        except ValueError:
+            print(f"Usage: {sys.argv[0]} [interval_seconds]")
+            sys.exit(1)
 
-    cfg = load_config(config_path)
-
-    if mode == "daemon":
-        print(f"[{datetime.now(timezone.utc).isoformat()}] Fanpage Agent — daemon mode")
-        print(f"  Tick interval: {cfg.tick_interval_seconds}s")
-        print(f"  Max actions/tick: {cfg.max_actions_per_tick}")
-        print(f"  Deliver Telegram: {cfg.deliver_telegram}")
-        daemon(cfg)
-    elif mode == "tick":
-        print(f"[{datetime.now(timezone.utc).isoformat()}] Fanpage Agent — tick mode")
-        result = tick(cfg)
-        print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-    else:
-        print(f"Unknown mode: {mode}. Use 'tick' or 'daemon'.", file=sys.stderr)
-        sys.exit(1)
+    run_daemon(tick_interval=interval)
 
 
 if __name__ == "__main__":

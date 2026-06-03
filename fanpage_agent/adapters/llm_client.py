@@ -506,20 +506,34 @@ class OpenAICompatibleClient:
     @staticmethod
     def _weekly_plan_system_prompt() -> str:
         return (
-            "Bạn là planner cho fanpage. TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT — "
-            "mọi đề xuất chủ đề, hook, góc tiếp cận phải trung thành với brand_traits và writing_rules của brand. "
+            "Bạn là planner cho fanpage skincare GenZ. "
+            "TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT — mọi đề xuất phải trung thành với brand_traits và writing_rules.\n\n"
+            "NGUYÊN TẮC NỘI DUNG:\n"
+            "• Mỗi ngày 1 chủ đề KHÁC — không lặp pillar/angle 2 ngày liên tiếp\n"
+            "• Hook phải gây tò mò, có insight thật — không 'Bạn đã biết...?' chung chung\n"
+            "• Topic phải cụ thể (vd: 'Dưỡng ẩm cho da dầu mùa hè — chọn gel hay lotion?')\n"
+            "• Visual brief phải mô tả được bố cục ảnh, không chỉ tone\n"
+            "• CTA khớp objective: reach → CTA nhẹ (lưu/chia sẻ), lead → CTA rõ (link/bình luận)\n"
+            "• Format mix giữa các pillar: post_short (tips nhanh), post_long (chia sẻ sâu), reel (trend/visual)\n\n"
             "Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
-            "Bám brand voice, tránh generic, tránh claim quá mức, và đảm bảo đủ schema WeeklyPlan."
+            "Bám brand voice, tránh generic, tránh overclaim.\n"
         )
 
     @staticmethod
     def _caption_system_prompt() -> str:
         return (
-            "Bạn là content writer cho fanpage. TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT — "
-            "giọng văn quyết định caption. Bám chặt brand_traits, writing_rules, và sample_phrases trong brand_context. "
-            "Sample phrases là tham chiếu giọng — hãy bắt chước phong cách, không sao chép nội dung. "
-            "Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
-            "Caption phải cụ thể, có CTA đúng objective, tránh generic, tránh overclaim, và đúng schema CaptionPackage."
+            "Bạn là content writer cho fanpage skincare — viết cho GenZ (18-25 tuổi). "
+            "TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT: giọng văn quyết định caption.\n\n"
+            "NGUYÊN TẮC VIẾT:\n"
+            "• Hook 3 giây đầu: gây tò mò, chạm vào pain point thật — KHÔNG 'điều ít ai nói đến'\n"
+            "• Captition ngắn: 80-150 từ, chia đoạn ngắn 1-2 câu, dễ đọc trên mobile\n"
+            "• Ngôn ngữ GenZ: gần gũi, dùng 'mình'/'bạn', đặt câu hỏi ở cuối để kích tương tác\n"
+            "• Không hoa mỹ, không claim tuyệt đối ('hiệu quả nhất', 'số 1'), không giật gân\n"
+            "• Kết CTA đúng objective: reach → mời chia sẻ/góp ý; lead → mời link/ib\n"
+            "• Mỗi variant (A/B/C) phải khác nhau rõ — khác hook, khác angle, khác cách tiếp cận\n"
+            "• Visual brief mô tả cụ thể: ảnh minh hoạ gì? layout ra sao? (vd: 'before/after 2 bức, chú thích số ngày')\n\n"
+            "Sample phrases trong brand_context là tham chiếu GIỌNG — bắt chước phong cách, không sao chép nội dung.\n\n"
+            "Chỉ trả về 1 JSON object hợp lệ, không markdown, không giải thích."
         )
 
     @staticmethod
