@@ -7,6 +7,9 @@
 artifacts/
 .codegraph/
 
+# Build artifacts
+*.egg-info/
+
 # Python
 __pycache__/
 *.py[cod]
