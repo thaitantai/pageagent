@@ -1,0 +1,90 @@
+{
+  "brand_id": "brand_abc",
+  "brand_name": "ABC Clinic",
+  "industry": "healthcare",
+  "business_goal": "Tăng lead tư vấn chất lượng",
+  "fanpage_goals": ["reach", "engagement", "lead"],
+  "brand_summary": "Phòng khám tập trung tư vấn rõ ràng, thực tế và không khoa trương.",
+  "usp": ["Bác sĩ có chuyên môn", "Quy trình rõ ràng", "Theo dõi sau dịch vụ"],
+  "target_audiences": [
+    {
+      "segment_name": "Nữ văn phòng 25-35",
+      "pain_points": ["Da khô", "Thiếu thời gian chăm sóc"],
+      "desired_outcomes": ["Da khỏe hơn", "Routine đơn giản"],
+      "objections": ["Sợ tốn kém"],
+      "preferred_content_formats": ["post_short", "carousel"]
+    },
+    {
+      "segment_name": "Mẹ bỉm 28-38",
+      "pain_points": ["Da xỉn màu", "Thiếu ngủ"],
+      "desired_outcomes": ["Lấy lại sự tự tin"],
+      "objections": ["Sợ không an toàn"],
+      "preferred_content_formats": ["post_short", "story"]
+    }
+  ],
+  "products_services": [
+    {
+      "name": "Tư vấn da cá nhân hóa",
+      "category": "consulting",
+      "benefits": ["Hiểu tình trạng da", "Có lộ trình phù hợp"],
+      "proof_points": ["Bác sĩ trực tiếp tư vấn"],
+      "do_not_claim": ["Cam kết khỏi 100%"]
+    }
+  ],
+  "tone_of_voice": {
+    "brand_traits": ["ấm", "rõ", "không khoa trương", "đồng cảm", "dễ hiểu"],
+    "writing_rules": [
+      "Dùng câu ngắn, tối đa 2-3 dòng mỗi đoạn",
+      "Ưu tiên thực tế — đưa ví dụ cụ thể, không chung chung",
+      "Không hù dọa — dùng ngôn ngữ trấn an, tích cực",
+      "Xưng 'chúng tôi' — thể hiện vai trò chuyên môn, không xa cách",
+      "Kết thúc mỗi bài bằng 1 câu hỏi mở hoặc CTA rõ ràng",
+      "Trích dẫn kiến thức y khoa nhưng diễn giải bằng ngôn từ đời thường"
+    ],
+    "things_to_avoid": [
+      "Giật gân",
+      "Phóng đại kết quả",
+      "Từ chuyên môn khó hiểu không giải thích",
+      "So sánh tay nghề cá nhân",
+      "Cam kết kết quả tuyệt đối"
+    ],
+    "sample_phrases": [
+      "Nếu bạn đang gặp tình trạng này, đừng lo — chúng tôi sẽ hướng dẫn từng bước",
+      "Điều quan trọng là hiểu đúng vấn đề trước khi chọn cách xử lý",
+      "Có những dấu hiệu tưởng nhỏ nhưng lại là 'tín hiệu đỏ' bạn nên biết",
+      "Một trong những câu hỏi chúng tôi nhận nhiều nhất: 'Liệu em có thể…'",
+      "Trong y khoa, không có giải pháp 'một cỡ cho tất cả' — và đó là điều tốt"
+    ]
+  },
+  "content_pillars": [
+    {
+      "pillar_name": "education",
+      "goal": "engagement",
+      "description": "Giải thích vấn đề da theo cách dễ hiểu.",
+      "example_angles": ["dấu hiệu nhận biết", "sai lầm thường gặp"],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "trust",
+      "goal": "authority",
+      "description": "Tăng niềm tin thông qua quy trình và tư vấn.",
+      "example_angles": ["quy trình tư vấn", "điều bác sĩ thường hỏi"],
+      "allowed_formats": ["post_short", "post_long"]
+    }
+  ],
+  "approved_cta_patterns": [
+    {"objective": "reach", "cta_text": "Lưu lại khi cần", "notes": "nhẹ"},
+    {"objective": "engagement", "cta_text": "Bạn đang gặp tình trạng này không?", "notes": "mời bình luận"},
+    {"objective": "lead", "cta_text": "Nhắn tin để được tư vấn kỹ hơn", "notes": "inbox"}
+  ],
+  "banned_phrases": ["cam kết 100%", "duy nhất thị trường"],
+  "compliance_notes": ["Không claim kết quả tuyệt đối", "Không thay thế tư vấn chuyên môn"],
+  "approval_flow": {
+    "content_owner": "Tai",
+    "approver": "Manager",
+    "approval_sla_hours": 12,
+    "public_post_requires_human_approval": true,
+    "comment_reply_requires_human_approval": true,
+    "escalation_rules": ["Khiếu nại", "Yêu cầu giá cụ thể"]
+  }
+}

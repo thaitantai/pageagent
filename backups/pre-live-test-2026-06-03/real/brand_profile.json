@@ -1,0 +1,136 @@
+{
+  "brand_id": "outfit_nha_gau",
+  "brand_name": "Outfit Nhà Gấu — GENZS Park Mall",
+  "industry": "fashion, thời trang Gen Z",
+  "business_goal": "Thu hút Gen Z đến trải nghiệm mua sắm tại showroom Park Mall, xây dựng cộng đồng yêu thời trang local brand, affiliate qua các thương hiệu nội địa",
+  "fanpage_goals": ["reach", "engagement", "lead"],
+  "brand_summary": "Outfit Nhà Gấu là điểm đến thời trang Gen Z tại Park Mall, quy tụ hơn 5 local brand nổi bật từ Streetwear cá tính đến Casual tinh tế. Trang tạo cảm hứng phối đồ, giới thiệu thương hiệu Việt và mang đến trải nghiệm mua sắm thực tế — thử đồ trực tiếp, xem tận tay, mặc thử ngay tại showroom.",
+  "usp": [
+    "Thử đồ trực tiếp tại showroom — không chỉ xem ảnh, mà được cầm, sờ, mặc thử",
+    "Quy tụ local brand Việt trong 1 không gian — không cần đi nhiều nơi",
+    "Phối đồ đa dạng — mix & match giữa các thương hiệu khác nhau trong cùng set đồ"
+  ],
+  "target_audiences": [
+    {
+      "segment_name": "Gen Z yêu thời trang 18-25",
+      "pain_points": [
+        "Ngại mua online vì sợ không giống hình",
+        "Tốn thời gian di chuyển nhiều nơi để săn đồ",
+        "Không biết phối đồ sao cho đẹp và hợp xu hướng",
+        "Ngân sách có hạn nhưng vẫn muốn ăn mặc chất"
+      ],
+      "desired_outcomes": [
+        "Trải nghiệm mua sắm thực tế, thử đồ trực tiếp",
+        "Tìm được outfit hoàn chỉnh trong 1 địa điểm",
+        "Cảm hứng phối đồ mới, cập nhật xu hướng",
+        "Sản phẩm chất lượng, giá hợp lý từ brand nội địa"
+      ],
+      "objections": [
+        "Ngại đến showroom vì nghĩ đắt",
+        "Không biết gu thời trang của mình có phù hợp không",
+        "Đã quen mua online, ngại thay đổi thói quen"
+      ],
+      "preferred_content_formats": ["post_short", "carousel", "story"]
+    }
+  ],
+  "products_services": [
+    {
+      "name": "Trải nghiệm mua sắm tại Park Mall",
+      "category": "retail",
+      "benefits": [
+        "Thử đồ trực tiếp tất cả local brand trong 1 không gian",
+        "Đa dạng phong cách từ Streetwear đến Casual",
+        "Giá cả phải chăng từ thương hiệu nội địa"
+      ],
+      "proof_points": [
+        "5+ thương hiệu nổi bật tại Park Mall",
+        "Khách hàng thử đồ và mua sắm thực tế hàng ngày"
+      ],
+      "do_not_claim": [
+        "Không so sánh với brand quốc tế",
+        "Không cam kết giảm giá nếu chưa có chương trình"
+      ]
+    }
+  ],
+  "tone_of_voice": {
+    "brand_traits": ["gần gũi", "năng động", "sành điệu", "dễ hiểu", "cá tính"],
+    "writing_rules": [
+      "Ngắn gọn, dễ đọc — không quá 200 chữ cho post thường",
+      "Xưng hô mình/bạn hoặc tao/cậu (tuỳ ngữ cảnh, Gen Z)",
+      "Ngôn ngữ trẻ trung, dùng từ trending: chất lừ, đỉnh, hời, chốt hạ",
+      "Đặt câu hỏi ở đầu hoặc cuối bài để kích thích tương tác",
+      "Dùng icon ✨👖👜🐆🔥 để sinh động nhưng không lạm dụng",
+      "Kết thúc bằng CTA cụ thể hoặc câu hỏi về phong cách"
+    ],
+    "things_to_avoid": [
+      "Giọng văn quá formal, học thuật",
+      "Phóng đại chất lượng sản phẩm",
+      "Dùng từ ngữ tiêu cực, gây áp lực mua sắm",
+      "Quảng cáo quá lộ liễu — ưu tiên trải nghiệm và cảm hứng"
+    ],
+    "sample_phrases": [
+      "Bạn đã bao giờ thử mix-match các local brand yêu thích để tạo nên một outfit 'viral' chưa?",
+      "Hôm nay, mình cùng 'lên đồ' với 3 item cực đỉnh từ các thương hiệu nội địa",
+      "Không cần lướt web, không cần chờ ship. Ghé ngay Park Mall hôm nay để tự tay chọn cho mình những món đồ ưng ý nhất!",
+      "Có bao giờ bạn thấy mình cứ quay cuồng cả ngày, rồi tối về chỉ muốn xỏ dép ra ngoài một chút?",
+      "Đôi khi, cảm nhận trực tiếp bằng mắt thấy, tay sờ vẫn là trải nghiệm không thể thay thế"
+    ]
+  },
+  "content_pillars": [
+    {
+      "pillar_name": "outfit_guide",
+      "goal": "engagement",
+      "description": "Hướng dẫn phối đồ, mix & match các local brand",
+      "example_angles": ["mix 3 item từ 3 brand", "phối đồ theo công thức", "outfit cho từng dịp"],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "showroom_promo",
+      "goal": "lead",
+      "description": "Giới thiệu trải nghiệm mua sắm tại Park Mall, kêu gọi ghé showroom",
+      "example_angles": ["trải nghiệm thử đồ thực tế", "đa dạng brand trong 1 địa điểm", "lý do nên đến showroom"],
+      "allowed_formats": ["post_short", "story"]
+    },
+    {
+      "pillar_name": "local_brand_promo",
+      "goal": "awareness",
+      "description": "Giới thiệu từng thương hiệu local brand nổi bật",
+      "example_angles": ["spotlight brand A", "local brand chất lượng cao", "thiết kế Việt đỉnh"],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "short_tip",
+      "goal": "awareness",
+      "description": "Mẹo thời trang nhanh, xu hướng, phối đồ cơ bản cho Gen Z",
+      "example_angles": ["mẹo phối đồ Gen Z", "xu hướng mùa mới", "cách chọn size chuẩn"],
+      "allowed_formats": ["post_short", "story"]
+    },
+    {
+      "pillar_name": "lifestyle",
+      "goal": "engagement",
+      "description": "Câu chuyện cảm hứng sống, động lực, self-care cho Gen Z — gắn nhẹ với thời trang",
+      "example_angles": ["motivation cho cuối tuần", "chuyện tự chăm sóc bản thân", "giải tỏa áp lực"],
+      "allowed_formats": ["post_short", "story"]
+    }
+  ],
+  "approved_cta_patterns": [
+    {"objective": "reach", "cta_text": "Lưu lại để phối đồ sau nha!", "notes": "nhẹ"},
+    {"objective": "engagement", "cta_text": "Bạn thuộc phong cách nào — Streetwear hay Casual?", "notes": "mời bình luận"},
+    {"objective": "lead", "cta_text": "Ghé ngay Park Mall hôm nay để tự tay chọn đồ bạn nhé!", "notes": "mời ghé showroom"},
+    {"objective": "awareness", "cta_text": "Bạn đã biết đến local brand này chưa?", "notes": "khám phá"}
+  ],
+  "banned_phrases": ["hàng độc quyền", "rẻ nhất thị trường", "ai cũng mặc", "xu hướng duy nhất"],
+  "compliance_notes": [
+    "Không cam kết sản phẩm giống 100% với hình ảnh",
+    "Không claim giá rẻ nhất thị trường",
+    "Không so sánh trực tiếp với thương hiệu khác"
+  ],
+  "approval_flow": {
+    "content_owner": "Tai",
+    "approver": "Manager",
+    "approval_sla_hours": 6,
+    "public_post_requires_human_approval": true,
+    "comment_reply_requires_human_approval": true,
+    "escalation_rules": ["Khiếu nại về chất lượng sản phẩm", "Thông tin sai về giá"]
+  }
+}
