@@ -34,3 +34,6 @@ env/
 /data/live_*.csv
 /data/ops_content_calendar.csv
 /data/research_ops_calendar.csv
+
+# Runtime logs
+logs/

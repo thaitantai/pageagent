@@ -108,7 +108,12 @@ class FacebookClient:
         Returns aggregated dict:
             {post_id, message, created_time, permalink_url,
              reach, impressions, likes, comments, shares, engagement_rate}
+
+        Note: FB Graph API v21.0+ requires ``pageId_postId`` format.
+        If ``post_id`` is bare (no underscore), we prepend ``{page_id}_``.
         """
+        if "_" not in post_id:
+            post_id = f"{self.page_id}_{post_id}"
         fields = (
             "message,created_time,permalink_url,shares,"
             "likes.limit(0).summary(true),comments.limit(0).summary(true)"

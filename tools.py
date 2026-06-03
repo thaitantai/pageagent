@@ -43,6 +43,7 @@ ROOT_DIR = Path(__file__).resolve().parent  # project root (now at root level)
 DEFAULT_CALENDAR = ROOT_DIR / "data" / "real" / "content_calendar.csv"
 DEFAULT_HISTORY = ROOT_DIR / "data" / "real" / "post_history.csv"
 DEFAULT_COMMENT = ROOT_DIR / "data" / "real" / "comment_inbox.csv"
+DEFAULT_METRICS = ROOT_DIR / "data" / "real" / "post_metrics.csv"
 DEFAULT_BRAND = ROOT_DIR / "data" / "real" / "brand_profile.json"
 
 
@@ -55,6 +56,7 @@ def _local_store() -> LocalSheetStore:
     return LocalSheetStore(
         calendar_csv=DEFAULT_CALENDAR,
         history_csv=DEFAULT_HISTORY,
+        metrics_csv=DEFAULT_METRICS,
         triage_csv=DEFAULT_COMMENT,
     )
 
