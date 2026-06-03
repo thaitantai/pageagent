@@ -2,14 +2,23 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 from collections import Counter
 from pathlib import Path
 
-from fanpage_agent.models import CommentInboxEntry, ResearchBrief
+from fanpage_agent.models import CommentInboxEntry, ResearchBrief, TrendItem
+from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
+
+logger = logging.getLogger(__name__)
 
 
 class ResearchService:
-    def build_brief(self, store: object, comment_csv: str | Path | None = None, campaign_notes_file: str | Path | None = None) -> ResearchBrief:
+    def __init__(self, trend_scraper: TrendScraper | None = None, trend_analyzer: TrendAnalyzer | None = None):
+        self._trend_scraper = trend_scraper
+        self._trend_analyzer = trend_analyzer
+
+    def build_brief(self, store: object, comment_csv: str | Path | None = None, campaign_notes_file: str | Path | None = None, fetch_external_trends: bool = True) -> ResearchBrief:
         history = store.read_post_history(limit=90)
         metrics = store.read_post_metrics()
         comments = self._read_comments(comment_csv)
@@ -48,6 +57,25 @@ class ResearchService:
         if frequent_questions:
             recommendations.append(f"Khai thác câu hỏi khách hàng thật: {frequent_questions[0]}")
 
+        external_trends: list[TrendItem] = []
+        trend_keywords: list[str] = []
+        trend_clusters: dict[str, list[str]] = {}
+        if fetch_external_trends and self._trend_scraper:
+            try:
+                external_trends = self._trend_scraper.fetch_all()
+                if external_trends:
+                    recommendations.append(f"Có {len(external_trends)} trend ngoài — xem external_trends để tham khảo.")
+                # Enrich with TrendAnalyzer
+                if external_trends and self._trend_analyzer:
+                    self._trend_analyzer = TrendAnalyzer(external_trends)
+                    report = self._trend_analyzer.generate_report()
+                    trend_keywords = [kw["word"] for kw in report["top_keywords"][:15]]
+                    trend_clusters = report["clusters"]
+                    recommendations.append(f"Top keyword từ trend: {', '.join(trend_keywords[:5])}.")
+                    recommendations.append(f"Cluster nổi bật: {', '.join(list(trend_clusters.keys())[:3])}.")
+            except Exception as exc:
+                logger.warning("TrendScraper/TrendAnalyzer thất bại: %s", exc)
+
         return ResearchBrief(
             top_performing_topics=top_performing_topics,
             overused_topics=overused_topics,
@@ -57,6 +85,9 @@ class ResearchService:
             recommended_objectives=recommended_objectives,
             next_angles=next_angles,
             recommendations=recommendations,
+            external_trends=external_trends,
+            trend_keywords=trend_keywords,
+            trend_clusters=trend_clusters,
         )
 
     @staticmethod
@@ -70,6 +101,8 @@ class ResearchService:
             rows = list(csv.DictReader(handle))
         return [
             CommentInboxEntry(
+                id=row.get("id", ""),
+                post_id=row.get("post_id", ""),
                 created_at=row.get("created_at", ""),
                 source=row.get("source", ""),
                 message=row.get("message", ""),

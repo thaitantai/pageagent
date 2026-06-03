@@ -133,9 +133,19 @@ class PostMetric(BaseModel):
 
 
 class CommentInboxEntry(BaseModel):
-    created_at: str
+    id: str = ""
+    post_id: str = ""
+    created_at: str = ""
+    source: str = ""
+    message: str = ""
+
+
+class TrendItem(BaseModel):
+    title: str
     source: str
-    message: str
+    url: str = ""
+    snippet: str = ""
+    relevance: str = ""
 
 
 class ResearchBrief(BaseModel):
@@ -147,6 +157,9 @@ class ResearchBrief(BaseModel):
     recommended_objectives: List[str] = Field(default_factory=list)
     next_angles: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)
+    external_trends: List[TrendItem] = Field(default_factory=list)
+    trend_keywords: List[str] = Field(default_factory=list, description="Top keywords từ TrendAnalyzer")
+    trend_clusters: dict[str, list[str]] = Field(default_factory=dict, description="Cluster tên + các title từ TrendAnalyzer")
 
 
 class AnalyticsSummary(BaseModel):
@@ -160,6 +173,9 @@ class AnalyticsSummary(BaseModel):
 class AnalyticsReport(BaseModel):
     summary: AnalyticsSummary
     top_post: PostMetric | None = None
+    top_posts: List[PostMetric] = Field(default_factory=list)
+    wow: dict[str, float] = Field(default_factory=dict, description="Week-over-week % change: posts, reach, engagements, engagement_rate")
+    pillar_breakdown: dict[str, dict[str, int]] = Field(default_factory=dict, description="Per pillar: count, reach, engagements")
     recommendations: List[str] = Field(default_factory=list)
 
 

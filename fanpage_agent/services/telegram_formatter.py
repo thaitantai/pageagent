@@ -58,29 +58,80 @@ class TelegramFormatterService:
     def format_weekly_report(self, payload: dict) -> str:
         summary = payload.get("summary", {})
         top_post = payload.get("top_post") or {}
+        wow = payload.get("wow", {})
+
+        def _trend_icon(val: float) -> str:
+            if val > 5:
+                return "▲"
+            if val < -5:
+                return "▼"
+            return "→"
+
         lines = [
             "## Weekly Report",
-            f"posts: {summary.get('total_posts', 0)}",
-            f"reach: {summary.get('total_reach', 0)}",
-            f"engagements: {summary.get('total_engagements', 0)}",
-            f"leads: {summary.get('total_leads', 0)}",
-            f"avg engagement rate: {summary.get('avg_engagement_rate', 0)}",
+            f"📝 posts: {summary.get('total_posts', 0)}",
+            f"👁 reach: {summary.get('total_reach', 0)}",
+            f"💬 engagements: {summary.get('total_engagements', 0)}",
+            f"🎯 leads: {summary.get('total_leads', 0)}",
+            f"📈 avg engagement rate: {summary.get('avg_engagement_rate', 0)}",
             "",
         ]
-        if top_post:
-            lines.extend(
-                [
-                    "top post:",
-                    f"- topic: {top_post.get('topic', '-')}",
-                    f"- pillar: {top_post.get('pillar', '-')} | objective: {top_post.get('objective', '-')}",
-                    f"- reach: {top_post.get('reach', 0)} | engagements: {top_post.get('engagements', 0)} | leads: {top_post.get('leads', 0)}",
-                    "",
-                ]
+
+        # WoW trend
+        if wow:
+            lines.append("tuần này vs tuần trước:")
+            wow_keys = [
+                ("posts", "📝 posts"),
+                ("reach", "👁 reach"),
+                ("engagements", "💬 engagements"),
+                ("engagement_rate", "📈 engagement rate"),
+            ]
+            for key, label in wow_keys:
+                val = wow.get(key, 0)
+                icon = _trend_icon(val)
+                lines.append(f"  {icon} {label}: {val:+.0f}%")
+            lines.append("")
+
+        # Top posts (up to 3)
+        top_posts_raw = payload.get("top_posts") or []
+        if top_post and not top_posts_raw:
+            # fallback to single top_post
+            top_posts_raw = [top_post]
+        if top_posts_raw:
+            lines.append("🏆 top posts:")
+            for i, tp in enumerate(top_posts_raw[:3], 1):
+                topic = tp.get("topic", "-")
+                pillar = tp.get("pillar", "-")
+                obj = tp.get("objective", "-")
+                reach = tp.get("reach", 0)
+                eng = tp.get("engagements", 0)
+                er_raw = tp.get("engagement_rate", 0)
+                er = f"{er_raw * 100:.1f}%" if isinstance(er_raw, float) and reach > 0 else "N/A"
+                lines.append(f"  {i}. {topic}")
+                lines.append(f"     {pillar} | {obj} | reach {reach} | eng {eng} | rate {er}")
+            lines.append("")
+
+        # Pillar breakdown
+        pillar_breakdown = payload.get("pillar_breakdown", {})
+        if pillar_breakdown:
+            lines.append("📂 pillar performance:")
+            sorted_pillars = sorted(
+                pillar_breakdown.items(),
+                key=lambda kv: kv[1].get("reach", 0),
+                reverse=True,
             )
+            for name, data in sorted_pillars:
+                cnt = data.get("count", 0)
+                reach = data.get("reach", 0)
+                eng = data.get("engagements", 0)
+                er_val = eng / max(reach, 1)
+                lines.append(f"  • {name}: {cnt} bài | reach {reach} | rate {er_val*100:.1f}%")
+            lines.append("")
+
         recommendations = payload.get("recommendations", [])
         if recommendations:
-            lines.append("recommendations:")
-            lines.extend([f"- {item}" for item in recommendations])
+            lines.append("💡 recommendations:")
+            lines.extend([f"  • {item}" for item in recommendations])
         return "\n".join(lines).strip()
 
     def format_community_triage(self, payload: dict) -> str:
@@ -417,3 +468,137 @@ class TelegramFormatterService:
                 f"   python3 -m fanpage_agent.main resolve-triage-item --triage-id {triage_id} --resolved-at <ISO_TIME>",
             ]
         return []
+
+    def format_hashtag_set(self, payload: dict) -> str:
+        content_topic = payload.get("content_topic", "")
+        pillar = payload.get("pillar", "")
+        objective = payload.get("objective", "")
+        suggestions = payload.get("suggestions", [])
+        recommended = payload.get("recommended", [])
+
+        lines = [
+            "## Hashtag Package",
+            f"topic: {content_topic}",
+            f"pillar: {pillar} | objective: {objective}",
+            "",
+        ]
+
+        # Group by tier
+        tiers = {"high_volume": "High Volume", "medium_volume": "Medium Volume",
+                 "low_volume": "Low Volume", "branded": "Branded"}
+        for tier_key, tier_label in tiers.items():
+            tier_tags = [s for s in suggestions if s.get("tier") == tier_key]
+            if not tier_tags:
+                continue
+            lines.append(f"**{tier_label}:**")
+            for s in tier_tags:
+                tag = s.get("tag", "")
+                score = s.get("relevance_score", 0)
+                reason = s.get("reason", "")
+                badge = " ✅" if tag in recommended else ""
+                lines.append(f"  #{tag} ({score:.0%}){badge} — {reason}")
+            lines.append("")
+
+        if recommended:
+            lines.append("**Recommended:** " + " ".join(f"#{t}" for t in recommended))
+
+        return "\n".join(lines).strip()
+
+    def format_metrics_auto_fetch(self, payload: dict) -> str:
+        scanned = payload.get("scanned", 0)
+        missing = payload.get("missing_metrics", 0)
+        fetched = payload.get("fetched", 0)
+        recorded = payload.get("recorded", 0)
+        errors = payload.get("errors", 0)
+        items = payload.get("items", [])
+
+        lines = [
+            "## Metrics Auto-Fetch",
+            f"scanned: {scanned} published items",
+            f"missing metrics: {missing}",
+            f"fetched: {fetched} | recorded: {recorded} | errors: {errors}",
+            "",
+        ]
+
+        recorded_items = [i for i in items if i.get("status") == "recorded"]
+        error_items = [i for i in items if i.get("status") == "error"]
+        skipped_items = [i for i in items if i.get("status") == "skipped"]
+
+        if recorded_items:
+            lines.append("**Recorded:**")
+            for item in recorded_items[:5]:
+                lines.append(f"- {item.get('topic', '-')} ({item.get('calendar_id', '')})")
+                lines.append(f"  {item.get('detail', '')}")
+                if item.get("permalink"):
+                    lines.append(f"  {item['permalink']}")
+            if len(recorded_items) > 5:
+                lines.append(f"  ... +{len(recorded_items) - 5} more")
+
+        if error_items:
+            lines.append("")
+            lines.append("**Errors:**")
+            for item in error_items[:3]:
+                lines.append(f"- {item.get('topic', '-')} — {item.get('detail', '')}")
+
+        if skipped_items:
+            lines.append("")
+            lines.append(f"**Skipped:** {len(skipped_items)} items (no permalink)")
+
+        return "\n".join(lines)
+
+    def format_analytics_review(self, payload: dict) -> str:
+        review_period = payload.get("review_period", {})
+        report = payload.get("report", {})
+        summary = report.get("summary", {})
+        matched_posts = payload.get("matched_posts", [])
+        unmatched_posts = payload.get("unmatched_posts", [])
+
+        lines = [
+            "## Analytics Review",
+            "",
+            f"period: {review_period.get('days', 7)} days",
+            f"fetched: {payload.get('fetched', 0)} FB posts",
+            f"matched to calendar: {payload.get('matched', 0)}",
+            f"unmatched: {payload.get('unmatched', 0)}",
+            f"recorded to store: {payload.get('recorded', 0)}",
+            "",
+        ]
+
+        if payload.get("recorded", 0) > 0:
+            lines.append("--- metrics summary ---")
+            lines.append(f"total posts: {summary.get('total_posts', 0)}")
+            lines.append(f"total reach: {summary.get('total_reach', 0)}")
+            lines.append(f"total engagements: {summary.get('total_engagements', 0)}")
+            lines.append(f"avg engagement rate: {summary.get('avg_engagement_rate', 0)}")
+            top_post = report.get("top_post")
+            if top_post:
+                lines.append("")
+                lines.append(f"top post: {top_post.get('topic', '-')}")
+                lines.append(f"  reach: {top_post.get('reach', 0)} | engagements: {top_post.get('engagements', 0)}")
+            lines.append("")
+
+        if matched_posts:
+            lines.append("--- matched posts ---")
+            for p in matched_posts[:5]:
+                recorded_badge = " [recorded]" if p.get("recorded") else " [preview]"
+                lines.append(f"- {p.get('topic', '-')} ({p.get('pillar', '-')}){recorded_badge}")
+                lines.append(f"  reach: {p.get('reach', 0)} | engagements: {p.get('engagements', 0)}")
+                if p.get("permalink"):
+                    lines.append(f"  {p['permalink']}")
+            if len(matched_posts) > 5:
+                lines.append(f"  ... and {len(matched_posts) - 5} more")
+
+        if unmatched_posts:
+            lines.append("")
+            lines.append("--- unmatched posts ---")
+            for p in unmatched_posts[:5]:
+                preview = (p.get("message_preview") or "")[:80]
+                lines.append(f"- [{p.get('fb_post_id', '')}] {p.get('created_time', '')[:10]}")
+                lines.append(f"  {preview}...")
+                lines.append(f"  reach: {p.get('reach', 0)} | engagements: {p.get('engagements', 0)}")
+                if p.get("permalink"):
+                    lines.append(f"  {p['permalink']}")
+            if len(unmatched_posts) > 5:
+                lines.append(f"  ... and {len(unmatched_posts) - 5} more")
+
+        return "\n".join(lines)

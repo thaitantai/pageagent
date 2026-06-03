@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fanpage-agent"
+version = "0.15.0"
+description = "Autonomous Facebook fanpage agent"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+fanpage-agent = "fanpage_cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fanpage_agent*", "fanpage_cli*"]
+
+[tool.setuptools]
+py-modules = ["agent", "config", "tools", "scheduler", "cli"]

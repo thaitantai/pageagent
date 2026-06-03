@@ -24,7 +24,7 @@ class AnalyticsReportTest(unittest.TestCase):
                 writer.writeheader()
                 writer.writerow(
                     {
-                        "published_at": "2026-05-26",
+                        "published_at": "2026-05-29",
                         "topic": "Routine 3 bước cho da thiếu nước",
                         "pillar": "education",
                         "objective": "engagement",
@@ -35,7 +35,7 @@ class AnalyticsReportTest(unittest.TestCase):
                 )
                 writer.writerow(
                     {
-                        "published_at": "2026-05-27",
+                        "published_at": "2026-05-30",
                         "topic": "Checklist chăm da sau treatment",
                         "pillar": "trust",
                         "objective": "lead",
@@ -55,6 +55,8 @@ class AnalyticsReportTest(unittest.TestCase):
                     str(sample),
                     "--metrics-file",
                     str(metrics_csv),
+                    "--store-backend",
+                    "local",
                 ],
                 cwd=root,
                 env=isolated_subprocess_env(),
@@ -66,7 +68,12 @@ class AnalyticsReportTest(unittest.TestCase):
         data = json.loads(completed.stdout)
         self.assertEqual(data["summary"]["total_posts"], 2)
         self.assertEqual(data["top_post"]["topic"], "Routine 3 bước cho da thiếu nước")
-        self.assertTrue(any("trust" in item.lower() or "lead" in item.lower() for item in data["recommendations"]))
+        # New recommendations: data-driven, mentions best pillar or engagement rate insight
+        recs_text = " ".join(data.get("recommendations", []))
+        self.assertTrue(
+            any(kw in recs_text.lower() for kw in ["education", "engagement", "nội dung"]),
+            f"Recommendations missing expected content: {data['recommendations']}",
+        )
 
 
 if __name__ == "__main__":

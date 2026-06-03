@@ -64,6 +64,15 @@ class LocalSheetStore:
         "reach",
         "engagement_rate",
     ]
+    HASHTAG_HEADERS = [
+        "calendar_id",
+        "brand_id",
+        "topic",
+        "hashtags",
+        "reach",
+        "engagements",
+        "recorded_at",
+    ]
 
     def __init__(
         self,
@@ -71,11 +80,13 @@ class LocalSheetStore:
         history_csv: str | Path | None = None,
         metrics_csv: str | Path | None = None,
         triage_csv: str | Path | None = None,
+        hashtag_csv: str | Path | None = None,
     ) -> None:
         self.calendar_csv = Path(calendar_csv)
         self.history_csv = Path(history_csv) if history_csv else None
         self.metrics_csv = Path(metrics_csv) if metrics_csv else None
         self.triage_csv = Path(triage_csv) if triage_csv else None
+        self.hashtag_csv = Path(hashtag_csv) if hashtag_csv else None
 
     def append_plan(self, brand_id: str, plan: WeeklyPlan) -> None:
         rows: list[dict[str, str]] = []
@@ -225,6 +236,7 @@ class LocalSheetStore:
 
     def list_calendar_items(
         self,
+        brand_id: str | None = None,
         status: str | None = None,
         approval_status: str | None = None,
         date: str | None = None,
@@ -235,7 +247,8 @@ class LocalSheetStore:
         filtered = [
             row
             for row in rows
-            if (not status or row.get("status") == status)
+            if (not brand_id or row.get("brand_id") == brand_id)
+            and (not status or row.get("status") == status)
             and (not approval_status or row.get("approval_status") == approval_status)
             and (not date or row.get("date") == date)
             and (not metrics_pending or self._is_metrics_pending_row(row))
@@ -243,6 +256,69 @@ class LocalSheetStore:
         if limit is not None:
             return filtered[:limit]
         return filtered
+
+    def check_calendar_gaps(
+        self,
+        brand_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        max_gap_days: int = 3,
+    ) -> list[dict[str, object]]:
+        """Find gaps in the content calendar longer than max_gap_days.
+
+        Returns list of gap dicts with keys: start_date, end_date, gap_days.
+        """
+        from datetime import date as _date, timedelta
+
+        rows = self._read_calendar_rows()
+        if brand_id:
+            rows = [r for r in rows if r.get("brand_id") == brand_id]
+
+        today = _date.today()
+        start = _date.fromisoformat(start_date) if start_date else today
+        end = _date.fromisoformat(end_date) if end_date else today + timedelta(days=14)
+
+        # Collect scheduled dates (planned + approved items only)
+        scheduled: set[_date] = set()
+        for row in rows:
+            if row.get("status") in ("planned", "approved", "published"):
+                raw = row.get("date", "")
+                if raw:
+                    try:
+                        scheduled.add(_date.fromisoformat(raw))
+                    except ValueError:
+                        pass
+
+        gaps: list[dict[str, object]] = []
+        gap_start: _date | None = None
+        cursor = start
+        while cursor <= end:
+            if cursor not in scheduled:
+                if gap_start is None:
+                    gap_start = cursor
+            else:
+                if gap_start is not None:
+                    gap_days = (cursor - gap_start).days
+                    if gap_days > max_gap_days:
+                        gaps.append({
+                            "start_date": gap_start.isoformat(),
+                            "end_date": (cursor - timedelta(days=1)).isoformat(),
+                            "gap_days": gap_days,
+                        })
+                    gap_start = None
+            cursor += timedelta(days=1)
+
+        # Handle trailing gap
+        if gap_start is not None:
+            gap_days = (end - gap_start).days + 1
+            if gap_days > max_gap_days:
+                gaps.append({
+                    "start_date": gap_start.isoformat(),
+                    "end_date": end.isoformat(),
+                    "gap_days": gap_days,
+                })
+
+        return gaps
 
     def read_post_history(self, limit: int = 30) -> list[PostHistoryEntry]:
         if not self.history_csv or not self.history_csv.exists():
@@ -402,6 +478,89 @@ class LocalSheetStore:
         if limit is not None:
             return filtered[:limit]
         return filtered
+
+    def record_hashtag_usage(
+        self,
+        calendar_id: str,
+        brand_id: str,
+        hashtags: list[str],
+        topic: str = "",
+        reach: int = 0,
+        engagements: int = 0,
+        recorded_at: str | None = None,
+    ) -> dict[str, str]:
+        from datetime import datetime, timezone
+
+        now = recorded_at or datetime.now(timezone.utc).isoformat()
+        row = {
+            "calendar_id": calendar_id,
+            "brand_id": brand_id,
+            "topic": topic,
+            "hashtags": " ".join(hashtags),
+            "reach": str(reach),
+            "engagements": str(engagements),
+            "recorded_at": now,
+        }
+        rows = self._read_hashtag_rows()
+        rows.append(row)
+        self._write_hashtag_rows(rows)
+        return row
+
+    def read_hashtag_performance(
+        self,
+        brand_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        """Aggregate hashtag performance: for each unique hashtag, sum reach/engagements.
+
+        Returns top tags by total reach, descending.
+        """
+        rows = self._read_hashtag_rows()
+        if brand_id:
+            rows = [r for r in rows if r.get("brand_id") == brand_id]
+
+        agg: dict[str, dict[str, int]] = {}
+        for row in rows:
+            tags = row.get("hashtags", "").strip().split()
+            r_reach = int(row.get("reach", 0) or 0)
+            r_eng = int(row.get("engagements", 0) or 0)
+            for tag in tags:
+                tag = tag.strip().lower()
+                if not tag:
+                    continue
+                if tag not in agg:
+                    agg[tag] = {"reach": 0, "engagements": 0, "post_count": 0}
+                agg[tag]["reach"] += r_reach
+                agg[tag]["engagements"] += r_eng
+                agg[tag]["post_count"] += 1
+
+        sorted_tags = sorted(agg.items(), key=lambda x: x[1]["reach"], reverse=True)
+        return [
+            {
+                "hashtag": tag,
+                "total_reach": stats["reach"],
+                "total_engagements": stats["engagements"],
+                "post_count": stats["post_count"],
+            }
+            for tag, stats in sorted_tags[:limit]
+        ]
+
+    def _read_hashtag_rows(self) -> list[dict[str, str]]:
+        if not self.hashtag_csv or not self.hashtag_csv.exists():
+            return []
+        with self.hashtag_csv.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        return [{header: row.get(header, "") for header in self.HASHTAG_HEADERS} for row in rows]
+
+    def _write_hashtag_rows(self, rows: list[dict[str, str]]) -> None:
+        if not self.hashtag_csv:
+            raise RuntimeError("hashtag_csv is required for hashtag tracking operations")
+        self.hashtag_csv.parent.mkdir(parents=True, exist_ok=True)
+        with self.hashtag_csv.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=self.HASHTAG_HEADERS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({header: row.get(header, "") for header in self.HASHTAG_HEADERS})
 
     def _read_calendar_rows(self) -> list[dict[str, str]]:
         if not self.calendar_csv.exists():

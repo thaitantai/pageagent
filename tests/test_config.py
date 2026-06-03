@@ -20,6 +20,9 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(settings.telegram_bot_token, "")
         self.assertEqual(settings.telegram_chat_id, "")
         self.assertEqual(settings.telegram_base_url, "https://api.telegram.org")
+        self.assertEqual(settings.fb_page_id, "")
+        self.assertEqual(settings.fb_page_token, "")
+        self.assertEqual(settings.fb_api_version, "v21.0")
         self.assertEqual(settings.artifacts_dir, root / "artifacts")
 
     def test_from_env_reads_explicit_values(self) -> None:
@@ -38,6 +41,9 @@ class SettingsTest(unittest.TestCase):
             "TELEGRAM_BOT_TOKEN": "bot-token",
             "TELEGRAM_CHAT_ID": "123456",
             "TELEGRAM_BASE_URL": "https://telegram.example",
+            "FB_PAGE_ID": "page-123",
+            "FB_PAGE_TOKEN": "token-abc",
+            "FB_API_VERSION": "v22.0",
             "ARTIFACTS_DIR": str(root / "tmp-artifacts"),
         }
         settings = Settings.from_env(env=env, root_dir=root, load_dotenv=False)
@@ -55,6 +61,9 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(settings.telegram_bot_token, "bot-token")
         self.assertEqual(settings.telegram_chat_id, "123456")
         self.assertEqual(settings.telegram_base_url, "https://telegram.example")
+        self.assertEqual(settings.fb_page_id, "page-123")
+        self.assertEqual(settings.fb_page_token, "token-abc")
+        self.assertEqual(settings.fb_api_version, "v22.0")
         self.assertEqual(settings.artifacts_dir, root / "tmp-artifacts")
 
     def test_from_env_loads_root_dotenv_without_overriding_explicit_env(self) -> None:

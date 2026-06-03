@@ -1,4 +1,7 @@
 pydantic>=2
-requests>=2
+scrapling>=0.4
+curl_cffi>=0.15
+browserforge>=1.2
+playwright>=1.60
 google-api-python-client>=2
 google-auth>=2

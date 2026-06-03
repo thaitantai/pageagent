@@ -12,7 +12,14 @@ def build_store(settings: Settings, args):
         history_file = getattr(args, "history_file", None)
         metrics_file = getattr(args, "metrics_file", None)
         triage_file = getattr(args, "triage_file", None)
-        return LocalSheetStore(calendar_file, history_csv=history_file, metrics_csv=metrics_file, triage_csv=triage_file)
+        hashtag_file = getattr(args, "hashtag_file", None) or (settings.artifacts_dir / "_local_store" / "hashtag_performance.csv")
+        return LocalSheetStore(
+            calendar_file,
+            history_csv=history_file,
+            metrics_csv=metrics_file,
+            triage_csv=triage_file,
+            hashtag_csv=hashtag_file,
+        )
     if backend == "google":
         return GoogleSheetsStore(settings=settings)
     raise ValueError(f"Unsupported store backend: {backend}")

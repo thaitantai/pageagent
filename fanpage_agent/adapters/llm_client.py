@@ -184,6 +184,31 @@ class MockLLMClient:
                 angles.extend(pillar.example_angles)
         return angles or [profile.content_pillars[0].description]
 
+    def chat_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ) -> dict:
+        """Mock tool-compatible response — just says WAIT."""
+        return {"role": "assistant", "content": json.dumps({"action": "WAIT", "reason": "mock"})}
+
+    def complete(self, prompt: str, *, system_prompt: str = "", max_tokens: int = 2000) -> str:
+        """Mock generic completion — returns a placeholder JSON hashtag response."""
+        # Return a canned hashtag response regardless of prompt
+        return json.dumps({
+            "suggestions": [
+                {"tag": "#mock_skincare", "tier": "high_volume", "relevance_score": 0.95, "reason": "mock fallback"},
+                {"tag": "#mock_routine", "tier": "high_volume", "relevance_score": 0.90, "reason": "mock fallback"},
+                {"tag": "#mock_tips", "tier": "medium_volume", "relevance_score": 0.85, "reason": "mock fallback"},
+                {"tag": "#mock_glow", "tier": "medium_volume", "relevance_score": 0.80, "reason": "mock fallback"},
+                {"tag": "#mock_acne_free", "tier": "low_volume", "relevance_score": 0.75, "reason": "mock fallback"},
+                {"tag": "#mock_genz", "tier": "branded", "relevance_score": 0.70, "reason": "mock fallback"},
+            ],
+            "recommended": ["#mock_skincare", "#mock_routine", "#mock_tips", "#mock_glow"],
+        })
+
 
 class OpenAICompatibleClient:
     def __init__(self, settings: Settings) -> None:
@@ -225,12 +250,37 @@ class OpenAICompatibleClient:
         )
         return CaptionPackage.model_validate(payload)
 
+    def complete(self, prompt: str, *, system_prompt: str = "", max_tokens: int = 2000) -> str:
+        """Generic completion — sends a user prompt, returns raw text.
+
+        Useful for one-off LLM calls (hashtags, summaries, etc.) that
+        don't need a structured response model.
+        """
+        final_system = system_prompt or "You are a helpful assistant. Respond in plain text."
+        for model in self._model_attempt_order():
+            try:
+                return self._chat_completion(
+                    system_prompt=final_system,
+                    user_prompt=prompt,
+                    model=model,
+                )
+            except RuntimeError as exc:
+                if self._should_try_next_model(str(exc)):
+                    continue
+                raise
+        raise RuntimeError("All models exhausted for generic completion")
+
     def _complete_json(self, system_prompt: str, user_prompt: str, response_model: type[WeeklyPlan | CaptionPackage]) -> dict:
         errors: list[str] = []
         for model in self._model_attempt_order():
             for _ in range(2):
                 try:
-                    raw_content = self._chat_completion(system_prompt=system_prompt, user_prompt=user_prompt, model=model)
+                    raw_content = self._chat_completion(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        model=model,
+                        response_format={"type": "json_object"},
+                    )
                 except RuntimeError as exc:
                     errors.append(f"{model}: {exc}")
                     if self._should_try_next_model(str(exc)):
@@ -250,17 +300,18 @@ class OpenAICompatibleClient:
             f"Errors: {' | '.join(errors)}"
         )
 
-    def _chat_completion(self, system_prompt: str, user_prompt: str, model: str) -> str:
+    def _chat_completion(self, system_prompt: str, user_prompt: str, model: str, *, response_format: dict | None = None) -> str:
         payload = {
             "model": model,
             "temperature": 0.2,
             "max_tokens": self.settings.llm_max_tokens,
-            "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         }
+        if response_format is not None:
+            payload["response_format"] = response_format
         request = Request(
             self.endpoint,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -513,7 +564,7 @@ class OpenAICompatibleClient:
     def _compact_research_payload(research_brief: ResearchBrief | None) -> dict | None:
         if not research_brief:
             return None
-        return {
+        result: dict = {
             "recommended_objectives": research_brief.recommended_objectives[:3],
             "recommended_pillars": research_brief.recommended_pillars[:4],
             "next_angles": research_brief.next_angles[:5],
@@ -522,6 +573,14 @@ class OpenAICompatibleClient:
             "overused_topics": research_brief.overused_topics[:4],
             "recommendations": research_brief.recommendations[:4],
         }
+        # Enrich with trend data if available
+        if research_brief.trend_keywords:
+            result["trend_keywords"] = research_brief.trend_keywords[:15]
+        if research_brief.trend_clusters:
+            result["trend_clusters"] = dict(
+                list(research_brief.trend_clusters.items())[:5]
+            )
+        return result
 
     @staticmethod
     def _weekly_plan_user_prompt(
@@ -581,6 +640,120 @@ class OpenAICompatibleClient:
             },
             ensure_ascii=False,
         )
+
+
+    # ── tools / function calling ─────────────────────────────────
+
+    def chat_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ) -> dict:
+        """Send messages with optional tools array.
+
+        Returns the full message dict from the LLM response.
+        If the LLM wants to call tools, the dict includes
+        ``tool_calls`` — a list of ``{id, type, function: {name, arguments}}``.
+        If the LLM responds with text, ``tool_calls`` is absent.
+
+        Uses model fallback like the rest of this client.
+        """
+        errors: list[str] = []
+        for model in self._model_attempt_order():
+            try:
+                return self._tool_completion(
+                    messages=messages,
+                    tools=tools,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            except RuntimeError as exc:
+                err = f"{model}: {exc}"
+                errors.append(err)
+                if self._should_try_next_model(str(exc)):
+                    continue
+                raise
+        raise RuntimeError(
+            f"All models exhausted for chat_with_tools. "
+            f"Errors: {' | '.join(errors[:3])}"
+        )
+
+    def _tool_completion(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None,
+        model: str,
+        temperature: float,
+        max_tokens: int | None,
+    ) -> dict:
+        """Raw HTTP call that returns the full message dict (with tool_calls)."""
+        payload: dict = {
+            "model": model,
+            "temperature": temperature,
+            "max_tokens": max_tokens or self.settings.llm_max_tokens,
+            "messages": messages,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
+        request = Request(
+            self.endpoint,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.settings.llm_api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=90) as response:
+                body = response.read().decode("utf-8")
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            raise RuntimeError(f"LLM HTTP error {exc.code}: {detail[:500]}") from exc
+        except URLError as exc:
+            raise RuntimeError(f"LLM connection error: {exc}") from exc
+
+        parsed: dict = json.loads(body)
+        choices = parsed.get("choices") or []
+        if not choices:
+            raise RuntimeError(f"LLM response missing choices: {body[:500]}")
+
+        message: dict = choices[0].get("message") or {}
+
+        # Normalise text content
+        content = message.get("content")
+        if isinstance(content, list):
+            text_parts = [
+                part.get("text", "") for part in content if isinstance(part, dict)
+            ]
+            message["content"] = "\n".join(p for p in text_parts if p)
+
+        # Parse tool_calls
+        raw_tool_calls = message.get("tool_calls") or []
+        if raw_tool_calls:
+            parsed_calls = []
+            for tc in raw_tool_calls:
+                fn = tc.get("function") or {}
+                try:
+                    args = json.loads(fn.get("arguments", "{}"))
+                except (json.JSONDecodeError, TypeError):
+                    args = {"raw": fn.get("arguments", "")}
+                parsed_calls.append({
+                    "id": tc.get("id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": fn.get("name", ""),
+                        "arguments": args,
+                    },
+                })
+            message["tool_calls"] = parsed_calls
+
+        return message
 
 
 def build_llm_client(settings: Settings):

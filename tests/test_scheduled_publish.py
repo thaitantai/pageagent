@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from datetime import date
@@ -131,6 +132,145 @@ class ScheduledPublishServiceTest(unittest.TestCase):
         self.assertEqual(rows[1]["status"], "published")
         self.assertIn("published_at", rows[0])
         self.assertTrue(rows[0]["published_at"])  # not empty
+
+
+class ScheduledPublishWithFacebookTest(unittest.TestCase):
+    """Test publishing with FacebookClient integration."""
+
+    def setUp(self):
+        sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
+        self.profile = load_brand_profile(sample)
+
+    def test_publishes_to_facebook_when_client_provided(self):
+        """When fb_client is provided, post_to_page should be called."""
+        # Build a minimal mock FacebookClient
+        class MockFacebookClient:
+            page_id = "123456789"
+
+            def post_to_page(self, message: str, link: str = "") -> dict:
+                self.last_message = message
+                return {"id": "123456789_987654321"}
+
+        mock_fb = MockFacebookClient()
+
+        # Create store with approved items
+        planner = PlannerService()
+        plan = planner.plan_week(profile=self.profile, start_date="2026-06-01", days=1)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            calendar = tmpdir / "content_calendar.csv"
+            history = tmpdir / "post_history.csv"
+            store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
+            store.append_plan(self.profile.brand_id, plan)
+
+            rows = store._read_calendar_rows()
+            rows[0]["approval_status"] = "approved"
+            rows[0]["status"] = "approved"
+
+            # Create a caption file
+            caption = tmpdir / "caption.json"
+            caption.write_text(json.dumps({
+                "topic": "Test topic",
+                "variants": [
+                    {
+                        "label": "A",
+                        "hook": "Bạn có biết điều này?",
+                        "caption": "Đây là nội dung bài viết.",
+                        "cta": "Nhắn tin để biết thêm",
+                        "tone_tags": ["ấm", "rõ"],
+                        "visual_brief": "",
+                    }
+                ],
+                "dos": [],
+                "donts": [],
+            }), encoding="utf-8")
+            rows[0]["final_caption_ref"] = str(caption)
+            store._write_calendar_rows(rows)
+
+            service = ScheduledPublishService(
+                store=store,
+                brand_id=self.profile.brand_id,
+                fb_client=mock_fb,  # type: ignore[arg-type]
+            )
+            result = service.publish_due(reference_date="2026-06-02")
+
+        self.assertEqual(result.published_count, 1)
+        self.assertIn("post_id", result.published[0])
+        self.assertEqual(result.published[0]["post_id"], "123456789_987654321")
+        self.assertIn("permalink", result.published[0])
+        self.assertIn("facebook.com", result.published[0]["permalink"])
+        self.assertIn("Bạn có biết điều này?", mock_fb.last_message)
+        self.assertIn("Đây là nội dung bài viết.", mock_fb.last_message)
+
+    def test_publishes_without_facebook_when_no_client(self):
+        """Without fb_client, it falls back to old behaviour (no API call)."""
+        planner = PlannerService()
+        plan = planner.plan_week(profile=self.profile, start_date="2026-06-01", days=1)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            calendar = tmpdir / "content_calendar.csv"
+            history = tmpdir / "post_history.csv"
+            store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
+            store.append_plan(self.profile.brand_id, plan)
+
+            rows = store._read_calendar_rows()
+            rows[0]["approval_status"] = "approved"
+            rows[0]["status"] = "approved"
+            store._write_calendar_rows(rows)
+
+            service = ScheduledPublishService(
+                store=store,
+                brand_id=self.profile.brand_id,
+                # no fb_client — should fall back silently
+            )
+            result = service.publish_due(reference_date="2026-06-02")
+
+        self.assertEqual(result.published_count, 1)
+        self.assertEqual(result.published[0]["post_id"], "")
+        base_id = f"{plan.plan_title}-1"
+        self.assertEqual(
+            result.published[0]["permalink"],
+            f"https://fanpage.auto/{base_id}",
+        )
+
+    def test_fail_open_when_facebook_errors(self):
+        """If Facebook API raises, we still mark as published locally (fail open)."""
+
+        class FailingFacebookClient:
+            page_id = "123456789"
+
+            def post_to_page(self, message: str, link: str = "") -> dict:
+                msg = "Facebook API error 400: (#200) Permission error"
+                raise RuntimeError(msg)
+
+        planner = PlannerService()
+        plan = planner.plan_week(profile=self.profile, start_date="2026-06-01", days=1)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            calendar = tmpdir / "content_calendar.csv"
+            history = tmpdir / "post_history.csv"
+            store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
+            store.append_plan(self.profile.brand_id, plan)
+
+            rows = store._read_calendar_rows()
+            rows[0]["approval_status"] = "approved"
+            rows[0]["status"] = "approved"
+            store._write_calendar_rows(rows)
+
+            service = ScheduledPublishService(
+                store=store,
+                brand_id=self.profile.brand_id,
+                fb_client=FailingFacebookClient(),  # type: ignore[arg-type]
+            )
+            result = service.publish_due(reference_date="2026-06-02")
+
+        # Published count should still be 1 (fail open) with error field
+        self.assertEqual(result.published_count, 1)
+        self.assertIn("error", result.published[0])
+        self.assertIn("Facebook API error", result.published[0]["error"])
 
 
 if __name__ == "__main__":

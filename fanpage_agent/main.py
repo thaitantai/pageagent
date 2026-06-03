@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -10,6 +11,7 @@ from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
+from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
 from fanpage_agent.services.analytics import AnalyticsService
@@ -24,9 +26,13 @@ from fanpage_agent.services.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
 )
+from fanpage_agent.services.hashtag import HashtagService
+from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
 from fanpage_agent.services.scheduled_publish import ScheduledPublishService
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
+from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.utils import dump_json
 
 
@@ -385,8 +391,60 @@ def build_parser() -> argparse.ArgumentParser:
     scheduled_parser = subparsers.add_parser("scheduled-publish")
     scheduled_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     scheduled_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    scheduled_parser.add_argument("--hashtag-file")
     scheduled_parser.add_argument("--reference-date")
     scheduled_parser.add_argument("--brand-file", default=str(ROOT_DIR / "data" / "sample" / "brand_profile.json"))
+
+    # ── generate-image: generate an image from a visual brief ──
+    img_parser = subparsers.add_parser("generate-image")
+    img_parser.add_argument("prompt", nargs="?", help="Visual brief text (reads from stdin if omitted)")
+    img_parser.add_argument("--output", help="Output file path (auto-generates if omitted)")
+
+    # ── list-calendar: browse content calendar items ──────────
+    cal_list = subparsers.add_parser("list-calendar")
+    cal_list.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    cal_list.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    cal_list.add_argument("--brand-id", help="Filter by brand_id")
+    cal_list.add_argument("--status", help="Filter by status (planned/approved/published)")
+    cal_list.add_argument("--approval-status", help="Filter by approval_status (pending/approved/rejected)")
+    cal_list.add_argument("--date", help="Filter by exact date (YYYY-MM-DD)")
+    cal_list.add_argument("--limit", type=int, default=20, help="Max items to show")
+    cal_list.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # ── approve-calendar-item: approve a calendar item ───────
+    cal_approve = subparsers.add_parser("approve-calendar-item")
+    cal_approve.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    cal_approve.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    cal_approve.add_argument("--calendar-id", required=True)
+    cal_approve.add_argument("--final-caption-ref", help="Path to final caption JSON")
+    cal_approve.add_argument("--approved-by", default="admin", help="Who approved")
+
+    # ── reject-calendar-item: reject a calendar item ─────────
+    cal_reject = subparsers.add_parser("reject-calendar-item")
+    cal_reject.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    cal_reject.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    cal_reject.add_argument("--calendar-id", required=True)
+    cal_reject.add_argument("--reason", default="Needs revision", help="Rejection reason")
+
+    # ── check-calendar-gaps: find scheduling gaps ────────────
+    cal_gaps = subparsers.add_parser("check-calendar-gaps")
+    cal_gaps.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    cal_gaps.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    cal_gaps.add_argument("--brand-id", help="Filter by brand_id")
+    cal_gaps.add_argument("--start-date", help="Start date (YYYY-MM-DD, default: today)")
+    cal_gaps.add_argument("--end-date", help="End date (YYYY-MM-DD, default: today+14)")
+    cal_gaps.add_argument("--max-gap-days", type=int, default=3, help="Alert on gaps longer than N days")
+    cal_gaps.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # ── fill-calendar-gaps: auto-detect + fill gaps ────────────
+    fill_gaps = subparsers.add_parser("fill-calendar-gaps")
+    fill_gaps.add_argument("--brand-file", required=True)
+    fill_gaps.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    fill_gaps.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    fill_gaps.add_argument("--start-date", help="Start date (YYYY-MM-DD, default: today)")
+    fill_gaps.add_argument("--lookahead-days", type=int, default=3, help="How many days forward to scan")
+    fill_gaps.add_argument("--max-items", type=int, default=3, help="Max items to fill per run")
+    fill_gaps.add_argument("--json", action="store_true", help="Output raw JSON")
 
     record_metrics_parser = subparsers.add_parser("record-post-metrics")
     record_metrics_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
@@ -415,6 +473,48 @@ def build_parser() -> argparse.ArgumentParser:
     report_delivery_parser.add_argument("--save", action="store_true")
     report_delivery_parser.add_argument("--chat-id")
     add_store_backend_arg(report_delivery_parser)
+
+    analytics_parser = subparsers.add_parser("analytics-review")
+    analytics_parser.add_argument("--brand-file", required=True)
+    analytics_parser.add_argument("--days", type=int, default=7)
+    analytics_parser.add_argument("--record", action="store_true", help="Write metrics to store (without --record, preview only)")
+    analytics_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    analytics_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    analytics_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    analytics_parser.add_argument("--save", action="store_true")
+    analytics_parser.add_argument("--now")
+    add_store_backend_arg(analytics_parser)
+
+    analytics_delivery_parser = subparsers.add_parser("deliver-analytics-review")
+    analytics_delivery_parser.add_argument("--brand-file", required=True)
+    analytics_delivery_parser.add_argument("--days", type=int, default=7)
+    analytics_delivery_parser.add_argument("--record", action="store_true", help="Write metrics to store (without --record, preview only)")
+    analytics_delivery_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    analytics_delivery_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    analytics_delivery_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    analytics_delivery_parser.add_argument("--save", action="store_true")
+    analytics_delivery_parser.add_argument("--chat-id")
+    analytics_delivery_parser.add_argument("--now")
+    add_store_backend_arg(analytics_delivery_parser)
+
+    BRAND_FILE_DEFAULT: str = str(ROOT_DIR / "data" / "brand_profile.json")
+    dashboard_parser = subparsers.add_parser("generate-dashboard")
+    dashboard_parser.add_argument("--brand-file", default=BRAND_FILE_DEFAULT)
+    dashboard_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    dashboard_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    dashboard_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    dashboard_parser.add_argument("--days", type=int, default=7)
+    dashboard_parser.add_argument("--save", action="store_true", help="Save dashboard HTML to artifacts")
+    add_store_backend_arg(dashboard_parser)
+
+    dashboard_delivery_parser = subparsers.add_parser("deliver-dashboard")
+    dashboard_delivery_parser.add_argument("--brand-file", default=BRAND_FILE_DEFAULT)
+    dashboard_delivery_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    dashboard_delivery_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    dashboard_delivery_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    dashboard_delivery_parser.add_argument("--days", type=int, default=7)
+    dashboard_delivery_parser.add_argument("--chat-id")
+    add_store_backend_arg(dashboard_delivery_parser)
 
     ops_status_parser = subparsers.add_parser("ops-status")
     ops_status_parser.add_argument(
@@ -457,6 +557,50 @@ def build_parser() -> argparse.ArgumentParser:
     telegram_send_parser.add_argument("--artifact-type", required=True, choices=["plan", "caption", "report", "triage", "approved_replies", "approval", "approval_audit", "metrics", "operator", "research"])
     telegram_send_parser.add_argument("--input-file", required=True)
     telegram_send_parser.add_argument("--chat-id")
+
+    # ── research-trends: scrape web + analyze trends ──────────
+    research_trends_parser = subparsers.add_parser("research-trends")
+    research_trends_parser.add_argument("--timeout", type=int, default=30, help="Timeout per request (sec)")
+    research_trends_parser.add_argument("--tldr", action="store_true", help="Only print summary (no full report)")
+    research_trends_parser.add_argument("--save", action="store_true", help="Save report to JSON")
+
+    # ── generate-hashtags: LLM-powered hashtag generation ────
+    hashtag_parser = subparsers.add_parser("generate-hashtags")
+    hashtag_parser.add_argument("--brand-file", required=True)
+    hashtag_parser.add_argument("--topic", required=True)
+    hashtag_parser.add_argument("--pillar", required=True)
+    hashtag_parser.add_argument("--objective", default="engagement")
+    hashtag_parser.add_argument("--angle", default="")
+    hashtag_parser.add_argument("--brand-id", default="", help="Override brand_id if brand file has multiple")
+    hashtag_parser.add_argument("--no-llm", action="store_true", help="Use rule-based fallback only")
+    hashtag_parser.add_argument("--json", action="store_true", help="Output raw JSON instead of formatted text")
+
+    # ── auto-fetch-metrics: fetch missing FB metrics ────────
+    metrics_fetch_parser = subparsers.add_parser("auto-fetch-metrics")
+    metrics_fetch_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    metrics_fetch_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    metrics_fetch_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    metrics_fetch_parser.add_argument("--days-back", type=int, default=30, help="Process items within this many days")
+    metrics_fetch_parser.add_argument("--json", action="store_true", help="Output raw JSON")
+    add_store_backend_arg(metrics_fetch_parser)
+
+    # ── fetch-fb-comments: pull real comments from FB API ─────
+    fb_comment_parser = subparsers.add_parser("fetch-fb-comments")
+    fb_comment_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    fb_comment_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    fb_comment_parser.add_argument("--comment-file", default=str(DEFAULT_COMMENT_FILE))
+    fb_comment_parser.add_argument("--post-limit", type=int, default=10, help="Max recent posts to scan")
+    fb_comment_parser.add_argument("--comment-limit", type=int, default=50, help="Max comments per post")
+    fb_comment_parser.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # ── agent commands ──────────────────────────────────
+    tick_parser = subparsers.add_parser("agent-tick", help="Run one autonomous agent cycle")
+    tick_parser.add_argument("--config", help="Path to agent config JSON")
+    tick_parser.add_argument("--max-actions", type=int, default=5, help="Max actions per tick")
+
+    daemon_parser = subparsers.add_parser("agent-daemon", help="Run agent in daemon mode (infinite loop)")
+    daemon_parser.add_argument("--config", help="Path to agent config JSON")
+    daemon_parser.add_argument("--interval", type=int, default=7200, help="Tick interval in seconds")
 
     return parser
 
@@ -1018,18 +1162,198 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
+        hashtag_csv=settings.artifacts_dir / "_local_store" / "hashtag_performance.csv",
     )
+
+    # Build Facebook client if credentials are available
+    fb_client: FacebookClient | None = None
+    if settings.fb_page_id and settings.fb_page_token:
+        fb_client = FacebookClient(settings)
+
+    # Build image service (generates images from visual_brief)
+    from fanpage_agent.services.image_gen import build_image_service
+    image_service = build_image_service(settings)
 
     service = ScheduledPublishService(
         store=store,
         brand_id=profile.brand_id,
         verifier=VerifierService(),
         brand_profile=profile,
+        fb_client=fb_client,
+        image_service=image_service,
     )
     result = service.publish_due(reference_date=args.reference_date)
     payload = result.to_dict()
+    payload["fb_published"] = fb_client is not None
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
+
+
+def cmd_generate_image(args: argparse.Namespace) -> int:
+    """Generate an image from a visual brief prompt."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    from fanpage_agent.services.image_gen import build_image_service
+
+    prompt = args.prompt
+    if not prompt:
+        prompt = sys.stdin.read().strip()
+    if not prompt:
+        print("ERROR: No prompt provided. Pass as argument or pipe via stdin.", file=sys.stderr)
+        return 1
+
+    svc = build_image_service(settings)
+    output = args.output or None
+    result_path = svc.generate(prompt, output_dir=output)
+    print(json.dumps({"image_path": result_path}, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_list_calendar(args: argparse.Namespace) -> int:
+    """List content calendar items with filters."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+    items = store.list_calendar_items(
+        brand_id=args.brand_id,
+        status=args.status,
+        approval_status=args.approval_status,
+        date=args.date,
+        limit=args.limit,
+    )
+    if args.json:
+        print(json.dumps(items, ensure_ascii=False, indent=2))
+        return 0
+
+    if not items:
+        print("No items found.")
+        return 0
+
+    # Table-like output for Telegram/terminal
+    print(f"📋 Calendar items ({len(items)}):\n")
+    for item in items:
+        cid = item.get("calendar_id", "?")
+        b = item.get("brand_id", "?")
+        d = item.get("date", "?")
+        t = item.get("topic", "?")[:50]
+        s = item.get("status", "?")
+        a = f"{item.get('approval_status', '?')[:8]}"
+        p = "📸" if item.get("visual_brief") else ""
+        print(f"  [{s}/{a}] {d} | {b} | {cid}\n    {t} {p}")
+    return 0
+
+
+def cmd_approve_calendar_item(args: argparse.Namespace) -> int:
+    """Approve a content calendar item."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+    from datetime import datetime as _dt
+    now = _dt.now(timezone.utc).isoformat()
+    result = store.approve_calendar_item(
+        calendar_id=args.calendar_id,
+        approved_by=args.approved_by,
+        final_caption_ref=args.final_caption_ref or "",
+        approved_at=now,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_reject_calendar_item(args: argparse.Namespace) -> int:
+    """Reject a content calendar item."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+    from datetime import datetime as _dt
+    now = _dt.now(timezone.utc).isoformat()
+    result = store.reject_calendar_item(
+        calendar_id=args.calendar_id,
+        reason=args.reason,
+        rejected_at=now,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
+    """Find gaps in the content calendar."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+    gaps = store.check_calendar_gaps(
+        brand_id=args.brand_id,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        max_gap_days=args.max_gap_days,
+    )
+    if args.json:
+        print(json.dumps(gaps, ensure_ascii=False, indent=2))
+        return 0
+    if not gaps:
+        print("✅ No significant gaps found.")
+    else:
+        for g in gaps:
+            print(f"  ⚠️  Gap: {g['start_date']} → {g['end_date']} ({g['gap_days']} days)")
+    return 0
+
+
+def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
+    """Auto-detect and fill gaps in the content calendar."""
+    import json as _json
+    from fanpage_agent.services.calendar_gap_service import CalendarGapService
+    from fanpage_agent.services.planner import PlannerService
+    from fanpage_agent.services.writer import WriterService
+    from fanpage_agent.adapters.sheet_store import LocalSheetStore
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    profile = load_brand_profile(args.brand_file)
+    llm_client = build_llm_client(settings)
+    store = LocalSheetStore(
+        calendar_csv=args.calendar_file,
+        history_csv=args.history_file,
+    )
+    gap_svc = CalendarGapService(
+        planner=PlannerService(llm_client=llm_client),
+        writer=WriterService(llm_client=llm_client),
+        artifacts_dir=ROOT_DIR / "artifacts" / "captions",
+    )
+    result = gap_svc.fill_gaps(
+        profile=profile,
+        store=store,
+        start_date=args.start_date,
+        lookahead_days=args.lookahead_days,
+        max_items=args.max_items,
+    )
+    if args.json:
+        print(_json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        return 0
+
+    if result.filled_count > 0:
+        print(f"✅ Filled {result.filled_count} gap(s):")
+        for item in result.filled:
+            print(f"  📝 {item['date']} — {item['pillar']}: {item['topic']}")
+    else:
+        print("ℹ️  No gaps filled.")
+
+    if result.skipped_count > 0:
+        print(f"⏭️  Skipped {result.skipped_count}:")
+        for item in result.skipped:
+            print(f"  {item['date']} — {item['reason']}")
+
+    if result.error_count > 0:
+        print(f"❌ {result.error_count} error(s):")
+        for item in result.errors:
+            print(f"  {item.get('date', item.get('calendar_id', '?'))} — {item['reason']}")
+
+    return 0 if result.error_count == 0 else 1
 
 
 def cmd_record_post_metrics(args: argparse.Namespace) -> int:
@@ -1065,6 +1389,75 @@ def cmd_deliver_weekly_report(args: argparse.Namespace) -> int:
     if args.save:
         dump_json(settings.artifacts_dir / "reports" / "weekly-report.json", payload)
     payload["delivery"] = DeliveryService(settings).deliver_weekly_report(payload, chat_id=args.chat_id)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_analytics_review(args: argparse.Namespace) -> int:
+    from fanpage_agent.services.analytics_reviewer import AnalyticsReviewer
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    _ = load_brand_profile(args.brand_file)
+    store = build_store(settings=settings, args=args)
+    fb_client = FacebookClient(settings)
+    reviewer = AnalyticsReviewer(settings, fb_client=fb_client)
+    payload = reviewer.run_review(store=store, days=args.days, record=args.record)
+    if args.save:
+        dump_json(settings.artifacts_dir / "reports" / "analytics-review.json", payload)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_deliver_analytics_review(args: argparse.Namespace) -> int:
+    from fanpage_agent.services.analytics_reviewer import AnalyticsReviewer
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    _ = load_brand_profile(args.brand_file)
+    store = build_store(settings=settings, args=args)
+    fb_client = FacebookClient(settings)
+    reviewer = AnalyticsReviewer(settings, fb_client=fb_client)
+    payload = reviewer.run_review(store=store, days=args.days, record=args.record)
+    if args.save:
+        dump_json(settings.artifacts_dir / "reports" / "analytics-review.json", payload)
+    payload["delivery"] = DeliveryService(settings).deliver_analytics_review(payload, chat_id=args.chat_id)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_generate_dashboard(args: argparse.Namespace) -> int:
+    from fanpage_agent.services.analytics_dashboard import AnalyticsDashboardService
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    metrics = build_store(settings=settings, args=args).read_post_metrics()
+    svc = AnalyticsDashboardService(settings.artifacts_dir)
+    result = svc.generate(metrics, days=args.days)
+    if args.save:
+        pass  # already saved in generate()
+    print(f"📊 Dashboard saved: {result['path']}")
+    print(f"   Period: {args.days}d | Posts: {result['total_posts']} | Reach: {result['total_reach']} | Eng: {result['total_engagements']}")
+    return 0
+
+
+def cmd_deliver_dashboard(args: argparse.Namespace) -> int:
+    from fanpage_agent.services.analytics_dashboard import AnalyticsDashboardService
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    metrics = build_store(settings=settings, args=args).read_post_metrics()
+    svc = AnalyticsDashboardService(settings.artifacts_dir)
+    result = svc.generate(metrics, days=args.days)
+
+    # Send HTML file via delivery service
+    payload = {
+        "type": "dashboard",
+        "path": result["path"],
+        "generated_at": result["generated_at"],
+        "total_posts": result["total_posts"],
+        "total_reach": result["total_reach"],
+        "total_engagements": result["total_engagements"],
+    }
+    payload["delivery"] = DeliveryService(settings).deliver_analytics_review(
+        payload, chat_id=args.chat_id
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -1406,6 +1799,207 @@ def cmd_send_telegram_preview(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_research_trends(args: argparse.Namespace) -> int:
+    """Scrape web trends and analyze for skincare/healthcare topics."""
+    scraper = TrendScraper(timeout=args.timeout)
+    trends = scraper.fetch_all()
+
+    if not trends:
+        print("⚠ Khong lay duoc trend tu nguon nao.")
+        return 1
+
+    analyzer = TrendAnalyzer(trends)
+    report = analyzer.generate_report()
+
+    if args.tldr:
+        print(f"📊 {report['total_trends']} trends tu {len(report['sources'])} nguon\n")
+        print("Top keywords:")
+        for kw in report["top_keywords"][:10]:
+            print(f"  {kw['word']} ({kw['count']})")
+        print()
+        for label, items in list(report["clusters"].items())[:5]:
+            print(f"[{label}] ({len(items)} items)")
+        print()
+        print("Top relevant cho skincare/healthcare:")
+        for item in report["top_relevant"][:5]:
+            print(f"  {item['score']:.0%} - {item['title'][:60]}")
+    else:
+        # Full report
+        print(f"=== 🌐 Research Trends ===")
+        print(f"Tong: {report['total_trends']} trends tu {len(report['sources'])} nguon\n")
+
+        print("--- Top Keywords ---")
+        for kw in report["top_keywords"][:20]:
+            print(f"  {kw['word']:20s} ✕ {kw['count']}")
+
+        print("\n--- Top Phrases ---")
+        for ph in report["top_phrases"][:15]:
+            print(f"  {ph['phrase']:30s} ✕ {ph['count']}")
+
+        print("\n--- Clusters ---")
+        for label, items in list(report["clusters"].items())[:10]:
+            print(f"  [{label}] ({len(items)} items)")
+            for t in items[:3]:
+                print(f"    - {t[:60]}")
+            if len(items) > 3:
+                print(f"    ... +{len(items)-3} more")
+
+        print("\n--- Top Relevant (skincare/healthcare) ---")
+        for item in report["top_relevant"][:10]:
+            print(f"  {item['score']:.0%} | {item['title'][:55]}")
+            print(f"     [{item['source']}]")
+
+    if args.save:
+        path = ROOT_DIR / "data" / f"research-trends-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        dump_json(path, report)
+        print(f"\n💾 Saved to {path}")
+
+    return 0
+
+
+def cmd_generate_hashtags(args: argparse.Namespace) -> int:
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    profile = load_brand_profile(args.brand_file)
+    llm_client = build_llm_client(settings) if settings.llm_provider != "mock-local" or not args.no_llm else None
+    service = HashtagService(llm_client=llm_client, settings=settings)
+
+    result = service.generate(
+        topic=args.topic,
+        pillar=args.pillar,
+        objective=args.objective,
+        angle=args.angle,
+        brand_id=profile.brand_id,
+        use_llm=not args.no_llm,
+    )
+
+    # Convert to serializable dict
+    output = {
+        "content_topic": result.content_topic,
+        "pillar": result.pillar,
+        "objective": result.objective,
+        "suggestions": [
+            {"tag": s.tag, "tier": s.tier, "relevance_score": s.relevance_score, "reason": s.reason}
+            for s in result.suggestions
+        ],
+        "recommended": result.recommended,
+    }
+
+    if args.json:
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        formatter = TelegramFormatterService()
+        print(formatter.format_hashtag_set(output))
+
+    return 0
+
+
+def cmd_auto_fetch_metrics(args: argparse.Namespace) -> int:
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    service = MetricsAutoFetchService(settings=settings)
+    result = service.auto_fetch(store=store, days_back=args.days_back)
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+    else:
+        formatter = TelegramFormatterService()
+        print(formatter.format_metrics_auto_fetch(result))
+
+    return 0
+
+
+def cmd_fetch_fb_comments(args: argparse.Namespace) -> int:
+    """Fetch real comments from FB API and merge into comment_inbox.csv.
+
+    Get recent published posts → fetch comments → dedup by FB comment id → save.
+    """
+    import csv
+    from fanpage_agent.adapters.facebook_client import FacebookClient
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    comment_path = Path(args.comment_file)
+
+    # 1. Fetch recent posts from FB
+    fb = FacebookClient(settings)
+    print(f"📡 Fetching up to {args.post_limit} recent posts from FB...")
+    try:
+        posts = fb.get_page_posts(limit=args.post_limit)
+    except Exception as e:
+        print(f"❌ Failed to fetch posts: {e}")
+        return 1
+
+    if not posts:
+        print("⚠️  No recent posts found.")
+        return 0
+
+    # 2. Fetch comments for each post
+    all_comments: list[dict] = []
+    for post in posts:
+        post_id = post.get("id", "")
+        if not post_id:
+            continue
+        print(f"  📝 Post {post_id}: fetching comments...")
+        try:
+            comments = fb.get_comments(post_id, limit=args.comment_limit)
+        except Exception as e:
+            print(f"  ⚠️  Error fetching comments for {post_id}: {e}")
+            continue
+        for c in comments:
+            c["post_id"] = post_id
+            all_comments.append(c)
+
+    print(f"✅ Fetched {len(all_comments)} comments across {len(posts)} posts.")
+
+    if not all_comments:
+        return 0
+
+    # 3. Read existing comments
+    existing_ids: set[str] = set()
+    existing_rows: list[dict] = []
+    if comment_path.exists():
+        with comment_path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames or ["id", "post_id", "created_at", "source", "message"]
+            for row in reader:
+                existing_rows.append(row)
+                if row.get("id"):
+                    existing_ids.add(row["id"])
+
+    # 4. Merge new comments (dedup by FB comment id)
+    new_rows: list[dict] = []
+    for c in all_comments:
+        cid = c.get("id", "")
+        if cid and cid in existing_ids:
+            continue
+        new_rows.append({
+            "id": c.get("id", ""),
+            "post_id": c.get("post_id", ""),
+            "created_at": c.get("created_time", ""),
+            "source": "facebook_comment",
+            "message": c.get("message", ""),
+        })
+        if cid:
+            existing_ids.add(cid)
+
+    if not new_rows:
+        print("ℹ️  No new comments to add.")
+        return 0
+
+    # 5. Write back
+    all_rows = existing_rows + new_rows
+    fieldnames = ["id", "post_id", "created_at", "source", "message"]
+    with comment_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(all_rows)
+
+    print(f"✅ Added {len(new_rows)} new comments. Total: {len(all_rows)}.")
+    if args.json:
+        print(json.dumps({"added": len(new_rows), "total": len(all_rows)}, ensure_ascii=False))
+
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1461,14 +2055,40 @@ def main() -> int:
         return cmd_process_pending(args)
     if args.command == "scheduled-publish":
         return cmd_scheduled_publish(args)
+    if args.command == "generate-image":
+        return cmd_generate_image(args)
+    if args.command == "list-calendar":
+        return cmd_list_calendar(args)
+    if args.command == "approve-calendar-item":
+        return cmd_approve_calendar_item(args)
+    if args.command == "reject-calendar-item":
+        return cmd_reject_calendar_item(args)
+    if args.command == "check-calendar-gaps":
+        return cmd_check_calendar_gaps(args)
+    if args.command == "fill-calendar-gaps":
+        return cmd_fill_calendar_gaps(args)
     if args.command == "record-post-metrics":
         return cmd_record_post_metrics(args)
     if args.command == "weekly-report":
         return cmd_weekly_report(args)
     if args.command == "deliver-weekly-report":
         return cmd_deliver_weekly_report(args)
+    if args.command == "analytics-review":
+        return cmd_analytics_review(args)
+    if args.command == "deliver-analytics-review":
+        return cmd_deliver_analytics_review(args)
+    if args.command == "generate-dashboard":
+        return cmd_generate_dashboard(args)
+    if args.command == "deliver-dashboard":
+        return cmd_deliver_dashboard(args)
     if args.command == "ops-status":
         return cmd_ops_status(args)
+    if args.command == "research-trends":
+        return cmd_research_trends(args)
+    if args.command == "generate-hashtags":
+        return cmd_generate_hashtags(args)
+    if args.command == "auto-fetch-metrics":
+        return cmd_auto_fetch_metrics(args)
     if args.command == "hermes-cron-status":
         return cmd_hermes_cron_status(args)
     if args.command == "eval-all":
@@ -1477,6 +2097,32 @@ def main() -> int:
         return cmd_preview_telegram(args)
     if args.command == "send-telegram-preview":
         return cmd_send_telegram_preview(args)
+    if args.command == "fetch-fb-comments":
+        return cmd_fetch_fb_comments(args)
+
+    # ── agent commands ──────────────────────────────────
+    if args.command == "agent-tick":
+        from fanpage_agent.agent.config import AgentConfig
+        from fanpage_agent.agent.scheduler import tick
+
+        cfg = AgentConfig(max_actions_per_tick=args.max_actions)
+        if args.config:
+            cfg = __import__("fanpage_agent.agent.scheduler", fromlist=["load_config"]).load_config(args.config)
+        import json as _json
+        result = tick(cfg)
+        print(_json.dumps(result, ensure_ascii=False, indent=2, default=str))
+        return 0
+
+    if args.command == "agent-daemon":
+        from fanpage_agent.agent.config import AgentConfig
+        from fanpage_agent.agent.scheduler import daemon
+
+        cfg = AgentConfig(tick_interval_seconds=args.interval)
+        if args.config:
+            cfg = __import__("fanpage_agent.agent.scheduler", fromlist=["load_config"]).load_config(args.config)
+        daemon(cfg)
+        return 0
+
     parser.error(f"Unknown command: {args.command}")
     return 2
 

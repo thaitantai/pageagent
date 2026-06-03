@@ -92,6 +92,24 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(payload["recommended_objectives"], ["lead"])
         self.assertEqual(payload["recommendations"], ["Ưu tiên câu hỏi thật từ inbox"])
         self.assertNotIn("objective_focus", payload)
+        self.assertNotIn("trend_keywords", payload)
+        self.assertNotIn("trend_clusters", payload)
+
+    def test_compact_research_payload_includes_trend_data(self) -> None:
+        """Trend data được inject vào payload khi có trend_keywords/trend_clusters."""
+        payload = OpenAICompatibleClient._compact_research_payload(
+            ResearchBrief(
+                trend_keywords=["dưỡng ẩm", "chống nắng", "retinol", "mụn", "nám"],
+                trend_clusters={
+                    "dưỡng ẩm": ["Cách chọn kem dưỡng ẩm", "Dưỡng ẩm mùa hè"],
+                    "chống nắng": ["Chống nắng đúng cách"],
+                },
+            )
+        )
+        self.assertIn("trend_keywords", payload)
+        self.assertEqual(payload["trend_keywords"], ["dưỡng ẩm", "chống nắng", "retinol", "mụn", "nám"])
+        self.assertIn("trend_clusters", payload)
+        self.assertIn("dưỡng ẩm", payload["trend_clusters"])
 
     def test_weekly_plan_prompt_avoids_days_input_collision_with_output_schema(self) -> None:
         prompt = json.loads(

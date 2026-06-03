@@ -205,6 +205,70 @@ class GoogleSheetsStore:
             for row in rows
         ]
 
+    def record_hashtag_usage(
+        self,
+        calendar_id: str,
+        brand_id: str,
+        hashtags: list[str],
+        topic: str = "",
+        reach: int = 0,
+        engagements: int = 0,
+        recorded_at: str | None = None,
+    ) -> dict[str, str]:
+        from datetime import datetime, timezone
+
+        now = recorded_at or datetime.now(timezone.utc).isoformat()
+        headers = LocalSheetStore.HASHTAG_HEADERS
+        tab_name = self._tab_name("hashtag_performance")
+        self._ensure_headers(tab_name, headers)
+        row = {
+            "calendar_id": calendar_id,
+            "brand_id": brand_id,
+            "topic": topic,
+            "hashtags": " ".join(hashtags),
+            "reach": str(reach),
+            "engagements": str(engagements),
+            "recorded_at": now,
+        }
+        self._append_rows(tab_name, [[row.get(h, "") for h in headers]])
+        return row
+
+    def read_hashtag_performance(
+        self,
+        brand_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        headers = LocalSheetStore.HASHTAG_HEADERS
+        rows = self._read_tab_as_dicts(self._tab_name("hashtag_performance"), headers)
+        if brand_id:
+            rows = [r for r in rows if r.get("brand_id") == brand_id]
+
+        agg: dict[str, dict[str, int]] = {}
+        for row in rows:
+            tags = row.get("hashtags", "").strip().split()
+            r_reach = int(row.get("reach", 0) or 0)
+            r_eng = int(row.get("engagements", 0) or 0)
+            for tag in tags:
+                tag = tag.strip().lower()
+                if not tag:
+                    continue
+                if tag not in agg:
+                    agg[tag] = {"reach": 0, "engagements": 0, "post_count": 0}
+                agg[tag]["reach"] += r_reach
+                agg[tag]["engagements"] += r_eng
+                agg[tag]["post_count"] += 1
+
+        sorted_tags = sorted(agg.items(), key=lambda x: x[1]["reach"], reverse=True)
+        return [
+            {
+                "hashtag": tag,
+                "total_reach": stats["reach"],
+                "total_engagements": stats["engagements"],
+                "post_count": stats["post_count"],
+            }
+            for tag, stats in sorted_tags[:limit]
+        ]
+
     def upsert_triage_items(self, brand_id: str, items: list[CommunityTriageItem]) -> list[dict[str, str]]:
         tab_name = self._tab_name("comment_triage")
         headers = LocalSheetStore.TRIAGE_HEADERS

@@ -2,8 +2,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
+from fanpage_agent.models import TrendItem
 from fanpage_agent.services.research import ResearchService
 
 
@@ -63,6 +65,52 @@ class ResearchServiceTest(unittest.TestCase):
             self.assertIn("soi da", brief.campaign_focus)
             self.assertIn("Routine phục hồi da", brief.top_performing_topics)
             self.assertTrue(any("lead" in item.lower() for item in brief.recommendations))
+
+    def test_build_brief_enriches_with_trend_analyzer(self) -> None:
+        """ResearchBrief chứa trend_keywords và trend_clusters khi có TrendAnalyzer."""
+        mock_scraper = MagicMock()
+        mock_scraper.fetch_all.return_value = [
+            TrendItem(title="Cách chọn kem dưỡng ẩm cho da dầu", source="VnExpress"),
+            TrendItem(title="Chống nắng mùa hè đúng cách", source="24h"),
+            TrendItem(title="Retinol có nên dùng hàng ngày không", source="Afamily"),
+            TrendItem(title="Trị mụn hiệu quả với BHA", source="VnExpress"),
+            TrendItem(title="Dưỡng ẩm sâu cho da khô", source="24h"),
+        ]
+
+        from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
+
+        service = ResearchService(trend_scraper=mock_scraper, trend_analyzer=TrendAnalyzer([]))
+        store = MagicMock()
+        store.read_post_history.return_value = []
+        store.read_post_metrics.return_value = []
+
+        brief = service.build_brief(store=store)
+
+        self.assertGreater(len(brief.trend_keywords), 0)
+        self.assertGreater(len(brief.trend_clusters), 0)
+        # trend_keywords should contain some of the words from trend titles
+        trend_words_flat = set(brief.trend_keywords)
+        common = trend_words_flat & {"dưỡng", "ẩm", "kem", "chống", "nắng", "mụn", "da"}
+        self.assertGreater(len(common), 0)
+        # recommendations should mention trend data
+        trend_recs = [r for r in brief.recommendations if "trend" in r.lower() or "keyword" in r.lower() or "cluster" in r.lower()]
+        self.assertGreater(len(trend_recs), 0)
+
+    def test_build_brief_skips_trend_analyzer_when_not_configured(self) -> None:
+        """Không crash khi không có TrendAnalyzer."""
+        mock_scraper = MagicMock()
+        mock_scraper.fetch_all.return_value = [
+            TrendItem(title="Test title", source="Test"),
+        ]
+
+        service = ResearchService(trend_scraper=mock_scraper)
+        store = MagicMock()
+        store.read_post_history.return_value = []
+        store.read_post_metrics.return_value = []
+
+        brief = service.build_brief(store=store)
+        self.assertEqual(brief.trend_keywords, [])
+        self.assertEqual(brief.trend_clusters, {})
 
 
 if __name__ == "__main__":

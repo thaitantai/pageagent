@@ -97,3 +97,11 @@ class DeliveryService:
             "sent_count": 1,
             "results": [result],
         }
+
+    def deliver_analytics_review(self, payload: dict, chat_id: str | None = None) -> dict:
+        message = self.formatter.format_analytics_review(payload)
+        result = self.telegram_client.send_message(message, chat_id=chat_id)
+        return {
+            "sent_count": 1,
+            "results": [result],
+        }
