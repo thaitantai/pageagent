@@ -57,6 +57,7 @@ class PublisherAgent(BaseAgent):
             "track_performance",
             "delete_post",
             "fetch_metrics",
+            "refresh_metrics",
         ]
 
     def handle_task(self, task: AgentTask) -> AgentResult:
@@ -65,7 +66,8 @@ class PublisherAgent(BaseAgent):
 
         # Check FB availability for publish/track/delete actions
         if action in ("publish_post", "publish_package", "publish_due",
-                       "track_performance", "delete_post", "fetch_metrics"):
+                       "track_performance", "delete_post", "fetch_metrics",
+                       "refresh_metrics"):
             if self._fb is None:
                 return AgentResult(
                     task_id=task.id, success=False,
@@ -88,11 +90,14 @@ class PublisherAgent(BaseAgent):
             return self._track_performance(
                 fb_post_id=params.get("fb_post_id", ""),
                 variant_id=params.get("variant_id", ""),
+                package_id=params.get("package_id"),
             )
         elif action == "delete_post":
             return self._delete_post(params.get("fb_post_id", ""))
         elif action == "fetch_metrics":
             return self._fetch_metrics(limit=params.get("limit", 10))
+        elif action == "refresh_metrics":
+            return self._refresh_metrics(limit=params.get("limit", 10))
         return AgentResult(
             task_id=task.id, success=False, error=f"Unknown action: {action}"
         )
@@ -252,7 +257,7 @@ class PublisherAgent(BaseAgent):
         )
 
     def _track_performance(
-        self, fb_post_id: str, variant_id: str
+        self, fb_post_id: str, variant_id: str, package_id: str | None = None
     ) -> AgentResult:
         """Fetch and record post performance metrics from Facebook."""
         if not fb_post_id:
@@ -269,9 +274,11 @@ class PublisherAgent(BaseAgent):
             engagements = likes + comments + shares
 
             # Update performance memory
+            # For simple posts, package_id defaults to auto-{fb_post_id}
             if self._memory and variant_id:
+                actual_pkg_id = package_id or f"auto-{fb_post_id}"
                 self._memory.record_metrics_update(
-                    package_id=variant_id,
+                    package_id=actual_pkg_id,
                     variant_id=variant_id,
                     reach=reach,
                     engagements=engagements,
@@ -314,6 +321,53 @@ class PublisherAgent(BaseAgent):
                 error=f"Delete failed: {e}",
             )
 
+    def _refresh_metrics(self, limit: int = 10) -> AgentResult:
+        """Fetch recent page posts and update metrics in performance memory.
+
+        For each tracked post in memory, fetches real likes/comments/shares
+        and records them via record_metrics_update.
+        """
+        if not self._memory:
+            return AgentResult(
+                task_id="metrics-refresh",
+                success=False,
+                error="No performance memory available",
+            )
+        try:
+            posts = self._fb.get_recent_posts(limit=limit)
+            updated = 0
+            errors = 0
+            for post in posts:
+                post_id = post.get("id", "")
+                if not post_id:
+                    continue
+                try:
+                    self._memory.record_metrics_update(
+                        package_id=post_id,
+                        variant_id=post_id,
+                        reach=post.get("reach", 0),
+                        engagements=post.get("engagements", 0),
+                    )
+                    updated += 1
+                except Exception:
+                    errors += 1
+
+            return AgentResult(
+                task_id="metrics-refresh",
+                success=True,
+                data={
+                    "posts_fetched": len(posts),
+                    "updated": updated,
+                    "errors": errors,
+                    "refreshed_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        except Exception as e:
+            return AgentResult(
+                task_id="metrics-refresh",
+                success=False,
+                error=f"Refresh metrics failed: {e}",
+            )
     def _fetch_metrics(self, limit: int = 10) -> AgentResult:
         """Fetch recent page posts with engagement data."""
         try:

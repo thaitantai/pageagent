@@ -225,6 +225,23 @@ class OrchestratorAgent(BaseAgent):
                     ))
                     results.append(self_reply)
 
+                # ── Track performance after publish ──
+                if fb_post_id:
+                    variant_id = ""
+                    pkg_id = None
+                    if writer_package:
+                        if hasattr(writer_package, "best_variant"):
+                            v = writer_package.best_variant()
+                            if v:
+                                variant_id = v.variant_id
+                        if hasattr(writer_package, "package_id"):
+                            pkg_id = writer_package.package_id
+                    track_result = self._bus.dispatch(self._bus.create_task(
+                        AgentRole.PUBLISHER, "track_performance",
+                        {"fb_post_id": fb_post_id, "variant_id": variant_id, "package_id": pkg_id},
+                    ))
+                    results.append(track_result)
+
         return AgentResult(
             task_id=f"pipeline-{mode}",
             success=True,
@@ -354,6 +371,14 @@ class OrchestratorAgent(BaseAgent):
             "agent": AgentRole.ANALYST,
             "action": "weekly_report",
         }))
+
+        # Periodic metric refresh every 3 ticks
+        if self._tick_count > 0 and self._tick_count % 3 == 0:
+            actions.append((ActionPriority.LOW, {
+                "agent": AgentRole.PUBLISHER,
+                "action": "refresh_metrics",
+                "params": {"limit": 10},
+            }))
 
         return actions
 

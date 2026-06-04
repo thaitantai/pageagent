@@ -106,8 +106,12 @@ class FacebookClient:
         """Fetch reach + engagement insights for a single post.
 
         Returns aggregated dict:
-            {post_id, message, created_time, permalink_url,
-             reach, impressions, likes, comments, shares, engagement_rate}
+            {id, message, created_time, permalink_url,
+             reach, likes, comments, shares, engagements, engagement_rate}
+
+        Reach comes from the /insights edge (post_impressions_unique).
+        If insights aren't available yet (<24h old or missing perms),
+        reach defaults to 0.
 
         Note: FB Graph API v21.0+ requires ``pageId_postId`` format.
         If ``post_id`` is bare (no underscore), we prepend ``{page_id}_``.
@@ -123,7 +127,34 @@ class FacebookClient:
             f"/{self.api_version}/{post_id}",
             params={"fields": fields},
         )
-        return self._parse_post_insights(raw)
+        result = self._parse_post_insights(raw)
+
+        # ── Fetch real reach from /insights edge ──
+        # This is a separate endpoint; may fail for new posts (<24h)
+        try:
+            insights_raw = self._request(
+                "GET",
+                f"/{self.api_version}/{post_id}/insights",
+                params={"metric": "post_impressions_unique,post_engaged_users"},
+            )
+            for item in insights_raw.get("data", []):
+                name = item.get("name", "")
+                values = item.get("values", [])
+                val = values[-1]["value"] if values else 0
+                if name == "post_impressions_unique":
+                    result["reach"] = int(val)
+                elif name == "post_engaged_users":
+                    result["engaged_users"] = int(val)
+        except RuntimeError:
+            pass  # insights unavailable yet (new post) — reach stays 0
+
+        # Recalculate engagement_rate if reach is now real
+        if result.get("reach", 0) > 0:
+            result["engagement_rate"] = round(
+                result["engagements"] / result["reach"], 4
+            )
+
+        return result
 
     def get_page_posts(
         self, limit: int = 25, before: str = "", after: str = ""
@@ -272,8 +303,10 @@ class FacebookClient:
             "message": raw.get("message", ""),
             "created_time": raw.get("created_time", ""),
             "permalink_url": raw.get("permalink_url", ""),
+            "reach": 0,
             "likes": likes,
             "comments": comments,
             "shares": shares,
             "engagements": engagements,
+            "engagement_rate": 0.0,
         }
