@@ -222,7 +222,7 @@ Output JSON:
                         cta=v.get("cta", ""),
                         format=v.get("format", self._pick_format(i, tick_offset)),
                         tone_tags=v.get("tone_tags", []),
-                        hashtags=v.get("hashtags", self._base_hashtags(pillar)),
+                        hashtags=v.get("hashtags", self._base_hashtags(pillar, tick_offset)),
                     )
                     for i, v in enumerate(data["variants"][:count])
                 ]
@@ -252,7 +252,7 @@ Output JSON:
                                         cta=rv.get("cta", variants[ri].cta),
                                         format=rv.get("format", self._pick_format(ri, tick_offset)),
                                         tone_tags=rv.get("tone_tags", variants[ri].tone_tags),
-                                        hashtags=rv.get("hashtags", self._base_hashtags(pillar)),
+                                        hashtags=rv.get("hashtags", self._base_hashtags(pillar, tick_offset)),
                                     )
                 except Exception:
                     pass  # scoring is best-effort, never block publishing
@@ -363,7 +363,7 @@ Output JSON:
                 cta=cta,
                 format=self._pick_format(i, tick_offset),
                 tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
-                hashtags=self._base_hashtags(pillar),
+                hashtags=self._base_hashtags(pillar, tick_offset),
             ))
 
         return AgentResult(
@@ -515,18 +515,42 @@ Output JSON:
         return formats[(index + tick_offset) % len(formats)]
 
     @staticmethod
-    def _base_hashtags(pillar: str = "") -> list[str]:
-        """Base hashtags with pillar-specific additions for better discoverability."""
+    def _base_hashtags(pillar: str = "", tick_offset: int = 0) -> list[str]:
+        """Base hashtags with pillar-specific rotation for content diversity."""
         base: list[str] = ["skincare", "skincareroutine", "genzskincare", "damatdep"]
 
-        pillar_map: dict[str, list[str]] = {
-            "education": ["skincaretips", "hocskincare", "chamsocdatainha"],
-            "review": ["reviewthat", "reviewmypham", "dungthu"],
-            "trust": ["skincaretips", "myphamchatluong", "damatdep"],
-            "engagement": ["hoctap", "cunghocskincare", "genzlife"],
-            "entertainment": ["genzhumor", "skincarefunny", "trending"],
+        pillar_pool: dict[str, list[str]] = {
+            "education": [
+                "skincaretips", "hocskincare", "chamsocdatainha",
+                "bikipchamsocda", "skincarechongenz", "hoclamsong",
+            ],
+            "review": [
+                "reviewthat", "reviewmypham", "dungthu",
+                "reviewchamsocda", "myphamtot", "thatnghiemthat",
+            ],
+            "trust": [
+                "skincaretips", "myphamchatluong", "damatdep",
+                "chamsocdathat", "lammetda", "genzskincaredep",
+            ],
+            "engagement": [
+                "hoctap", "cunghocskincare", "genzlife",
+                "cungnhaulamsong", "chiaSeKinhNghiem", "genzdep",
+            ],
+            "entertainment": [
+                "genzhumor", "skincarefunny", "trending",
+                "skincarevui", "genzfun", "trendskincare",
+            ],
         }
 
         key = pillar.strip().lower()
-        extra = pillar_map.get(key, ["chamsocda", "lamdepcunggenz"])
+        pool = pillar_pool.get(key, ["chamsocda", "lamdepcunggenz", "skincareviet"])
+
+        # Rotate: pick 3 from pool, shifted by tick_offset
+        if len(pool) > 0:
+            offset = tick_offset % len(pool)
+            extra = pool[offset:] + pool[:offset]
+            extra = extra[:3]
+        else:
+            extra = pool
+
         return base + extra
