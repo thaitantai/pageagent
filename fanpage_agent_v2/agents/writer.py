@@ -210,7 +210,7 @@ Output JSON:
                         cta=v.get("cta", ""),
                         format=v.get("format", self._pick_format(i)),
                         tone_tags=v.get("tone_tags", []),
-                        hashtags=v.get("hashtags", self._base_hashtags()),
+                        hashtags=v.get("hashtags", self._base_hashtags(pillar)),
                     )
                     for i, v in enumerate(data["variants"][:count])
                 ]
@@ -320,7 +320,7 @@ Output JSON:
                 cta=cta,
                 format=self._pick_format(i),
                 tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
-                hashtags=self._base_hashtags(),
+                hashtags=self._base_hashtags(pillar),
             ))
 
         return AgentResult(
@@ -420,5 +420,18 @@ Output JSON:
         return formats[index % len(formats)]
 
     @staticmethod
-    def _base_hashtags() -> list[str]:
-        return ["skincare", "skincareroutine", "genzskincare", "damatdep"]
+    def _base_hashtags(pillar: str = "") -> list[str]:
+        """Base hashtags with pillar-specific additions for better discoverability."""
+        base: list[str] = ["skincare", "skincareroutine", "genzskincare", "damatdep"]
+
+        pillar_map: dict[str, list[str]] = {
+            "education": ["skincaretips", "hocskincare", "chamsocdatainha"],
+            "review": ["reviewthat", "reviewmypham", "dungthu"],
+            "trust": ["skincaretips", "myphamchatluong", "damatdep"],
+            "engagement": ["hoctap", "cunghocskincare", "genzlife"],
+            "entertainment": ["genzhumor", "skincarefunny", "trending"],
+        }
+
+        key = pillar.strip().lower()
+        extra = pillar_map.get(key, ["chamsocda", "lamdepcunggenz"])
+        return base + extra
