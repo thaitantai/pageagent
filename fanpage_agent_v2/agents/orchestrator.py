@@ -191,10 +191,9 @@ class OrchestratorAgent(BaseAgent):
                     day0 = strategist_data["schedule"][0]
                     topic = day0.get("topic_template", "")
                     pillar = day0.get("pillar", "")
-                # Fallback if strategist returned empty topics
+                # Fallback if strategist returned empty topics — use seasonal engine
                 if not topic.strip():
-                    topic = "Chăm sóc da dầu mụn cho GenZ"
-                    pillar = pillar or "education"
+                    topic, pillar = self._seasonal_topic_and_pillar(pillar)
                 r = self._bus.dispatch(self._bus.create_task(
                     AgentRole.WRITER, "write_variants",
                     {"variants": 2, "topic": topic, "pillar": pillar},
@@ -373,6 +372,71 @@ class OrchestratorAgent(BaseAgent):
             f"🔄 auto-generating content (tick #{self._tick_count})",
             flush=True,
         )
+
+    @staticmethod
+    def _seasonal_topic_and_pillar(current_pillar: str = "") -> tuple[str, str]:
+        """Generate a seasonally-relevant topic & pillar based on current month."""
+        month = datetime.now(timezone.utc).month
+        pillar = current_pillar or "education"
+
+        if month in (1, 2):
+            # Tết — travel skincare, Tết eating, sleeping late
+            topics = [
+                "Chăm sóc da ngày Tết: ăn bánh chưng không lo lên mụn",
+                "Da đổ dầu ngày Tết? Mẹo skincare cấp tốc cho GenZ",
+                "Bí kíp giữ da đẹp xuyên Tết dù thức khuya liên tục",
+                "Skincare routine Tết: tối giản vẫn hiệu quả",
+            ]
+            pillar = "entertainment"
+        elif month in (3, 4):
+            # Giao mùa — barrier, dị ứng, thời tiết thất thường
+            topics = [
+                "Da 'nổi loạn' mùa giao mùa? 3 bước ổn định ngay",
+                "Giao mùa rồi, da dầu càng đổ dầu — cứu sao đây?",
+                "Skin barrier: tại sao da bạn yếu hơn vào tháng 3-4?",
+                "Mẹo chăm da mùa giao mùa cho GenZ: ít mà đúng",
+            ]
+            pillar = "education"
+        elif month in (5, 6):
+            # Hè — nắng nóng, đổ dầu, chống nắng
+            topics = [
+                "Chống nắng mùa hè: đừng để da cháy nắng khi đi chơi",
+                "Da đổ dầu như 'đổ xăng' mùa hè? Cách kiểm soát",
+                "Top 3 kem chống nắng cho da dầu mụn mùa hè 2026",
+                "Mồ hôi + dầu = mụn? Mẹo skincare mùa nóng",
+            ]
+            pillar = "review"
+        elif month in (7, 8):
+            # Mưa nồm — ẩm, maskne, nấm da
+            topics = [
+                "Mùa mưa ẩm: da dầu càng 'khổ' — làm sao đây?",
+                "Maskne mùa mưa: bí kíp giữ da thông thoáng",
+                "Độ ẩm cao làm da đổ dầu nhiều hơn? Sự thật bất ngờ",
+                "Skincare mùa mưa: 3 sản phẩm KHÔNG thể thiếu",
+            ]
+            pillar = "trust"
+        elif month in (9, 10):
+            # Tựu trường — dorm skincare, ngân sách sinh viên
+            topics = [
+                "Tựu trường rồi: skincare tối giản trong dorm cho GenZ",
+                "Budget skincare cho sinh viên: rẻ mà vẫn hiệu quả",
+                "Áp lực học tập làm da xấu đi? Mẹo skincare cho mùa thi",
+                "Dorm skincare: 4 bước cơ bản không thể thiếu",
+            ]
+            pillar = "trust"
+        else:  # 11-12
+            # Cuối năm — dưỡng da mùa lạnh, year-end review
+            topics = [
+                "Cuối năm rồi: da dầu có cần dưỡng ẩm nhiều hơn không?",
+                "Review năm cũ: sản phẩm skincare nào đáng mua lại?",
+                "Mùa lạnh + da dầu = 3 lỗi ai cũng mắc phải",
+                "Năm mới, da mới: mục tiêu skincare 2027 cho GenZ",
+            ]
+            pillar = "review"
+
+        import random
+        topic = random.choice(topics)
+        return topic, pillar
 
     def _save_state(self, state: PipelineState) -> None:
         """Persist pipeline state to disk."""
