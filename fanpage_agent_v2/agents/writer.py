@@ -1,4 +1,4 @@
-"""WriterAgent — generates multi-variant content captions for A/B testing.
+"""WriterAgent - generates multi-variant content captions for A/B testing.
 
 Uses LLM (via LLMAdapter) to write real captions in GenZ skincare voice.
 Falls back to empty variants if no LLM is configured.
@@ -20,11 +20,11 @@ from fanpage_agent_v2.core.types import (
 )
 
 # ── 5 tone personas for GenZ skincare ──
-# Each persona has distinct voice, energy, and structure — variants cycle through these.
+# Each persona has distinct voice, energy, and structure - variants cycle through these.
 _TONE_PERSONAS: dict[str, dict[str, str]] = {
     "chia_se_that": {
         "label": "💬 Chia sẻ thật (Real Talk)",
-        "description": "Kể chuyện cá nhân — từng sai, từng học, từng thay đổi. Giọng gần gũi, honest, vulnerable. Không dạy đời, chỉ chia sẻ.",
+        "description": "Kể chuyện cá nhân - từng sai, từng học, từng thay đổi. Giọng gần gũi, honest, vulnerable. Không dạy đời, chỉ chia sẻ.",
         "hook_example": "Mình từng nghĩ da dầu thì không cần dưỡng ẩm… cho tới khi da đổ dầu nhiều hơn 😅",
         "cta_example": "Bạn có từng mắc sai lầm giống mình không? Kể mình nghe với 👇",
     },
@@ -42,14 +42,14 @@ _TONE_PERSONAS: dict[str, dict[str, str]] = {
     },
     "hoi_dap_tuong_tac": {
         "label": "❓ Hỏi đáp / Tương tác (Interactive)",
-        "description": "Post dạng poll, câu hỏi mở, debate. Không đưa đáp án ngay — để GenZ tự trả lời trước, gây tương tác.",
+        "description": "Post dạng poll, câu hỏi mở, debate. Không đưa đáp án ngay - để GenZ tự trả lời trước, gây tương tác.",
         "hook_example": "Câu hỏi nhanh: Da dầu có NÊN rửa mặt 3 lần/ngày không? 🤔 👇",
         "cta_example": "Các bạn ngh sao? Yes hay No? Comment bên dưới nha!",
     },
     "review_thuc_te": {
         "label": "🔍 Review thực tế (Real Review)",
-        "description": "Review honest — nói cả ưu lẫn nhược. Format: đã dùng bao lâu → giá → cảm nhận → kết luận. Không PR.",
-        "hook_example": "Mình đã dùng kem chống nắng này 3 tháng — review thật không filter 🎯",
+        "description": "Review honest - nói cả ưu lẫn nhược. Format: đã dùng bao lâu → giá → cảm nhận → kết luận. Không PR.",
+        "hook_example": "Mình đã dùng kem chống nắng này 3 tháng - review thật không filter 🎯",
         "cta_example": "Bạn đã dùng sản phẩm nào tương tự chưa? Review cho mình với 🌸",
     },
 }
@@ -60,21 +60,21 @@ NHIỆM VỤ: Viết caption Facebook thu hút, chân thật, đúng giọng Gen
 
 NGUYÊN TẮC CHUNG:
 - Ngắn gọn, dễ hiểu, gần gũi (xưng mình/bạn)
-- Kiến thức chuyên môn nhưng không khô khan — lồng kiến thức vào câu chuyện
+- Kiến thức chuyên môn nhưng không khô khan - lồng kiến thức vào câu chuyện
 - KHÔNG phóng đại, KHÔNG hứa hẹn kết quả thần kỳ ("trắng sau 1 tuần", "hết mụn ngay lập tức")
 - Mỗi caption có: hook hút → body ngắn → CTA khéo léo
 - Luôn kết thúc bằng 1 câu hỏi mở để GenZ vào tương tác
 
 CÁC TONE PERSONA CÓ SẴN (chọn đúng 1 cho mỗi variant):
-1. 💬 Chia sẻ thật — Kể chuyện cá nhân, honest, vulnerable. Hook: từng sai → giờ hiểu. CTA: hỏi kinh nghiệm tương tự.
-2. 📚 Chuyên môn nhẹ — Fact-based, giải thích dễ hiểu. Hook: bác sĩ nói / nghiên cứu chỉ ra. CTA: cùng thảo luận.
-3. 😆 Hài hước / Meme — GenZ humor, exaggeration, từ lóng nhẹ (POV, thảo nào, xỉu). CTA: vote/comment hài.
-4. ❓ Hỏi đáp tương tác — Post dạng câu hỏi, debate, poll. KHÔNG đưa đáp án ngay. CTA: Yes/No, bạn nghĩ sao.
-5. 🔍 Review thực tế — Review honest: ưu + nhược. Hook: review thật không filter. CTA: bạn đã dùng chưa?
+1. 💬 Chia sẻ thật - Kể chuyện cá nhân, honest, vulnerable. Hook: từng sai → giờ hiểu. CTA: hỏi kinh nghiệm tương tự.
+2. 📚 Chuyên môn nhẹ - Fact-based, giải thích dễ hiểu. Hook: bác sĩ nói / nghiên cứu chỉ ra. CTA: cùng thảo luận.
+3. 😆 Hài hước / Meme - GenZ humor, exaggeration, từ lóng nhẹ (POV, thảo nào, xỉu). CTA: vote/comment hài.
+4. ❓ Hỏi đáp tương tác - Post dạng câu hỏi, debate, poll. KHÔNG đưa đáp án ngay. CTA: Yes/No, bạn nghĩ sao.
+5. 🔍 Review thực tế - Review honest: ưu + nhược. Hook: review thật không filter. CTA: bạn đã dùng chưa?
 
 VÍ DỤ GIỌNG VIẾT TỐT:
 • "Mình từng nghĩ toner là bước không thể thiếu cho da dầu… cho tới khi đọc nghiên cứu của bác sĩ da liễu 🤯 Mọi người có biết da dầu thực ra cần gì nhất không?"
-• "Review thật: Kem chống nắng 100k mình dùng suốt 3 tháng qua — được cái chống nắng tốt, mỏng nhẹ. Nhưng có điểm trừ là… 👇"
+• "Review thật: Kem chống nắng 100k mình dùng suốt 3 tháng qua - được cái chống nắng tốt, mỏng nhẹ. Nhưng có điểm trừ là… 👇"
 • "Có bạn nào từng mua serum vì thấy quảng cáo 'trắng sau 7 ngày' chưa? Mình xin phép nói thật nhé 🙈 Dưới góc nhìn của một người làm trong ngành…"
 
 VÍ DỤ GIỌNG VIẾT CẦN TRÁNH:
@@ -84,12 +84,12 @@ VÍ DỤ GIỌNG VIẾT CẦN TRÁNH:
 
 YÊU CẦU BẮT BUỘC:
 |- Hook: chọn 1 trong 6 style mở đầu bên dưới, phù hợp với tone persona:
-|  (A) Câu hỏi — "Bạn có bao giờ…?" (gắn với pain point cụ thể)
-|  (B) Sự thật ngược — "Mình từng nghĩ X, nhưng thực ra Y" (tạo surprise)
-|  (C) Con số — "3 bước/5 phút/2 loại serum…" (định lượng dễ nhớ)
-|  (D) Kể chuyện — "Hôm bữa mình…" (personal vignette, relatable)
-|  (E) Đánh đố — "Bạn có biết [sự thật bất ngờ về skincare] không?" (trivia hook)
-|  (F) Đồng cảm — "Có bạn nào…? Mình cũng từng vậy" (shared experience)
+|  (A) Câu hỏi - "Bạn có bao giờ…?" (gắn với pain point cụ thể)
+|  (B) Sự thật ngược - "Mình từng nghĩ X, nhưng thực ra Y" (tạo surprise)
+|  (C) Con số - "3 bước/5 phút/2 loại serum…" (định lượng dễ nhớ)
+|  (D) Kể chuyện - "Hôm bữa mình…" (personal vignette, relatable)
+|  (E) Đánh đố - "Bạn có biết [sự thật bất ngờ về skincare] không?" (trivia hook)
+|  (F) Đồng cảm - "Có bạn nào…? Mình cũng từng vậy" (shared experience)
 |- Caption: 2-3 câu ngắn, có emoji, tự nhiên
 |- CTA: 1 câu hỏi tương tác cuối bài (không kêu gọi mua hàng)
 |- tone_tags: gồm 2-3 từ khóa, PHẢI có tên tone persona được giao (vd: ["chia_sẻ_thật", "gần_gũi"])
@@ -101,7 +101,7 @@ Trả lời bằng JSON thuần, không markdown. KHÔNG để trống field nà
 
 
 class WriterAgent(BaseAgent):
-    """Writer — generates N variants of a content post using LLM or template."""
+    """Writer - generates N variants of a content post using LLM or template."""
 
     def __init__(
         self,
@@ -155,17 +155,17 @@ class WriterAgent(BaseAgent):
         scheduled_date: str | None,
         scheduled_time: str | None,
     ) -> AgentResult:
-        """Generate N content variants — LLM or template fallback."""
+        """Generate N content variants - LLM or template fallback."""
         now = datetime.now(timezone.utc).isoformat()
         package_id = f"pkg-{uuid.uuid4().hex[:8]}"
         date = scheduled_date or now[:10]
         # ── Smart scheduling: different pillars perform best at different times ──
         pillar_time_map: dict[str, str] = {
-            "education": "07:30",    # sáng sớm — tâm lý học hỏi
-            "trust": "08:00",        # sáng — xây dựng niềm tin
-            "review": "12:00",       # trưa — giờ nghỉ, đọc review
-            "entertainment": "19:00",# tối — giải trí, thư giãn
-            "engagement": "20:30",   # tối muộn — tương tác cao
+            "education": "07:30",    # sáng sớm - tâm lý học hỏi
+            "trust": "08:00",        # sáng - xây dựng niềm tin
+            "review": "12:00",       # trưa - giờ nghỉ, đọc review
+            "entertainment": "19:00",# tối - giải trí, thư giãn
+            "engagement": "20:30",   # tối muộn - tương tác cao
         }
         time = scheduled_time or pillar_time_map.get(pillar.strip().lower(), "09:00")
 
@@ -183,7 +183,7 @@ class WriterAgent(BaseAgent):
         # ── Try LLM ──
         if self._llm and topic:
             persona_section = "\n".join(
-                f"  Variant {i+1}: TONE = \"{label}\""
+                            f"  Variant {i+1}: TONE = \"{label}\""
                 for i, (_, label) in enumerate(assigned)
             )
             prompt = f"""Viết {count} variant caption cho bài đăng Facebook về chủ đề skincare.
@@ -208,10 +208,12 @@ Output JSON:
       "cta": "kêu gọi hành động (1 câu ngắn)",
       "format": "text_image|carousel|reel",
       "tone_tags": ["tone_persona_used", "keyword"],
-      "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"]
+      "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"],
+      "visual_brief": "mô tả ngắn visual style cho ảnh/carousel/reel - mood, màu sắc, cách bố trí, phong cách ảnh"
     }}
   ]
 }}"""
+
             data = self._llm.generate_json(
                 _WRITER_SYSTEM_PROMPT, prompt,
                 max_tokens=3000,
@@ -229,11 +231,12 @@ Output JSON:
                         format=v.get("format", self._pick_format(i, tick_offset)),
                         tone_tags=v.get("tone_tags", []),
                         hashtags=v.get("hashtags", self._base_hashtags(pillar, tick_offset)),
+                        visual_brief=v.get("visual_brief", None),
                     )
                     for i, v in enumerate(data["variants"][:count])
                 ]
 
-                # ── Quality scoring — auto-fail low-quality variants ──
+                # ── Quality scoring - auto-fail low-quality variants ──
                 try:
                     scored = self._score_variants(variants, topic)
                     low = [v for v in scored if v.get("score", 5) < 3.0]
@@ -276,23 +279,95 @@ Output JSON:
                     ),
                 )
 
-        # ── Template fallback — persona-based contentful variants ──
+        # ── Visual brief templates for each persona × format combo ──
+        _VISUAL_BRIEFS: dict[str, dict[str, list[str]]] = {
+            "chia_se_that": {
+                "text_image": [
+                    "Ảnh selfie gần gũi, ánh sáng tự nhiên, background phòng ngủ/bàn học. Tone màu ấm (beige/cream). Chân thật, không chỉnh filter quá tay.",
+                    "Ảnh close-up sản phẩm trên bàn gỗ, có tay cầm điện thoại chụp. Cảm giác 'đang dùng thực tế'. Không dàn dựng quá chuyên nghiệp.",
+                ],
+                "carousel": [
+                    "Carousel 3-4 slide: (1) Ảnh chân dung + quote cảm xúc, (2) Sản phẩm/dụng cụ trên bàn, (3) Mẹo/tip list. Font chữ tay viết, background pastel.",
+                    "Carousel kiểu 'before & insight': (1) Biểu cảm ngạc nhiên, (2) Sản phẩm zoom nhẹ, (3) Kết luận. Màu hồng đất + cam đào.",
+                ],
+                "reel": [
+                    "Cảnh quay ngắn 15s: thoại kể chuyện, cut cảnh sản phẩm. Âm thanh tự nhiên, beat nhẹ. Chân thật, không kịch bản.",
+                ],
+            },
+            "chuyen_mon_nhe": {
+                "text_image": [
+                    "Ảnh minh họa kiểu infographic đơn giản: biểu tượng + chữ trên nền trắng/xanh nhạt. Phong cách clean, medical aesthetic.",
+                    "Ảnh sản phẩm trên nền marble/gỗ sáng, có chú thích chuyên môn nhỏ. Cảm giác đáng tin cậy, chuyên nghiệp.",
+                ],
+                "carousel": [
+                    "Carousel 3 slide kiểu 'học nhanh': (1) Tiêu đề + icon, (2) Nội dung chính dạng bullet, (3) Tóm tắt + cta. Màu xanh mint + trắng.",
+                    "Carousel 4 slide chia theo bước: (1) Giới thiệu vấn đề, (2) Giải thích, (3) Cách áp dụng, (4) Kết luận. Font Helvetica/Lato.",
+                ],
+                "reel": [
+                    "Cảnh quay 'giải thích nhanh' 30s: mặt + key text overlay (không thoại). Nhạc nền chill lofi. Màu xanh mint chủ đạo.",
+                ],
+            },
+            "hai_huoc_meme": {
+                "text_image": [
+                    "Ảnh meme-style: chụp màn hình tweet/reddit hoặc ảnh chế có caption. Màu sặc sỡ, font Impact hoặc Comic Sans. GenZ humor energy.",
+                    "Ảnh 'hai mặt' (before vs after) hoặc POV: chia đôi ảnh, bên trái sai/bên phải đúng. Style meme Việt Nam quen thuộc.",
+                ],
+                "carousel": [
+                    "Carousel kiểu 'storytime hài': (1) Mở đầu kịch tính với icon mặt cười, (2) Plot twist ảnh chế, (3) Kết luận + reaction meme. Tone vàng/tím neon.",
+                ],
+                "reel": [
+                    "Cảnh quay 'POV' 15s: quay từ góc nhìn thứ nhất, có chèn meme sound effect. Style TikTok GenZ. Cắt nhanh, nhạc trend.",
+                ],
+            },
+            "hoi_dap_tuong_tac": {
+                "text_image": [
+                    "Ảnh dạng poll/câu hỏi big text: nền gradient trắng-xanh, chữ to, dấu hỏi lớn. Khoảng trống để comment.",
+                    "Ảnh 'This or That': chia đôi ảnh, bên trái option A/bên phải option B. Kêu gọi vote trong comment.",
+                ],
+                "carousel": [
+                    "Carousel 2 slide: (1) Câu hỏi lớn giữa màn hình, (2) Gợi ý trả lời + lời kêu gọi tag bạn bè. Màu cam/tím pastel.",
+                ],
+                "reel": [
+                    "Cảnh quay đặt câu hỏi 10s: nhìn vào camera, hỏi trực tiếp. Overlay chữ to. Beat chờ đợi hồi hộp.",
+                ],
+            },
+            "review_thuc_te": {
+                "text_image": [
+                    "Ảnh 'review haul': sản phẩm trải trên bàn, kèm chú thích tay. Phong cách lifestyle blog. Màu trung tính, ánh sáng cửa sổ.",
+                    "Ảnh chụp sản phẩm chính diện + list pros/cons bên cạnh. Dạng 'honest review card'. Font viết tay.",
+                ],
+                "carousel": [
+                    "Carousel 4-5 slide đánh giá chi tiết: (1) Ảnh sản phẩm + điểm, (2) Kết cấu/bao bì, (3) Cảm nhận khi dùng, (4) Pros & Cons, (5) Kết luận + điểm số. Màu xám sáng + xanh lá nhẹ.",
+                ],
+                "reel": [
+                    "Cảnh quay 'unboxing + review' 30s: cầm sản phẩm quay gần, thoại đánh giá thật. Không kịch bản, quay tay. Ánh sáng tự nhiên.",
+                ],
+            },
+        }
+
+        # ── Template fallback - persona-based contentful variants ──
         variants: list[ContentVariant] = []
-        # Each persona gets dedicated hook/caption/cta templates
         persona_templates: dict[str, dict[str, list[str]]] = {
             "chia_se_that": {
                 "hooks": [
                     f"Mình từng nghĩ {topic.lower()} khó lắm, nhưng thực ra…",
                     f"Mình đã từng vật lộn với {topic.lower()} suốt mấy tháng 😅",
                     f"Nói thật: mình từng bỏ qua {topic.lower()} vì nghĩ không quan trọng…",
+                    f"Hôm qua mình mới ngồi nghĩ lại về {topic.lower()}…",
+                    f"Có bạn nào như mình không: sợ {topic.lower()} vì sợ sai?",
+                    f"Mình từng sai rất nhiều về {topic.lower()}, giờ mới biết đúng là…",
                 ],
                 "captions": [
                     f"Mình đã từng vật lộn với {topic.lower()} suốt mấy tháng trời. Sau khi tìm hiểu kỹ thì mới nhận ra mình đã sai ngay từ bước cơ bản nhất. Các bạn có gặp tình trạng giống mình không?",
                     f"Đúng là không trải nghiệm thì không biết. Mình từng {topic.lower()} và kết quả thật sự bất ngờ… Kể ra đây để các bạn cùng rút kinh nghiệm nè 👇",
+                    f"Phải công nhận {topic.lower()} không hề dễ như mình tưởng. Qua bao lần 'thử và sai', cuối cùng mình cũng tìm ra cách ổn nhất. Các bạn thì sao?",
+                    f"Chuyện là mình từng khá tự tin về {topic.lower()}, cho tới khi một người bạn trong ngành chỉ ra mình sai cơ bản. Bài học đắt giá nhưng đáng 😅",
                 ],
                 "ctas": [
                     "Bạn có từng mắc sai lầm giống mình không? Kể mình nghe với 👇",
                     "Ai từng như mình thì giơ tay nào 🙋",
+                    "Kinh nghiệm của bạn về vụ này là gì? Chia sẻ để mọi người cùng học nha 🌸",
+                    "Bạn có tips gì hay hơn không? Comment bên dưới để mình học hỏi với 👇",
                 ],
             },
             "chuyen_mon_nhe": {
@@ -300,67 +375,88 @@ Output JSON:
                     f"Bạn có biết {topic.lower()} không? 🤔",
                     f"Bác sĩ da liễu nói gì về {topic.lower()}?",
                     f"3 điều mình rút ra về {topic.lower()}",
+                    f"Nghiên cứu mới chỉ ra: {topic.lower()} quan trọng hơn bạn nghĩ",
+                    f"99% người làm sai {topic.lower()} - bạn có thuộc số đó?",
+                    f"Mình hỏi bác sĩ về {topic.lower()} và đây là câu trả lời 🎯",
                 ],
                 "captions": [
-                    f"Hôm nay mình muốn chia sẻ về {topic.lower()}. Không quảng cáo, không PR — chỉ là kiến thức mình tổng hợp từ bác sĩ da liễu và kinh nghiệm thực tế. Cùng nhau học nha 🌸",
+                    f"Hôm nay mình muốn chia sẻ về {topic.lower()}. Không quảng cáo, không PR - chỉ là kiến thức mình tổng hợp từ bác sĩ da liễu và kinh nghiệm thực tế. Cùng nhau học nha 🌸",
                     f"Đây là những gì mình học được về {topic.lower()} sau thời gian tìm hiểu. Có thể bạn sẽ bất ngờ đấy! Dưới góc nhìn chuyên môn nhẹ, dễ hiểu ✨",
+                    f"Mình đọc được nghiên cứu thú vị về {topic.lower()}. Dịch ra tiếng Việt dễ hiểu cho các bạn đây - cực kỳ hữu ích cho ai quan tâm skincare khoa học 📚",
+                    f"Bác sĩ da liễu khuyên gì về {topic.lower()}? Mình tóm gọn lại bằng ngôn ngữ dễ hiểu nhất - không dùng từ chuyên ngành rối rắm ✨",
                 ],
                 "ctas": [
                     "Có bạn nào từng nghe điều này chưa? Cùng thảo luận bên dưới nha!",
                     "Bạn nghĩ sao về thông tin này? Comment góp ý nhé 👇",
+                    "Bạn có biết thêm nghiên cứu nào khác không? Chia sẻ cho mình với 🌸",
+                    "Ai muốn mình phân tích sâu hơn về chủ đề này thì thả 🔥 nha!",
                 ],
             },
             "hai_huoc_meme": {
                 "hooks": [
                     f"POV: Bạn nghĩ {topic.lower()} là chuyện đơn giản 💀",
-                    f"Thảo nào {topic.lower()} — mình tưởng biết hết rồi…",
+                    f"Thảo nào {topic.lower()} - mình tưởng biết hết rồi…",
+                    f"{topic.title()} be like: 'Tưởng dễ, hóa ra khó vãi' 😆",
+                    f"Mình cười mình mất 2 năm mới hiểu {topic.lower()} 🤡",
+                    f"Có một nhóm người: nghĩ {topic.lower()} chỉ dành cho… 😂",
                 ],
                 "captions": [
                     f"Xỉu up xỉu down khi phát hiện ra sự thật về {topic.lower()} 😵 Thôi thì chia sẻ để các bạn khỏi mắc sai lầm như mình. Đọc xong nhớ cmt cảm nghĩ nha 🤣",
-                    f"Sự thật thì {topic.lower()} không hề khó như bạn nghĩ đâu. Mình cũng từng 'gà mờ' như ai — nhưng giờ đã có kinh nghiệm để kể lại rồi. Đọc xong bạn sẽ thấy 'ngộ' ra nhiều điều 😆",
+                    f"Sự thật thì {topic.lower()} không hề khó như bạn nghĩ đâu. Mình cũng từng 'gà mờ' như ai - nhưng giờ đã có kinh nghiệm để kể lại rồi. Đọc xong bạn sẽ thấy 'ngộ' ra nhiều điều 😆",
+                    f"Nói thiệt: {topic.lower()} mà biết sớm thì mình đỡ tốn bao nhiêu tiền vô ích rồi. Thôi thì 'better late than never' - chia sẻ để các bạn đỡ khổ 😂👇",
                 ],
                 "ctas": [
                     "Ai từng 'thả thính' như mình thì vote 1 phát nào 🤣",
                     "Bạn có 'gà mờ' y như mình hồi xưa không? Comment kể đi 👇",
+                    "Ai thấy mình nói đúng thì share cho bạn bè cười cùng nha 😆",
                 ],
             },
             "hoi_dap_tuong_tac": {
                 "hooks": [
                     f"Câu hỏi nhanh: {topic.title()} có thực sự quan trọng? 🤔",
-                    f"Nhanh — bạn nghĩ {topic.lower()} nên làm ngay hay không?",
+                    f"Nhanh - bạn nghĩ {topic.lower()} nên làm ngay hay không?",
+                    f"1 câu hỏi cho các bạn: {topic.title()} - CÓ hay KHÔNG? 👇",
                 ],
                 "captions": [
-                    f"Mình đố các bạn: {topic.lower()} — có hay không? Trả lời trước khi đọc phần dưới đây nha 👇",
+                    f"Mình đố các bạn: {topic.lower()} - có hay không? Trả lời trước khi đọc phần dưới đây nha 👇",
+                    f"Trước khi đọc tiếp, hãy dừng lại 3 giây và tự hỏi: mình có đang làm {topic.lower()} đúng cách không? 🤔 Không thì comment ngay để mình chỉ cho 👇",
                 ],
                 "ctas": [
                     "Các bạn ngh sao? Yes hay No? Comment bên dưới nha!",
                     "Bạn có đồng ý không? Mình rất muốn nghe ý kiến trái chiều 👇",
+                    "Có ai nghĩ khác không? Cmt tranh luận vui vẻ nha 🌸",
                 ],
             },
             "review_thuc_te": {
                 "hooks": [
-                    f"Review thật: {topic.lower()} — có đáng tiền?",
+                    f"Review thật: {topic.lower()} - có đáng tiền?",
                     f"Mình dùng thử {topic.lower()} trong thời gian dài và đây là sự thật 🎯",
+                    f"Không filter, không PR - trải nghiệm thật của mình với {topic.lower()}",
                 ],
                 "captions": [
                     f"Review thật không filter về {topic.lower()}: ưu điểm, nhược điểm, và kết luận sau thời gian sử dụng. Mình không PR, chỉ nói những gì mình trải nghiệm. Ai quan tâm thì đọc thử nhé!",
+                    f"Mình đã dùng {topic.lower()} khá lâu rồi, hôm nay ngồi viết lại cảm nhận thật. Có điểm tốt, có điểm chưa ổn - nhưng quan trọng là HONEST. Bạn nào đang phân vân thì tham khảo nha 🌸",
                 ],
                 "ctas": [
                     "Bạn đã dùng sản phẩm nào tương tự chưa? Review cho mình với 🌸",
                     "Có bạn nào có trải nghiệm khác không? Chia sẻ để mọi người cùng biết nha 👇",
+                    "Bạn có muốn mình review thêm sản phẩm nào khác không? Gợi ý bên dưới nha!",
                 ],
             },
         }
 
-        import random
         for i in range(count):
             persona_key, persona_label = assigned[i]
             templates = persona_templates[persona_key]
             variant_id = f"var-{package_id}-{i}"
+            fmt = self._pick_format(i, tick_offset)
             # Rotate hooks/captions/ctas by (tick_offset + i) for diversity across ticks
             hook = templates["hooks"][(tick_offset + i) % len(templates["hooks"])]
             caption = templates["captions"][(tick_offset + i) % len(templates["captions"])]
             cta = templates["ctas"][(tick_offset + i) % len(templates["ctas"])]
+            # Rotate visual briefs
+            brief_pool = _VISUAL_BRIEFS.get(persona_key, {}).get(fmt, [""])
+            visual_brief = brief_pool[(tick_offset + i) % len(brief_pool)] if brief_pool else None
             variants.append(ContentVariant(
                 variant_id=variant_id,
                 topic=topic,
@@ -368,7 +464,8 @@ Output JSON:
                 caption=caption,
                 hook=hook,
                 cta=cta,
-                format=self._pick_format(i, tick_offset),
+                format=fmt,
+                visual_brief=visual_brief or None,
                 tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
                 hashtags=self._base_hashtags(pillar, tick_offset),
             ))
@@ -387,7 +484,7 @@ Output JSON:
         )
 
     def _generate_hooks(self, topic: str, count: int) -> AgentResult:
-        """Generate N hook options — LLM or template fallback."""
+        """Generate N hook options - LLM or template fallback."""
         if self._llm and topic:
             prompt = f"""Viết {count} câu hook thu hút cho bài đăng Facebook về: {topic}
 
@@ -423,7 +520,7 @@ Output JSON:
             f"Mình từng {topic.lower()} và đây là điều rút ra…",
             f"Bạn có biết {topic.lower()} không? 🤔",
             f"3 sai lầm khi {topic.lower()} mà ai cũng mắc phải",
-            f"Review thật: {topic.title()} — có đáng tiền?",
+            f"Review thật: {topic.title()} - có đáng tiền?",
             f"Bác sĩ da liễu nói gì về {topic.lower()}?",
         ]
         return AgentResult(
@@ -433,7 +530,7 @@ Output JSON:
         )
 
     def _rewrite_variant(self, variant_id: str, feedback: str) -> AgentResult:
-        """Revise a variant — LLM rewrite or stub."""
+        """Revise a variant - LLM rewrite or stub."""
         if self._llm and feedback:
             prompt = f"""Viết LẠI caption dựa trên phản hồi sau:
 
@@ -466,7 +563,7 @@ Output JSON:
 
     @staticmethod
     def _score_variants(variants: list[ContentVariant], topic: str) -> list[dict]:
-        """Lightweight heuristic scoring — no LLM call, checks structure and completeness."""
+        """Lightweight heuristic scoring - no LLM call, checks structure and completeness."""
         results: list[dict] = []
         for v in variants:
             score = 5.0
