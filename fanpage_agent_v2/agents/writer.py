@@ -19,17 +19,58 @@ from fanpage_agent_v2.core.types import (
     ContentVariant,
 )
 
+# ── 5 tone personas for GenZ skincare ──
+# Each persona has distinct voice, energy, and structure — variants cycle through these.
+_TONE_PERSONAS: dict[str, dict[str, str]] = {
+    "chia_se_that": {
+        "label": "💬 Chia sẻ thật (Real Talk)",
+        "description": "Kể chuyện cá nhân — từng sai, từng học, từng thay đổi. Giọng gần gũi, honest, vulnerable. Không dạy đời, chỉ chia sẻ.",
+        "hook_example": "Mình từng nghĩ da dầu thì không cần dưỡng ẩm… cho tới khi da đổ dầu nhiều hơn 😅",
+        "cta_example": "Bạn có từng mắc sai lầm giống mình không? Kể mình nghe với 👇",
+    },
+    "chuyen_mon_nhe": {
+        "label": "📚 Chuyên môn nhẹ (Light Expert)",
+        "description": "Fact-based, trích dẫn bác sĩ/nghiên cứu nhưng nói dễ hiểu. Dùng từ chuyên ngành ít, giải thích bằng analogy.",
+        "hook_example": "Bác sĩ da liễu nói gì về toner cho da dầu? 🤔 Mình tóm gọn 3 điều chính đây…",
+        "cta_example": "Có bạn nào từng nghe điều này chưa? Cùng thảo luận bên dưới nha!",
+    },
+    "hai_huoc_meme": {
+        "label": "😆 Hài hước / Meme",
+        "description": "GenZ humor, meme energy, exaggeration hài hước. Dùng từ lóng nhẹ (\"thảo nào\", \"xỉu up xỉu down\", \"chắc gì\"). KHÔNG nhảm, vẫn có giá trị.",
+        "hook_example": "POV: Bạn tưởng toner là 'thần dược' cho da dầu, nhưng sự thật thì… 💀",
+        "cta_example": "Ai từng 'thả thính' toner như mình thì vote 1 phát nào 🤣",
+    },
+    "hoi_dap_tuong_tac": {
+        "label": "❓ Hỏi đáp / Tương tác (Interactive)",
+        "description": "Post dạng poll, câu hỏi mở, debate. Không đưa đáp án ngay — để GenZ tự trả lời trước, gây tương tác.",
+        "hook_example": "Câu hỏi nhanh: Da dầu có NÊN rửa mặt 3 lần/ngày không? 🤔 👇",
+        "cta_example": "Các bạn ngh sao? Yes hay No? Comment bên dưới nha!",
+    },
+    "review_thuc_te": {
+        "label": "🔍 Review thực tế (Real Review)",
+        "description": "Review honest — nói cả ưu lẫn nhược. Format: đã dùng bao lâu → giá → cảm nhận → kết luận. Không PR.",
+        "hook_example": "Mình đã dùng kem chống nắng này 3 tháng — review thật không filter 🎯",
+        "cta_example": "Bạn đã dùng sản phẩm nào tương tự chưa? Review cho mình với 🌸",
+    },
+}
+
 _WRITER_SYSTEM_PROMPT = """Bạn là Copywriter chuyên content skincare/healthcare cho GenZ Việt Nam (18-25 tuổi).
 
-NHIỆM VỤ: Viết caption Facebook thu hút, chân thật, đúng giọng GenZ.
+NHIỆM VỤ: Viết caption Facebook thu hút, chân thật, đúng giọng GenZ theo TONE PERSONA được chỉ định.
 
-NGUYÊN TẮC:
+NGUYÊN TẮC CHUNG:
 - Ngắn gọn, dễ hiểu, gần gũi (xưng mình/bạn)
 - Kiến thức chuyên môn nhưng không khô khan — lồng kiến thức vào câu chuyện
-- GenZ tone: tự nhiên, có cảm xúc, hài hước nhẹ khi phù hợp
 - KHÔNG phóng đại, KHÔNG hứa hẹn kết quả thần kỳ ("trắng sau 1 tuần", "hết mụn ngay lập tức")
 - Mỗi caption có: hook hút → body ngắn → CTA khéo léo
 - Luôn kết thúc bằng 1 câu hỏi mở để GenZ vào tương tác
+
+CÁC TONE PERSONA CÓ SẴN (chọn đúng 1 cho mỗi variant):
+1. 💬 Chia sẻ thật — Kể chuyện cá nhân, honest, vulnerable. Hook: từng sai → giờ hiểu. CTA: hỏi kinh nghiệm tương tự.
+2. 📚 Chuyên môn nhẹ — Fact-based, giải thích dễ hiểu. Hook: bác sĩ nói / nghiên cứu chỉ ra. CTA: cùng thảo luận.
+3. 😆 Hài hước / Meme — GenZ humor, exaggeration, từ lóng nhẹ (POV, thảo nào, xỉu). CTA: vote/comment hài.
+4. ❓ Hỏi đáp tương tác — Post dạng câu hỏi, debate, poll. KHÔNG đưa đáp án ngay. CTA: Yes/No, bạn nghĩ sao.
+5. 🔍 Review thực tế — Review honest: ưu + nhược. Hook: review thật không filter. CTA: bạn đã dùng chưa?
 
 VÍ DỤ GIỌNG VIẾT TỐT:
 • "Mình từng nghĩ toner là bước không thể thiếu cho da dầu… cho tới khi đọc nghiên cứu của bác sĩ da liễu 🤯 Mọi người có biết da dầu thực ra cần gì nhất không?"
@@ -45,7 +86,7 @@ YÊU CẦU BẮT BUỘC:
 - Hook (câu mở): gây tò mò, chạm cảm xúc, hoặc đặt câu hỏi
 - Caption: 2-3 câu ngắn, có emoji, tự nhiên
 - CTA: 1 câu hỏi tương tác cuối bài (không kêu gọi mua hàng)
-- tone_tags: list 2-3 từ khóa mô tả tone (vd: chia_sẻ, chuyên_môn, hài_hước, review, hỏi_đáp)
+- tone_tags: gồm 2-3 từ khóa, PHẢI có tên tone persona được giao (vd: ["chia_sẻ_thật", "gần_gũi"])
 - Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan chi tiết (vd: #dau #trimun #duongam)
 
 FORMATS: text_image (ảnh + chữ), carousel (nhiều ảnh), reel (video).
@@ -108,14 +149,25 @@ class WriterAgent(BaseAgent):
         scheduled_date: str | None,
         scheduled_time: str | None,
     ) -> AgentResult:
-        """Generate N content variants — LLM or empty template fallback."""
+        """Generate N content variants — LLM or template fallback."""
         now = datetime.now(timezone.utc).isoformat()
         package_id = f"pkg-{uuid.uuid4().hex[:8]}"
         date = scheduled_date or now[:10]
         time = scheduled_time or "09:00"
 
+        # ── Assign tone personas round-robin ──
+        persona_keys = list(_TONE_PERSONAS.keys())
+        assigned: list[tuple[str, str]] = []
+        for i in range(count):
+            key = persona_keys[i % len(persona_keys)]
+            assigned.append((key, _TONE_PERSONAS[key]["label"]))
+
         # ── Try LLM ──
         if self._llm and topic:
+            persona_section = "\n".join(
+                f"  Variant {i+1}: TONE = \"{label}\""
+                for i, (_, label) in enumerate(assigned)
+            )
             prompt = f"""Viết {count} variant caption cho bài đăng Facebook về chủ đề skincare.
 
 Thương hiệu: {self._brand_id}
@@ -123,7 +175,9 @@ Chủ đề: {topic}
 Pillar: {pillar}
 Số lượng variant: {count}
 
-Mỗi variant cần có góc nhìn/giong điệu khác nhau (ví dụ: 1 chia sẻ, 1 chuyên môn, 1 hài hước).
+MỖI VARIANT PHẢI DÙNG ĐÚNG TONE PERSONA được chỉ định:
+
+{persona_section}
 
 Output JSON:
 {{
@@ -135,7 +189,7 @@ Output JSON:
       "hook": "câu mở đầu thu hút (1 câu)",
       "cta": "kêu gọi hành động (1 câu ngắn)",
       "format": "text_image|carousel|reel",
-      "tone_tags": ["tone1", "tone2"],
+      "tone_tags": ["tone_persona_used", "keyword"],
       "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"]
     }}
   ]
@@ -173,32 +227,90 @@ Output JSON:
                     ),
                 )
 
-        # ── Template fallback — contentful variants ──
+        # ── Template fallback — persona-based contentful variants ──
         variants: list[ContentVariant] = []
-        hook_templates = [
-            f"Mình từng nghĩ {topic.lower()} khó lắm, nhưng thực ra…",
-            f"Bạn có biết {topic.lower()} không? 🤔",
-            f"3 điều mình rút ra về {topic.lower()}",
-            f"Nói thật nhé: {topic.lower()} — có đáng tiền?",
-            f"{topic.title()} — mình đã thử và đây là kết quả",
-        ]
-        caption_templates = [
-            f"Mình đã từng vật lộn với {topic.lower()} suốt mấy tháng trời. Sau khi tìm hiểu kỹ thì mới nhận ra mình đã sai ngay từ bước cơ bản nhất. Các bạn có gặp tình trạng giống mình không?",
-            f"Hôm nay mình muốn chia sẻ thật lòng về {topic.lower()}. Không quảng cáo, không PR — chỉ là kinh nghiệm thực tế sau thời gian dài trải nghiệm. Ai quan tâm thì cùng thảo luận nhé 👇",
-            f"Nếu bạn cũng đang băn khoăn về {topic.lower()}, thì bài này dành cho bạn. Mình tổng hợp từ kinh nghiệm cá nhân và tư vấn của bác sĩ da liễu. Cùng xem có gì thú vị nha!",
-        ]
-        cta_templates = [
-            "Bạn đã thử cách này chưa? Chia sẻ trải nghiệm của bạn bên dưới nhé 👇",
-            "Có bạn nào từng gặp tình trạng tương tự không? Cùng thảo luận nha!",
-            "Bạn nghĩ sao về điều này? Mình rất muốn nghe ý kiến của mọi người 🌸",
-        ]
+        # Each persona gets dedicated hook/caption/cta templates
+        persona_templates: dict[str, dict[str, list[str]]] = {
+            "chia_se_that": {
+                "hooks": [
+                    f"Mình từng nghĩ {topic.lower()} khó lắm, nhưng thực ra…",
+                    f"Mình đã từng vật lộn với {topic.lower()} suốt mấy tháng 😅",
+                    f"Nói thật: mình từng bỏ qua {topic.lower()} vì nghĩ không quan trọng…",
+                ],
+                "captions": [
+                    f"Mình đã từng vật lộn với {topic.lower()} suốt mấy tháng trời. Sau khi tìm hiểu kỹ thì mới nhận ra mình đã sai ngay từ bước cơ bản nhất. Các bạn có gặp tình trạng giống mình không?",
+                    f"Đúng là không trải nghiệm thì không biết. Mình từng {topic.lower()} và kết quả thật sự bất ngờ… Kể ra đây để các bạn cùng rút kinh nghiệm nè 👇",
+                ],
+                "ctas": [
+                    "Bạn có từng mắc sai lầm giống mình không? Kể mình nghe với 👇",
+                    "Ai từng như mình thì giơ tay nào 🙋",
+                ],
+            },
+            "chuyen_mon_nhe": {
+                "hooks": [
+                    f"Bạn có biết {topic.lower()} không? 🤔",
+                    f"Bác sĩ da liễu nói gì về {topic.lower()}?",
+                    f"3 điều mình rút ra về {topic.lower()}",
+                ],
+                "captions": [
+                    f"Hôm nay mình muốn chia sẻ về {topic.lower()}. Không quảng cáo, không PR — chỉ là kiến thức mình tổng hợp từ bác sĩ da liễu và kinh nghiệm thực tế. Cùng nhau học nha 🌸",
+                    f"Đây là những gì mình học được về {topic.lower()} sau thời gian tìm hiểu. Có thể bạn sẽ bất ngờ đấy! Dưới góc nhìn chuyên môn nhẹ, dễ hiểu ✨",
+                ],
+                "ctas": [
+                    "Có bạn nào từng nghe điều này chưa? Cùng thảo luận bên dưới nha!",
+                    "Bạn nghĩ sao về thông tin này? Comment góp ý nhé 👇",
+                ],
+            },
+            "hai_huoc_meme": {
+                "hooks": [
+                    f"POV: Bạn nghĩ {topic.lower()} là chuyện đơn giản 💀",
+                    f"Thảo nào {topic.lower()} — mình tưởng biết hết rồi…",
+                ],
+                "captions": [
+                    f"Xỉu up xỉu down khi phát hiện ra sự thật về {topic.lower()} 😵 Thôi thì chia sẻ để các bạn khỏi mắc sai lầm như mình. Đọc xong nhớ cmt cảm nghĩ nha 🤣",
+                    f"Sự thật thì {topic.lower()} không hề khó như bạn nghĩ đâu. Mình cũng từng 'gà mờ' như ai — nhưng giờ đã có kinh nghiệm để kể lại rồi. Đọc xong bạn sẽ thấy 'ngộ' ra nhiều điều 😆",
+                ],
+                "ctas": [
+                    "Ai từng 'thả thính' như mình thì vote 1 phát nào 🤣",
+                    "Bạn có 'gà mờ' y như mình hồi xưa không? Comment kể đi 👇",
+                ],
+            },
+            "hoi_dap_tuong_tac": {
+                "hooks": [
+                    f"Câu hỏi nhanh: {topic.title()} có thực sự quan trọng? 🤔",
+                    f"Nhanh — bạn nghĩ {topic.lower()} nên làm ngay hay không?",
+                ],
+                "captions": [
+                    f"Mình đố các bạn: {topic.lower()} — có hay không? Trả lời trước khi đọc phần dưới đây nha 👇",
+                ],
+                "ctas": [
+                    "Các bạn ngh sao? Yes hay No? Comment bên dưới nha!",
+                    "Bạn có đồng ý không? Mình rất muốn nghe ý kiến trái chiều 👇",
+                ],
+            },
+            "review_thuc_te": {
+                "hooks": [
+                    f"Review thật: {topic.lower()} — có đáng tiền?",
+                    f"Mình dùng thử {topic.lower()} trong thời gian dài và đây là sự thật 🎯",
+                ],
+                "captions": [
+                    f"Review thật không filter về {topic.lower()}: ưu điểm, nhược điểm, và kết luận sau thời gian sử dụng. Mình không PR, chỉ nói những gì mình trải nghiệm. Ai quan tâm thì đọc thử nhé!",
+                ],
+                "ctas": [
+                    "Bạn đã dùng sản phẩm nào tương tự chưa? Review cho mình với 🌸",
+                    "Có bạn nào có trải nghiệm khác không? Chia sẻ để mọi người cùng biết nha 👇",
+                ],
+            },
+        }
 
         import random
         for i in range(count):
+            persona_key, persona_label = assigned[i]
+            templates = persona_templates[persona_key]
             variant_id = f"var-{package_id}-{i}"
-            hook = random.choice(hook_templates)
-            caption = random.choice(caption_templates)
-            cta = random.choice(cta_templates)
+            hook = random.choice(templates["hooks"])
+            caption = random.choice(templates["captions"])
+            cta = random.choice(templates["ctas"])
             variants.append(ContentVariant(
                 variant_id=variant_id,
                 topic=topic,
@@ -207,7 +319,7 @@ Output JSON:
                 hook=hook,
                 cta=cta,
                 format=self._pick_format(i),
-                tone_tags=["chia_sẻ", "chuyên_môn"],
+                tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
                 hashtags=self._base_hashtags(),
             ))
 
