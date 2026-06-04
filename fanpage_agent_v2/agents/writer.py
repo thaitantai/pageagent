@@ -163,6 +163,10 @@ class WriterAgent(BaseAgent):
         }
         time = scheduled_time or pillar_time_map.get(pillar.strip().lower(), "09:00")
 
+        # ── Tick offset for format rotation across days ──
+        tick_offset = sum(int(part) for part in date.split("-"))
+
+
         # ── Assign tone personas round-robin ──
         persona_keys = list(_TONE_PERSONAS.keys())
         assigned: list[tuple[str, str]] = []
@@ -216,7 +220,7 @@ Output JSON:
                         caption=v.get("caption", ""),
                         hook=v.get("hook", ""),
                         cta=v.get("cta", ""),
-                        format=v.get("format", self._pick_format(i)),
+                        format=v.get("format", self._pick_format(i, tick_offset)),
                         tone_tags=v.get("tone_tags", []),
                         hashtags=v.get("hashtags", self._base_hashtags(pillar)),
                     )
@@ -246,7 +250,7 @@ Output JSON:
                                         caption=rv.get("caption", variants[ri].caption),
                                         hook=rv.get("hook", variants[ri].hook),
                                         cta=rv.get("cta", variants[ri].cta),
-                                        format=rv.get("format", self._pick_format(ri)),
+                                        format=rv.get("format", self._pick_format(ri, tick_offset)),
                                         tone_tags=rv.get("tone_tags", variants[ri].tone_tags),
                                         hashtags=rv.get("hashtags", self._base_hashtags(pillar)),
                                     )
@@ -357,7 +361,7 @@ Output JSON:
                 caption=caption,
                 hook=hook,
                 cta=cta,
-                format=self._pick_format(i),
+                format=self._pick_format(i, tick_offset),
                 tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
                 hashtags=self._base_hashtags(pillar),
             ))
@@ -506,9 +510,9 @@ Output JSON:
         return results
 
     @staticmethod
-    def _pick_format(index: int) -> str:
-        formats = ["text_image", "carousel", "reel", "text_image"]
-        return formats[index % len(formats)]
+    def _pick_format(index: int, tick_offset: int = 0) -> str:
+        formats = ["text_image", "carousel", "reel", "text_image", "reel"]
+        return formats[(index + tick_offset) % len(formats)]
 
     @staticmethod
     def _base_hashtags(pillar: str = "") -> list[str]:
