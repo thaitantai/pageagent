@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-04T04:14:30.486269+00:00",
+  "timestamp": "2026-06-04T04:51:24.866948+00:00",
   "tick": 1,
   "state": {
     "calendar": {
@@ -14,15 +14,15 @@
       "new_comments_24h": 0
     },
     "performance": {
-      "weekly_posts": 0,
+      "weekly_posts": 4,
       "avg_reach": 0,
       "avg_engagement": 0.0,
-      "top_pillar": null
+      "top_pillar": "auto_generated"
     },
     "system": {
       "last_tick": "ok",
       "errors_24h": 0,
-      "uptime_hours": 3.5113758511013454e-07
+      "uptime_hours": 4.772345225016276e-07
     }
   }
 }

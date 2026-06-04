@@ -140,7 +140,11 @@ Output JSON:
     }}
   ]
 }}"""
-            data = self._llm.generate_json(_WRITER_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(
+                _WRITER_SYSTEM_PROMPT, prompt,
+                max_tokens=3000,
+                temperature=0.7,
+            )
             if data and "variants" in data:
                 variants = [
                     ContentVariant(
@@ -236,7 +240,11 @@ Output JSON:
     ...
   ]
 }}"""
-            data = self._llm.generate_json(_WRITER_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(
+                _WRITER_SYSTEM_PROMPT, prompt,
+                max_tokens=1500,
+                temperature=0.8,
+            )
             if data and "hooks" in data:
                 return AgentResult(
                     task_id=f"hooks-{topic[:20]}",
@@ -276,7 +284,11 @@ Output JSON:
   "revised_caption": "caption đã sửa theo feedback",
   "changes": "mô tả ngắn những gì đã thay đổi"
 }}"""
-            data = self._llm.generate_json(_WRITER_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(
+                _WRITER_SYSTEM_PROMPT, prompt,
+                max_tokens=2000,
+                temperature=0.6,
+            )
             if data:
                 return AgentResult(
                     task_id=f"rewrite-{variant_id}",

@@ -191,6 +191,10 @@ class OrchestratorAgent(BaseAgent):
                     day0 = strategist_data["schedule"][0]
                     topic = day0.get("topic_template", "")
                     pillar = day0.get("pillar", "")
+                # Fallback if strategist returned empty topics
+                if not topic.strip():
+                    topic = "Chăm sóc da dầu mụn cho GenZ"
+                    pillar = pillar or "education"
                 r = self._bus.dispatch(self._bus.create_task(
                     AgentRole.WRITER, "write_variants",
                     {"variants": 2, "topic": topic, "pillar": pillar},
