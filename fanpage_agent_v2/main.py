@@ -72,6 +72,15 @@ def create_pipeline(
         config={},
         llm=llm,
     )
+
+    # ── Facebook Adapter (shared across agents that need it) ─────
+    try:
+        from fanpage_agent_v2.adapters.fb_adapter import FacebookAdapter
+        fb_adapter = FacebookAdapter()
+        # Inject FB adapter into agents that need live Facebook data
+        community._fb = fb_adapter
+    except Exception as e:
+        print(f"⚠️  FB adapter init failed (community fetch disabled): {e}")
     publisher = PublisherAgent(
         config={},
         performance_memory=memory,

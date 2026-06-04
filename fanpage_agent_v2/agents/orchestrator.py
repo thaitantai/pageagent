@@ -162,6 +162,9 @@ class OrchestratorAgent(BaseAgent):
 
         results = []
         research_data: dict | None = None
+        strategist_data: dict | None = None
+        writer_package = None  # ContentPackage from writer
+
         for step in steps:
             if step == "research":
                 r = self._bus.dispatch(self._bus.create_task(
@@ -177,11 +180,23 @@ class OrchestratorAgent(BaseAgent):
                 r = self._bus.dispatch(self._bus.create_task(
                     AgentRole.STRATEGIST, "plan_weekly", params
                 ))
+                if r.success and r.data:
+                    strategist_data = r.data
                 results.append(r)
             elif step == "writing":
+                # Get topic + pillar from strategist's day-0 schedule
+                topic = ""
+                pillar = ""
+                if strategist_data and strategist_data.get("schedule"):
+                    day0 = strategist_data["schedule"][0]
+                    topic = day0.get("topic_template", "")
+                    pillar = day0.get("pillar", "")
                 r = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.WRITER, "write_variants", {"variants": 2}
+                    AgentRole.WRITER, "write_variants",
+                    {"variants": 2, "topic": topic, "pillar": pillar},
                 ))
+                if r.success and r.data:
+                    writer_package = r.data  # ContentPackage dataclass
                 results.append(r)
             elif step == "design":
                 r = self._bus.dispatch(self._bus.create_task(
@@ -189,9 +204,11 @@ class OrchestratorAgent(BaseAgent):
                 ))
                 results.append(r)
             elif step == "publish":
+                # Compose message from writer's best variant
+                message, image_path = self._compose_message(writer_package)
                 r = self._bus.dispatch(self._bus.create_task(
                     AgentRole.PUBLISHER, "publish_due",
-                    {"message": "Tin tức làm đẹp mỗi ngày ✨"},
+                    {"message": message, "image_path": image_path},
                 ))
                 results.append(r)
 
@@ -200,6 +217,42 @@ class OrchestratorAgent(BaseAgent):
             success=True,
             data={"mode": mode, "steps_run": steps, "results": [r.completed_at for r in results]},
         )
+
+    @staticmethod
+    def _compose_message(package) -> tuple[str, str | None]:
+        """Extract message text and image_path from a ContentPackage (or dict).
+
+        Returns (message_string, image_path_or_None).
+        """
+        from fanpage_agent_v2.core.types import ContentPackage  # local import
+
+        variant = None
+        if package is None:
+            pass
+        elif isinstance(package, ContentPackage):
+            variant = package.best_variant()
+        elif isinstance(package, dict):
+            try:
+                pkg = ContentPackage(**package)
+                variant = pkg.best_variant()
+            except Exception:
+                variant = None
+
+        if variant is None:
+            return "Tin tức làm đẹp mỗi ngày ✨", None
+
+        parts = []
+        if variant.hook:
+            parts.append(f"💡 {variant.hook}")
+        if variant.caption:
+            parts.append(variant.caption)
+        if variant.cta:
+            parts.append(variant.cta)
+        if variant.hashtags:
+            parts.append(" ".join(f"#{t.lstrip('#')}" for t in variant.hashtags))
+
+        message = "\n\n".join(parts) if parts else "Tin tức làm đẹp mỗi ngày ✨"
+        return message, variant.image_path
 
     def _status(self) -> AgentResult:
         """Return current orchestrator status."""
@@ -255,8 +308,14 @@ class OrchestratorAgent(BaseAgent):
                 "action": "publish_due",
             }))
 
-        # Priority 1: Community triage
-        if state.pending_triage > 0 or state.new_comments_24h > 0:
+        # Community: fetch + triage (every 3 ticks when FB adapter available)
+        if self._tick_count % 3 == 1:  # tick #1, #4, #7, ...
+            actions.append((ActionPriority.HIGH, {
+                "agent": AgentRole.COMMUNITY,
+                "action": "fetch_and_triage",
+                "params": {"limit": 50},
+            }))
+        elif state.pending_triage > 0 or state.new_comments_24h > 0:
             actions.append((ActionPriority.HIGH, {
                 "agent": AgentRole.COMMUNITY,
                 "action": "triage_comments",

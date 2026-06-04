@@ -26,15 +26,23 @@ Trả lời bằng JSON thuần, không markdown."""
 
 
 class CommunityAgent(BaseAgent):
-    """Community manager — triages comments, suggests replies using LLM or template."""
+    """Community manager — triages comments, suggests replies using LLM or template.
+
+    When an ``fb_adapter`` is provided, the agent can also fetch live comments
+    from Facebook (``fetch_and_triage``) so the orchestrator doesn't need to
+    manually pass in comment data.
+    """
 
     def __init__(
         self,
         config: dict[str, Any] | None = None,
         llm: LLMAdapter | None = None,
+        fb_adapter: Any = None,  # FacebookAdapter | None
     ) -> None:
         super().__init__(config)
         self._llm = llm
+        self._fb = fb_adapter
+        self._last_fetched: list[dict] = []
 
     @property
     def role(self) -> AgentRole:
@@ -42,13 +50,17 @@ class CommunityAgent(BaseAgent):
 
     @property
     def capabilities(self) -> list[str]:
-        return ["triage_comments", "suggest_reply", "urgent_mentions", "sentiment_summary"]
+        return ["fetch_and_triage", "triage_comments", "suggest_reply", "sentiment_summary"]
 
     def handle_task(self, task: AgentTask) -> AgentResult:
         action = task.action
         params = task.params
 
-        if action == "triage_comments":
+        if action == "fetch_and_triage":
+            return self._fetch_and_triage(
+                limit=params.get("limit", 50),
+            )
+        elif action == "triage_comments":
             return self._triage_comments(
                 comments=params.get("comments", []),
                 limit=params.get("limit", 20),
@@ -63,6 +75,51 @@ class CommunityAgent(BaseAgent):
                 comments=params.get("comments", []),
             )
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
+
+    def _fetch_and_triage(self, limit: int = 50) -> AgentResult:
+        """Fetch recent comments from Facebook and triage them.
+
+        Gets recent posts, fetches comments for each, classifies them,
+        and returns the triage result. Falls back gracefully if no FB
+        adapter is available.
+        """
+        if self._fb is None:
+            return AgentResult(
+                task_id="fetch-triage",
+                success=True,
+                data={
+                    "total_analysed": 0,
+                    "categories": {},
+                    "note": "No FacebookAdapter — skip fetch",
+                    "urgent_count": 0,
+                    "reply_needed_count": 0,
+                },
+            )
+
+        all_comments: list[dict] = []
+        fetch_errors = 0
+        try:
+            posts = self._fb.get_recent_posts(limit=5)
+            for post in posts:
+                post_id = post.get("id", "")
+                if not post_id:
+                    continue
+                try:
+                    comments = self._fb.get_comments(post_id, limit=limit)
+                    for c in comments:
+                        c["post_id"] = post_id
+                    all_comments.extend(comments)
+                except Exception:
+                    fetch_errors += 1
+        except Exception as e:
+            return AgentResult(
+                task_id="fetch-triage",
+                success=False,
+                error=f"Failed to fetch posts: {e}",
+            )
+
+        self._last_fetched = all_comments  # cache for sentiment_summary
+        return self._triage_comments(all_comments, limit)
 
     def _triage_comments(self, comments: list[dict], limit: int) -> AgentResult:
         """Classify comments into categories using keyword matching."""

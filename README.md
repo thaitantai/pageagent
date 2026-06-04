@@ -201,8 +201,8 @@ V2 is a multi-agent orchestrator that runs as a Docker daemon and auto-generates
 | **WriterAgent** | Generate captions and variants |
 | **DesignerAgent** | Create visual briefs |
 | **PublisherAgent** | Publish to Facebook via API |
-| **CommunityAgent** | Comment triage (placeholder) |
-| **AnalystAgent** | Performance reporting |
+| **CommunityAgent** | Comment fetch & triage via Facebook API + LLM replies |
+| **AnalystAgent** | Performance reporting (weekly via Hermes cron) |
 
 ### Memory System
 
@@ -239,6 +239,7 @@ python3 -m fanpage_agent_v2.main daemon
 | Name | Schedule | Description |
 |---|---|---|
 | `fanpage-v2-status` | `0 */6 * * *` | V2 container health + memory report via no-agent script |
+| `fanpage-v2-weekly-report` | `0 2 * * 1` | Weekly analytics report (posts, reach, engagement, patterns) |
 
 ### Data Files
 
@@ -251,19 +252,23 @@ data/v2/
 
 ### Current Status
 
-✅ Container running with auto-restart
-✅ Tick cycle: gather → decide → auto-generate → publish → repeat
-✅ Facebook API publishing with PerformanceMemory recording
-✅ Publisher fix: posts now recorded in memory.db
-✅ Settings fix: .env auto-loaded from cwd
-✅ CLI `tick` and `daemon` modes work
-✅ Hermes cron V2 status reporter configured
+| ✅ Container running with auto-restart
+| ✅ Tick cycle: gather → decide → auto-generate → publish → repeat
+| ✅ Facebook API publishing with PerformanceMemory recording
+| ✅ Publisher fix: posts now recorded in memory.db
+| ✅ Settings fix: .env auto-loaded from cwd
+| ✅ CLI `tick` and `daemon` modes work
+| ✅ Hermes cron V2 status reporter configured
+| ✅ Content pipe: writer output → publisher message (non-hardcoded)
+| ✅ CommunityAgent: live comment fetch + triage from Facebook API
+| ✅ Weekly analytics report cron (no-agent, every Monday)
 
 ## Next implementation tasks
 
-- **P0:** Theo dõi lần chạy tự động đầu tiên của 9 cron jobs, kiểm tra `last_status`, output local và artifact freshness.
-- **P0:** Nếu job nào lỗi, pause job đó, đọc output/error, sửa wrapper hoặc dữ liệu nguồn rồi resume.
-- **P2:** Thêm dashboard HTML/Markdown local tổng hợp cron health + artifact health.
+- **P1:** Add daily community digests — cron job that fetches comments and delivers triage summary to Telegram
+- **P2:** Add dashboard HTML/Markdown local tổng hợp cron health + artifact health
+- **P2:** Auto-reply to triaged comments via Facebook Graph API
+- **P3:** A/B testing variants: writer generates 2+ variants, publisher picks best by pattern score
 
 ## Ghi chú
 - Bản này đã có lane OpenAI-compatible thật.
