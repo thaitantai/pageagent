@@ -222,6 +222,37 @@ Output JSON:
                     )
                     for i, v in enumerate(data["variants"][:count])
                 ]
+
+                # ── Quality scoring — auto-fail low-quality variants ──
+                try:
+                    scored = self._score_variants(variants, topic)
+                    low = [v for v in scored if v.get("score", 5) < 3.0]
+                    if low and self._llm:
+                        # regenerate low scorers with higher temperature
+                        retry_prompt = prompt + f"\n\n⚠️ {len(low)} variant(s) failed quality check (score < 3.0). Regenerate specifically variant #{[scored.index(v)+1 for v in low]} with stronger hook, clearer value, and a more engaging CTA. BE MORE CREATIVE."
+                        retry_data = self._llm.generate_json(
+                            _WRITER_SYSTEM_PROMPT, retry_prompt,
+                            max_tokens=3000,
+                            temperature=0.85,
+                        )
+                        if retry_data and "variants" in retry_data:
+                            # merge retry results back
+                            for ri, rv in enumerate(retry_data["variants"][:count]):
+                                if ri < len(variants):
+                                    variants[ri] = ContentVariant(
+                                        variant_id=f"var-{package_id}-{ri}",
+                                        topic=rv.get("topic", topic),
+                                        pillar=rv.get("pillar", pillar),
+                                        caption=rv.get("caption", variants[ri].caption),
+                                        hook=rv.get("hook", variants[ri].hook),
+                                        cta=rv.get("cta", variants[ri].cta),
+                                        format=rv.get("format", self._pick_format(ri)),
+                                        tone_tags=rv.get("tone_tags", variants[ri].tone_tags),
+                                        hashtags=rv.get("hashtags", self._base_hashtags(pillar)),
+                                    )
+                except Exception:
+                    pass  # scoring is best-effort, never block publishing
+
                 return AgentResult(
                     task_id=f"write-{package_id}",
                     success=True,
@@ -421,6 +452,58 @@ Output JSON:
             success=True,
             data={"variant_id": variant_id, "feedback": feedback, "revised": True, "generated_by": "template"},
         )
+
+    @staticmethod
+    def _score_variants(variants: list[ContentVariant], topic: str) -> list[dict]:
+        """Lightweight heuristic scoring — no LLM call, checks structure and completeness."""
+        results: list[dict] = []
+        for v in variants:
+            score = 5.0
+            reasons: list[str] = []
+
+            # hook quality
+            hook = (v.hook or "").strip()
+            if len(hook) < 10:
+                score -= 1.5
+                reasons.append("hook_too_short")
+            if not any(c in hook for c in "?!~😅🤔💀🎯👇"):
+                score -= 0.5
+                reasons.append("hook_no_emotional_punch")
+
+            # caption quality
+            cap = (v.caption or "").strip()
+            if len(cap) < 30:
+                score -= 1.5
+                reasons.append("caption_too_short")
+            if "?" not in cap:
+                score -= 0.5
+                reasons.append("caption_no_question")
+            if not any(c in cap for c in "😅🤔😂🌸✨💀👇🎯🔥"):
+                score -= 0.3
+                reasons.append("caption_no_emoji")
+
+            # CTA quality
+            cta = (v.cta or "").strip()
+            if len(cta) < 10:
+                score -= 1.0
+                reasons.append("cta_too_short")
+            if "?" not in cta and "👇" not in cta:
+                score -= 0.5
+                reasons.append("cta_no_question_or_arrow")
+
+            # penalize copy-paste
+            if hook and cap and hook.lower() in cap.lower():
+                score -= 1.0
+                reasons.append("hook_repeated_in_caption")
+
+            score = max(1.0, min(5.0, score))
+            results.append({
+                "variant_id": v.variant_id,
+                "score": score,
+                "reasons": reasons,
+                "persona": (v.tone_tags or ["unknown"])[0],
+            })
+        return results
 
     @staticmethod
     def _pick_format(index: int) -> str:
