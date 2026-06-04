@@ -26,6 +26,7 @@ from fanpage_agent.services.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
 )
+from fanpage_agent.services.auto_content import AutoContentOrchestrator
 from fanpage_agent.services.hashtag import HashtagService
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
 from fanpage_agent.services.scheduled_publish import ScheduledPublishService
@@ -33,6 +34,7 @@ from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
+from fanpage_agent.scraping.web_search import WebSearchClient
 from fanpage_agent.utils import dump_json
 
 
@@ -130,6 +132,13 @@ def build_parser() -> argparse.ArgumentParser:
     research_parser.add_argument("--save", action="store_true")
     research_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     add_store_backend_arg(research_parser)
+
+    # ── search-trends: web search + scrape ────────────────────
+    search_trends_parser = subparsers.add_parser("search-trends")
+    search_trends_parser.add_argument("queries", nargs="+", help="Search queries")
+    search_trends_parser.add_argument("--max-per-query", type=int, default=3, help="URLs per query")
+    search_trends_parser.add_argument("--max-articles", type=int, default=10, help="Total max items")
+    search_trends_parser.add_argument("--timeout", type=int, default=15, help="HTTP timeout")
 
     research_delivery_parser = subparsers.add_parser("deliver-research-brief")
     research_delivery_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
@@ -602,13 +611,32 @@ def build_parser() -> argparse.ArgumentParser:
     daemon_parser.add_argument("--config", help="Path to agent config JSON")
     daemon_parser.add_argument("--interval", type=int, default=7200, help="Tick interval in seconds")
 
+    # ── auto-content-cycle: autonomous content agent loop ──────
+    auto_parser = subparsers.add_parser("auto-content-cycle")
+    auto_parser.add_argument("--brand-file", help="Path to brand profile JSON (cần cho draft)")
+    auto_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
+    auto_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    auto_parser.add_argument("--comment-file", default=str(DEFAULT_COMMENT_FILE))
+    auto_parser.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE))
+    auto_parser.add_argument("--draft", action="store_true", help="Sinh draft caption cho top gaps")
+    auto_parser.add_argument("--max-gaps", type=int, default=10, help="Số gap tối đa phân tích")
+    auto_parser.add_argument("--save", action="store_true", help="Lưu report ra artifacts")
+    add_store_backend_arg(auto_parser)
+
     return parser
+
+
+def _build_research_service(timeout: int = 15) -> ResearchService:
+    """Build ResearchService với TrendScraper + WebSearchClient tích hợp."""
+    web_search = WebSearchClient()
+    scraper = TrendScraper(timeout=timeout, web_search=web_search)
+    return ResearchService(trend_scraper=scraper)
 
 
 def build_research_brief(args: argparse.Namespace):
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=args)
-    return ResearchService().build_brief(
+    return _build_research_service().build_brief(
         store=store,
         comment_csv=args.comment_file,
         campaign_notes_file=args.campaign_file,
@@ -836,12 +864,84 @@ def cmd_deliver_research_brief(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_search_trends(args: argparse.Namespace) -> int:
+    """CLI command: search web → scrape URLs → print TrendItems as JSON."""
+    web_search = WebSearchClient()
+    scraper = TrendScraper(timeout=args.timeout, web_search=web_search)
+    results = scraper.search_trends(
+        queries=args.queries,
+        max_results_per_query=args.max_per_query,
+        max_articles=args.max_articles,
+    )
+    payload = [r.model_dump(mode="json") for r in results]
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(f"\n📦 Tổng cộng: {len(results)} TrendItem", file=sys.stderr)
+    return 0
+
+
+def cmd_auto_content_cycle(args: argparse.Namespace) -> int:
+    """CLI command: autonomous content agent loop.
+
+    Pipeline:
+      1. Research — web search + scrape → trends
+      2. Gap analysis — trends vs published history → gaps
+      3. Draft — sinh caption cho top gaps (nếu --draft + --brand-file)
+      4. Report — in JSON + optional Telegram format
+    """
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+
+    research_service = _build_research_service()
+
+    brand_profile = None
+    if args.brand_file:
+        try:
+            brand_profile = load_brand_profile(args.brand_file)
+        except Exception as exc:
+            print(f"⚠️  Không load được brand profile: {exc}", file=sys.stderr)
+
+    writer_service = WriterService(llm_client=build_llm_client(settings)) if brand_profile and args.draft else None
+    orchestrator = AutoContentOrchestrator(
+        research_service=research_service,
+        writer_service=writer_service,
+    )
+
+    report = orchestrator.run_cycle(
+        store=store,
+        brand_profile=brand_profile,
+        comment_csv=getattr(args, "comment_file", None),
+        campaign_file=getattr(args, "campaign_file", None),
+        draft_content=bool(args.draft and brand_profile),
+        max_gaps=args.max_gaps,
+    )
+
+    payload = report.to_dict()
+
+    if args.save:
+        out_dir = settings.artifacts_dir / "auto_content"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"auto-content-cycle-{report.run_date}.json"
+        out_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(f"💾 Report saved: {out_path}", file=sys.stderr)
+
+    # Print JSON to stdout
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+    # Print Telegram summary to stderr
+    print(file=sys.stderr)
+    print(report.format_telegram(), file=sys.stderr)
+
+    return 0
+
+
 def cmd_run_daily(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings)
     store = build_store(settings=settings, args=args)
-    research_brief = ResearchService().build_brief(
+    research_brief = _build_research_service().build_brief(
         store=store,
         comment_csv=args.comment_file,
         campaign_notes_file=args.campaign_file,
@@ -876,7 +976,7 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings)
     store = build_store(settings=settings, args=args)
-    research_brief = ResearchService().build_brief(
+    research_brief = _build_research_service().build_brief(
         store=store,
         comment_csv=args.comment_file,
         campaign_notes_file=args.campaign_file,
@@ -2009,6 +2109,8 @@ def main() -> int:
         return cmd_research_brief(args)
     if args.command == "deliver-research-brief":
         return cmd_deliver_research_brief(args)
+    if args.command == "search-trends":
+        return cmd_search_trends(args)
     if args.command == "run-daily":
         return cmd_run_daily(args)
     if args.command == "deliver-daily-packet":
@@ -2085,6 +2187,8 @@ def main() -> int:
         return cmd_ops_status(args)
     if args.command == "research-trends":
         return cmd_research_trends(args)
+    if args.command == "auto-content-cycle":
+        return cmd_auto_content_cycle(args)
     if args.command == "generate-hashtags":
         return cmd_generate_hashtags(args)
     if args.command == "auto-fetch-metrics":

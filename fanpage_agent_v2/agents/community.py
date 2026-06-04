@@ -1,22 +1,40 @@
-"""CommunityAgent — community triage, comment management, and auto-replies."""
+"""CommunityAgent — community triage, comment management, and auto-replies.
 
+Uses LLM (via LLMAdapter) for contextual reply generation.
+Keeps keyword-based triage for speed, with optional LLM enhancement.
+"""
 from __future__ import annotations
 
 from typing import Any
 
+from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
 from fanpage_agent_v2.core.agent import BaseAgent
-from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask, ActionPriority
+from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask
+
+_COMMUNITY_SYSTEM_PROMPT = """Bạn là Community Manager cho fanpage skincare GenZ.
+
+NHIỆM VỤ: Trả lời bình luận của khách hàng với giọng điệu chân thật, ấm áp, gần gũi.
+
+NGUYÊN TẮC:
+- Khách khen: cảm ơn và hỏi thêm để tương tác
+- Khách hỏi: trả lời chuyên môn nhưng dễ hiểu, gợi ý inbox nếu cần tư vấn cá nhân
+- Khách phàn nàn: xin lỗi chân thành, đề nghị hỗ trợ riêng
+- Spam: không cần reply
+- GenZ tone: tự nhiên, friendly, không copy-paste
+
+Trả lời bằng JSON thuần, không markdown."""
 
 
 class CommunityAgent(BaseAgent):
-    """Community manager — triages comments, suggests replies.
+    """Community manager — triages comments, suggests replies using LLM or template."""
 
-    Capabilities:
-    - triage_comments: Classify new comments (spam/question/praise/complaint)
-    - suggest_reply: Generate a reply suggestion
-    - urgent_mentions: Flag urgent/high-priority mentions
-    - sentiment_summary: Summarise community sentiment
-    """
+    def __init__(
+        self,
+        config: dict[str, Any] | None = None,
+        llm: LLMAdapter | None = None,
+    ) -> None:
+        super().__init__(config)
+        self._llm = llm
 
     @property
     def role(self) -> AgentRole:
@@ -47,7 +65,7 @@ class CommunityAgent(BaseAgent):
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
     def _triage_comments(self, comments: list[dict], limit: int) -> AgentResult:
-        """Classify comments into categories."""
+        """Classify comments into categories using keyword matching."""
         categories = {"spam": [], "question": [], "praise": [], "complaint": [], "neutral": []}
 
         for c in comments[:limit]:
@@ -55,7 +73,7 @@ class CommunityAgent(BaseAgent):
             cat = self._classify(text)
             categories[cat].append(c)
 
-        urgent = [c for c in categories["complaint"]]
+        urgent = categories["complaint"]
         reply_needed = categories["question"] + categories["complaint"]
 
         return AgentResult(
@@ -74,21 +92,50 @@ class CommunityAgent(BaseAgent):
         )
 
     def _suggest_reply(self, comment_text: str, sentiment: str) -> AgentResult:
-        """Generate a reply suggestion (LLM placeholder)."""
+        """Generate a reply suggestion — LLM or template fallback."""
+        # ── Try LLM ──
+        if self._llm and comment_text:
+            prompt = f"""Đề xuất câu trả lời cho bình luận sau trên fanpage skincare:
+
+Bình luận: "{comment_text}"
+Sentiment: {sentiment}
+
+Output JSON:
+{{
+  "suggestion": "câu trả lời tự nhiên, friendly, bằng tiếng Việt",
+  "sentiment": "{sentiment}",
+  "auto_reply": false,
+  "reasoning": "tại sao reply thế này"
+}}"""
+            data = self._llm.generate_json(_COMMUNITY_SYSTEM_PROMPT, prompt)
+            if data:
+                return AgentResult(
+                    task_id=f"reply-{hash(comment_text) % 10**6}",
+                    success=True,
+                    data={
+                        "suggestion": data.get("suggestion", ""),
+                        "sentiment": sentiment,
+                        "auto_reply": data.get("auto_reply", False),
+                        "generated_by": "llm",
+                    },
+                )
+
+        # ── Template fallback ──
         suggestions = {
             "praise": "Cảm ơn bạn đã chia sẻ! Mình rất vui vì điều đó 🤗",
             "question": "Mình xin phép giải thích nhé! ...",
             "complaint": "Mình rất tiếc về trải nghiệm này. Bạn có thể inbox cho mình để được hỗ trợ chi tiết hơn không ạ?",
-            "spam": "",  # No reply needed
+            "spam": "",
         }
 
         return AgentResult(
-            task_id=f"reply-{id(comment_text)}",
+            task_id=f"reply-{hash(comment_text) % 10**6}",
             success=True,
             data={
                 "suggestion": suggestions.get(sentiment, ""),
                 "sentiment": sentiment,
                 "auto_reply": sentiment in ("spam",),
+                "generated_by": "template",
             },
         )
 
@@ -99,14 +146,9 @@ class CommunityAgent(BaseAgent):
             return AgentResult(
                 task_id="sentiment-summary",
                 success=True,
-                data={
-                    "total": 0,
-                    "summary": "Chưa có comments mới.",
-                    "trend": "neutral",
-                },
+                data={"total": 0, "summary": "Chưa có comments mới.", "trend": "neutral"},
             )
 
-        # Map classification → sentiment category
         cat_map = {
             "praise": "positive",
             "complaint": "negative",
@@ -119,6 +161,34 @@ class CommunityAgent(BaseAgent):
             cls = self._classify(c.get("message", ""))
             cats[cat_map.get(cls, "neutral")] += 1
 
+        # LLM enhancement for summary
+        if self._llm and n > 5:
+            prompt = f"""Tóm tắt cảm xúc cộng đồng từ {n} comments:
+- Tích cực: {cats['positive']}
+- Tiêu cực: {cats['negative']}
+- Trung tính: {cats['neutral']}
+
+Output JSON:
+{{
+  "summary": "tóm tắt 1-2 câu bằng tiếng Việt",
+  "trend": "positive|negative|neutral"
+}}"""
+            data = self._llm.generate_json(_COMMUNITY_SYSTEM_PROMPT, prompt)
+            if data:
+                return AgentResult(
+                    task_id="sentiment-summary",
+                    success=True,
+                    data={
+                        "total": n,
+                        "breakdown": cats,
+                        "positive_ratio": round(cats["positive"] / n * 100, 1),
+                        "negative_ratio": round(cats["negative"] / n * 100, 1),
+                        "summary": data.get("summary", ""),
+                        "trend": data.get("trend", "neutral"),
+                        "generated_by": "llm",
+                    },
+                )
+
         return AgentResult(
             task_id="sentiment-summary",
             success=True,
@@ -129,6 +199,7 @@ class CommunityAgent(BaseAgent):
                 "negative_ratio": round(cats["negative"] / n * 100, 1),
                 "summary": f"{cats['positive']} tích cực, {cats['negative']} tiêu cực, {cats['neutral']} trung tính",
                 "trend": "positive" if cats["positive"] > cats["negative"] else "negative",
+                "generated_by": "template",
             },
         )
 

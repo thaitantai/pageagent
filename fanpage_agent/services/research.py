@@ -5,20 +5,66 @@ import json
 import logging
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from fanpage_agent.models import CommentInboxEntry, ResearchBrief, TrendItem
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
+from fanpage_agent.scraping.web_search import WebSearchClient
 
 logger = logging.getLogger(__name__)
 
+# Query mặc định để search trend khi không có campaign focus
+FALLBACK_SEARCH_QUERIES: list[str] = [
+    "xu hướng chăm sóc da 2026",
+    "skincare routine mới nhất",
+    "dưỡng da mùa hè Gen Z",
+    "mẹo làm đẹp an toàn cho da dầu mụn",
+    "thực phẩm chức năng làm đẹp da uy tín",
+    "review kem chống nắng tốt nhất 2026",
+    "treatment da mụn hiệu quả tại nhà",
+    "serum vitamin C review tốt nhất",
+    "retinoid cho người mới bắt đầu",
+    "chăm sóc da ban đêm đúng cách",
+]
+
+# Số items tối đa từ web search trong research brief
+MAX_SEARCH_ITEMS_IN_BRIEF = 15
+
 
 class ResearchService:
-    def __init__(self, trend_scraper: TrendScraper | None = None, trend_analyzer: TrendAnalyzer | None = None):
+    def __init__(
+        self,
+        trend_scraper: TrendScraper | None = None,
+        trend_analyzer: TrendAnalyzer | None = None,
+    ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
 
-    def build_brief(self, store: object, comment_csv: str | Path | None = None, campaign_notes_file: str | Path | None = None, fetch_external_trends: bool = True) -> ResearchBrief:
+    def build_brief(
+        self,
+        store: object,
+        comment_csv: str | Path | None = None,
+        campaign_notes_file: str | Path | None = None,
+        fetch_external_trends: bool = True,
+        web_search_queries: list[str] | None = None,
+    ) -> ResearchBrief:
+        """Build research brief with optional web search + scrape.
+
+        Parameters
+        ----------
+        store : object
+            Data store (LocalSheetStore) với read_post_history/read_post_metrics.
+        comment_csv : str | Path | None
+            CSV file chứa comment/inbox.
+        campaign_notes_file : str | Path | None
+            JSON file chứa campaign notes.
+        fetch_external_trends : bool
+            Có fetch external trends từ TrendScraper không.
+        web_search_queries : list[str] | None
+            Override query tìm kiếm. Nếu None và fetch_external_trends=True,
+            tự sinh từ campaign focus + fallback queries.
+        """
         history = store.read_post_history(limit=90)
         metrics = store.read_post_metrics()
         comments = self._read_comments(comment_csv)
@@ -27,16 +73,28 @@ class ResearchService:
         topic_counts = Counter(item.topic for item in history if item.topic)
         overused_topics = [topic for topic, count in topic_counts.items() if count >= 2]
 
-        top_performing_topics = [item.topic for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)[:3] if item.topic]
+        top_performing_topics = [
+            item.topic
+            for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)[:3]
+            if item.topic
+        ]
 
-        recommended_pillars = [item.pillar for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True) if item.pillar]
+        recommended_pillars = [
+            item.pillar
+            for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)
+            if item.pillar
+        ]
         recommended_pillars = self._dedupe(recommended_pillars)
 
         recommended_objectives: list[str] = []
         priority_objective = campaign_notes.get("priority_objective")
         if priority_objective:
             recommended_objectives.append(priority_objective)
-        metric_objectives = [item.objective for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True) if item.objective]
+        metric_objectives = [
+            item.objective
+            for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)
+            if item.objective
+        ]
         recommended_objectives.extend(metric_objectives)
         recommended_objectives = self._dedupe(recommended_objectives)
 
@@ -60,12 +118,32 @@ class ResearchService:
         external_trends: list[TrendItem] = []
         trend_keywords: list[str] = []
         trend_clusters: dict[str, list[str]] = {}
+
         if fetch_external_trends and self._trend_scraper:
             try:
-                external_trends = self._trend_scraper.fetch_all()
-                if external_trends:
-                    recommendations.append(f"Có {len(external_trends)} trend ngoài — xem external_trends để tham khảo.")
-                # Enrich with TrendAnalyzer
+                # --- Bước 1: Web Search (nếu có WebSearchClient) ---
+                search_queries = self._build_search_queries(
+                    campaign_focus, top_performing_topics, web_search_queries
+                )
+                web_trends = self._trend_scraper.search_trends(
+                    queries=search_queries,
+                    max_articles=MAX_SEARCH_ITEMS_IN_BRIEF,
+                )
+                if web_trends:
+                    external_trends.extend(web_trends)
+                    recommendations.append(
+                        f"Tìm thấy {len(web_trends)} nội dung qua web search — xem external_trends."
+                    )
+
+                # --- Bước 2: Fixed URL scrape (như cũ) ---
+                fixed_trends = self._trend_scraper.fetch_all()
+                if fixed_trends:
+                    external_trends.extend(fixed_trends)
+                    recommendations.append(
+                        f"Có {len(fixed_trends)} trend từ nguồn cố định — xem external_trends để tham khảo."
+                    )
+
+                # --- Bước 3: TrendAnalyzer ---
                 if external_trends and self._trend_analyzer:
                     self._trend_analyzer = TrendAnalyzer(external_trends)
                     report = self._trend_analyzer.generate_report()
@@ -73,8 +151,9 @@ class ResearchService:
                     trend_clusters = report["clusters"]
                     recommendations.append(f"Top keyword từ trend: {', '.join(trend_keywords[:5])}.")
                     recommendations.append(f"Cluster nổi bật: {', '.join(list(trend_clusters.keys())[:3])}.")
+
             except Exception as exc:
-                logger.warning("TrendScraper/TrendAnalyzer thất bại: %s", exc)
+                logger.warning("TrendScraper/web search thất bại: %s", exc)
 
         return ResearchBrief(
             top_performing_topics=top_performing_topics,
@@ -89,6 +168,52 @@ class ResearchService:
             trend_keywords=trend_keywords,
             trend_clusters=trend_clusters,
         )
+
+    def _build_search_queries(
+        self,
+        campaign_focus: list[str],
+        top_performing_topics: list[str],
+        override_queries: list[str] | None,
+    ) -> list[str]:
+        """Tự sinh search queries từ campaign focus + performance data.
+
+        Ưu tiên: override → campaign → top topics → fallback.
+        """
+        if override_queries:
+            return override_queries
+
+        queries: list[str] = []
+        # Từ campaign focus
+        for cf in campaign_focus:
+            queries.append(f"xu hướng {cf} 2026")
+            queries.append(f"{cf} skincare review")
+            queries.append(f"{cf} mẹo làm đẹp")
+
+        # Từ top performing topics
+        for topic in top_performing_topics:
+            queries.append(f"{topic} mới nhất")
+            queries.append(f"{topic} xu hướng")
+
+        # Dedup + fallback nếu thiếu
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for q in queries:
+            ql = q.lower().strip()
+            if ql not in seen:
+                seen.add(ql)
+                deduped.append(q)
+
+        # Thêm fallback nếu chưa đủ query
+        if len(deduped) < 3:
+            for fq in FALLBACK_SEARCH_QUERIES:
+                if fq.lower() not in seen:
+                    deduped.append(fq)
+                    seen.add(fq.lower())
+                if len(deduped) >= 5:
+                    break
+
+        # Giới hạn tối đa 8 queries mỗi lần build brief
+        return deduped[:8]
 
     @staticmethod
     def _read_comments(path: str | Path | None) -> list[CommentInboxEntry]:

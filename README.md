@@ -175,6 +175,89 @@ python3 -m fanpage_agent.main ops-status --fail-on-stale
 ```
 
 Chi tiết mapping job/schedule/wrapper/runbook xem: [`docs/cron/hermes-jobs.md`](docs/cron/hermes-jobs.md).
+---
+## V2 Multi-Agent Pipeline
+
+V2 is a multi-agent orchestrator that runs as a Docker daemon and auto-generates content for Facebook.
+
+### Architecture
+
+```
+🕐 Daemon (tick 7200s)
+  ├─ 1. Gather state (calendar, community, performance, system)
+  ├─ 2. Decide actions (auto-generate if calendar empty or periodic)
+  ├─ 3. Run pipeline (when content needed):
+  │      Research → Strategist → Writer → Designer → Publisher
+  └─ 4. Analyst (weekly report, low priority)
+```
+
+### Agents
+
+| Agent | Role |
+|---|---|
+| **Orchestrator** | Master tick loop, state gathering, decision making |
+| **ResearchAgent** | Web search for trending topics |
+| **StrategistAgent** | Plan weekly content strategy |
+| **WriterAgent** | Generate captions and variants |
+| **DesignerAgent** | Create visual briefs |
+| **PublisherAgent** | Publish to Facebook via API |
+| **CommunityAgent** | Comment triage (placeholder) |
+| **AnalystAgent** | Performance reporting |
+
+### Memory System
+
+- **PerformanceMemory** — SQLite-backed store tracking posts, patterns, and recommendations
+- Records: pillar performance, format effectiveness, hook styles, posting hour patterns, tone analysis
+- Auto-generates actionable recommendations from learned patterns
+
+### Deployment
+
+```bash
+# Build image
+docker build -t fanpage-agent:latest -f Dockerfile .
+
+# Run container
+docker rm -f fanpage-agent-v2 2>/dev/null
+docker run -d --name fanpage-agent-v2 --restart unless-stopped \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/artifacts:/app/artifacts \
+  fanpage-agent:latest
+
+# Check logs
+docker logs fanpage-agent-v2 --tail 20
+
+# Run single tick (CLI)
+python3 -m fanpage_agent_v2.main tick
+
+# Run daemon (foreground)
+python3 -m fanpage_agent_v2.main daemon
+```
+
+### Cron Jobs
+
+| Name | Schedule | Description |
+|---|---|---|
+| `fanpage-v2-status` | `0 */6 * * *` | V2 container health + memory report via no-agent script |
+
+### Data Files
+
+```
+data/v2/
+├── memory.db         # PerformanceMemory SQLite DB
+├── state.json        # Tick state (calendar, community, performance, system)
+└── state.json.lock   # Concurrency lock
+```
+
+### Current Status
+
+✅ Container running with auto-restart
+✅ Tick cycle: gather → decide → auto-generate → publish → repeat
+✅ Facebook API publishing with PerformanceMemory recording
+✅ Publisher fix: posts now recorded in memory.db
+✅ Settings fix: .env auto-loaded from cwd
+✅ CLI `tick` and `daemon` modes work
+✅ Hermes cron V2 status reporter configured
 
 ## Next implementation tasks
 

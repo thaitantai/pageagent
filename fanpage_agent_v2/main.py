@@ -16,14 +16,22 @@ from fanpage_agent_v2.agents.writer import WriterAgent
 from fanpage_agent_v2.agents.designer import DesignerAgent
 from fanpage_agent_v2.agents.community import CommunityAgent
 from fanpage_agent_v2.agents.analyst import AnalystAgent
+from fanpage_agent_v2.agents.publisher import PublisherAgent
+from fanpage_agent_v2.agents.researcher import ResearchAgent
 from fanpage_agent_v2.memory.performance import PerformanceMemory
 
 
 def create_pipeline(
     data_dir: str | Path = "data/v2",
     brand_id: str = "skincare_genz",
+    enable_llm: bool = True,
 ) -> OrchestratorAgent:
     """Create and wire up the full V2 pipeline.
+
+    Args:
+        data_dir: Data directory for state/memory.
+        brand_id: Brand identifier.
+        enable_llm: If True, initialise LLM adapter for agents.
 
     Returns a ready-to-run OrchestratorAgent with all agents registered.
     """
@@ -33,19 +41,41 @@ def create_pipeline(
     # ── Memory layer ────────────────────────────────────────────
     memory = PerformanceMemory(db_path=data_path / "memory.db")
 
+    # ── LLM adapter (optional) ──────────────────────────────────
+    llm: LLMAdapter | None = None
+    if enable_llm:
+        try:
+            from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
+            llm = LLMAdapter()
+        except Exception as e:
+            print(f"⚠️  LLM init failed (falling back to templates): {e}")
+
     # ── Agents ──────────────────────────────────────────────────
+    researcher = ResearchAgent(
+        config={},
+        llm=llm,
+    )
     strategist = StrategistAgent(
         config={},
         performance_memory=memory,
         brand_id=brand_id,
+        llm=llm,
     )
     writer = WriterAgent(
         config={},
         brand_id=brand_id,
         default_variants=2,
+        llm=llm,
     )
     designer = DesignerAgent(config={})
-    community = CommunityAgent(config={})
+    community = CommunityAgent(
+        config={},
+        llm=llm,
+    )
+    publisher = PublisherAgent(
+        config={},
+        performance_memory=memory,
+    )
     analyst = AnalystAgent(
         config={},
         performance_memory=memory,
@@ -62,7 +92,7 @@ def create_pipeline(
     )
 
     orchestrator.register_all([
-        strategist, writer, designer, community, analyst,
+        researcher, strategist, writer, designer, community, publisher, analyst,
     ])
 
     return orchestrator

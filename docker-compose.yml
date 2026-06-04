@@ -1,71 +1,13 @@
 version: "3.9"
 
 services:
-  # ── Management CLI ──────────────────────────────────────────
-  manager:
-    image: fanpage-agent:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: fanpage-manager
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data:ro
-      - ./artifacts:/app/artifacts
-    entrypoint: ["fanpage-manager"]
-    command: ["status"]
-    profiles:
-      - manager
-
-  # ── Agent daemon (recurring autonomous tick) ────────────────
+  # ── V2 Agent daemon (multi-agent, performance memory) ───────
   agent:
     image: fanpage-agent:latest
-    container_name: fanpage-agent-daemon
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./data:/app/data
-      - ./artifacts:/app/artifacts
-      - ./.env:/app/.env:ro
-      - ./encoded-might-498016-q3-1ff99b2c609b.json:/app/encoded-might-498016-q3-1ff99b2c609b.json:ro
-    entrypoint: ["fanpage-agent"]
-    command: ["agent-daemon", "--interval", "7200"]
-    restart: unless-stopped
-    profiles:
-      - agent
-
-  # ── One-shot pipeline runner ────────────────────────────────
-  pipeline:
-    image: fanpage-agent:latest
-    container_name: fanpage-agent-pipeline
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
-      - ./artifacts:/app/artifacts
-      - ./.env:/app/.env:ro
-      - ./encoded-might-498016-q3-1ff99b2c609b.json:/app/encoded-might-498016-q3-1ff99b2c609b.json:ro
-    entrypoint: ["fanpage-agent"]
-    command: ["agent-tick"]
-    profiles:
-      - pipeline
-
-  # ── V2 Agent daemon (multi-agent, performance memory) ───────
-  v2-agent:
-    image: fanpage-agent-v2:latest
     container_name: fanpage-agent-v2
     build:
       context: .
-      dockerfile: Dockerfile.v2
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
@@ -79,4 +21,4 @@ services:
     command: ["daemon", "--interval", "7200"]
     restart: unless-stopped
     profiles:
-      - v2
+      - agent

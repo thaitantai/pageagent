@@ -1,15 +1,15 @@
 """WriterAgent — generates multi-variant content captions for A/B testing.
 
-This is the core content creation engine. It produces 2-3 variants per topic
-so the system can test which performs better and learn from results.
+Uses LLM (via LLMAdapter) to write real captions in GenZ skincare voice.
+Falls back to empty variants if no LLM is configured.
 """
-
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
 from fanpage_agent_v2.core.agent import BaseAgent
 from fanpage_agent_v2.core.types import (
     AgentRole,
@@ -19,42 +19,36 @@ from fanpage_agent_v2.core.types import (
     ContentVariant,
 )
 
+_WRITER_SYSTEM_PROMPT = """Bạn là Copywriter chuyên content skincare/healthcare cho GenZ Việt Nam.
+
+NHIỆM VỤ: Viết caption Facebook thu hút, chân thật, đúng giọng GenZ.
+
+NGUYÊN TẮC:
+- Ngắn gọn, dễ hiểu, gần gũi (xưng mình/bạn)
+- Kiến thức chuyên môn nhưng không khô khan
+- GenZ tone: tự nhiên, có thể hài hước nhẹ, không quá quảng cáo
+- Kết bài bằng câu hỏi để tương tác
+- Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan
+
+FORMAT phổ biến: text_image (ảnh + chữ), carousel (nhiều ảnh), reel (video).
+
+Trả lời bằng JSON thuần, không markdown."""
+
 
 class WriterAgent(BaseAgent):
-    """Writer — generates N variants of a content post.
-
-    Capabilities:
-    - write_variants: Generate 2-3 content variants for A/B testing
-    - rewrite: Revise a variant based on feedback
-    - merge_variants: Combine best elements from multiple variants
-    - generate_hooks: Generate N hook options for a topic
-    """
+    """Writer — generates N variants of a content post using LLM or template."""
 
     def __init__(
         self,
         config: dict[str, Any] | None = None,
         brand_id: str = "skincare_genz",
         default_variants: int = 2,
+        llm: LLMAdapter | None = None,
     ) -> None:
         super().__init__(config)
         self._brand_id = brand_id
         self._default_variants = default_variants
-
-        # Tone/style templates for GenZ skincare
-        self._tone_profiles: dict[str, dict] = (config or {}).get("tone_profiles", {
-            "chia_sẻ": {
-                "desc": "Kiểu chia sẻ chân thật, gần gũi",
-                "markers": ["Mình từng...", "Có bạn nào...", "Chia sẻ thật lòng"],
-            },
-            "chuyên_môn": {
-                "desc": "Kiểu giải thích khoa học, đáng tin",
-                "markers": ["Theo nghiên cứu", "Bác sĩ da liễu khuyên", "Thành phần hoạt động"],
-            },
-            "hài_hước": {
-                "desc": "Kiểu hài hước, trend GenZ",
-                "markers": ["POV:", "Be like", "Rant nhẹ"],
-            },
-        })
+        self._llm = llm
 
     @property
     def role(self) -> AgentRole:
@@ -96,31 +90,80 @@ class WriterAgent(BaseAgent):
         scheduled_date: str | None,
         scheduled_time: str | None,
     ) -> AgentResult:
-        """Generate N content variants with different angles and tones.
-
-        In production, this calls the LLM to generate unique variants.
-        Currently returns structured templates that the LLM fills in.
-        """
+        """Generate N content variants — LLM or empty template fallback."""
         now = datetime.now(timezone.utc).isoformat()
         package_id = f"pkg-{uuid.uuid4().hex[:8]}"
         date = scheduled_date or now[:10]
         time = scheduled_time or "09:00"
 
-        variants: list[ContentVariant] = []
-        tones = list(self._tone_profiles.keys())
+        # ── Try LLM ──
+        if self._llm and topic:
+            prompt = f"""Viết {count} variant caption cho bài đăng Facebook về chủ đề skincare.
 
+Thương hiệu: {self._brand_id}
+Chủ đề: {topic}
+Pillar: {pillar}
+Số lượng variant: {count}
+
+Mỗi variant cần có góc nhìn/giong điệu khác nhau (ví dụ: 1 chia sẻ, 1 chuyên môn, 1 hài hước).
+
+Output JSON:
+{{
+  "variants": [
+    {{
+      "topic": "{topic}",
+      "pillar": "{pillar}",
+      "caption": "caption hoàn chỉnh (2-3 câu, có emoji, kết câu hỏi)",
+      "hook": "câu mở đầu thu hút (1 câu)",
+      "cta": "kêu gọi hành động (1 câu ngắn)",
+      "format": "text_image|carousel|reel",
+      "tone_tags": ["tone1", "tone2"],
+      "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"]
+    }}
+  ]
+}}"""
+            data = self._llm.generate_json(_WRITER_SYSTEM_PROMPT, prompt)
+            if data and "variants" in data:
+                variants = [
+                    ContentVariant(
+                        variant_id=f"var-{package_id}-{i}",
+                        topic=v.get("topic", topic),
+                        pillar=v.get("pillar", pillar),
+                        caption=v.get("caption", ""),
+                        hook=v.get("hook", ""),
+                        cta=v.get("cta", ""),
+                        format=v.get("format", self._pick_format(i)),
+                        tone_tags=v.get("tone_tags", []),
+                        hashtags=v.get("hashtags", self._base_hashtags()),
+                    )
+                    for i, v in enumerate(data["variants"][:count])
+                ]
+                return AgentResult(
+                    task_id=f"write-{package_id}",
+                    success=True,
+                    data=ContentPackage(
+                        package_id=package_id,
+                        brand_id=self._brand_id,
+                        scheduled_date=date,
+                        scheduled_time=time,
+                        variants=variants,
+                        status="draft",
+                    ),
+                )
+
+        # ── Template fallback — empty variants ──
+        variants: list[ContentVariant] = []
         for i in range(count):
-            tone = tones[i % len(tones)]
             variant_id = f"var-{package_id}-{i}"
             variants.append(ContentVariant(
                 variant_id=variant_id,
                 topic=topic,
                 pillar=pillar,
-                caption="",  # LLM fills this
-                hook="",     # LLM fills this
-                cta="",      # LLM fills this
+                caption="",
+                hook="",
+                cta="",
                 format=self._pick_format(i),
-                tone_tags=[tone],
+                tone_tags=["chia_sẻ"],
                 hashtags=self._base_hashtags(),
             ))
 
@@ -138,29 +181,73 @@ class WriterAgent(BaseAgent):
         )
 
     def _generate_hooks(self, topic: str, count: int) -> AgentResult:
-        """Generate N hook options for a topic."""
+        """Generate N hook options — LLM or template fallback."""
+        if self._llm and topic:
+            prompt = f"""Viết {count} câu hook thu hút cho bài đăng Facebook về: {topic}
+
+Chủ đề: {topic}
+Đối tượng: GenZ Việt Nam (18-25), quan tâm skincare
+
+Output JSON:
+{{
+  "hooks": [
+    "hook 1 - ngắn gọn, gây tò mò, có cảm xúc",
+    "hook 2",
+    ...
+  ]
+}}"""
+            data = self._llm.generate_json(_WRITER_SYSTEM_PROMPT, prompt)
+            if data and "hooks" in data:
+                return AgentResult(
+                    task_id=f"hooks-{topic[:20]}",
+                    success=True,
+                    data={
+                        "hooks": data["hooks"][:count],
+                        "count": min(len(data["hooks"]), count),
+                        "generated_by": "llm",
+                    },
+                )
+
+        # ── Template fallback ──
         hooks = [
             f"Mình từng {topic.lower()} và đây là điều rút ra…",
             f"Bạn có biết {topic.lower()} không? 🤔",
             f"3 sai lầm khi {topic.lower()} mà ai cũng mắc phải",
-            f"POV: Bạn {topic.lower()} và kết quả bất ngờ",
             f"Review thật: {topic.title()} — có đáng tiền?",
             f"Bác sĩ da liễu nói gì về {topic.lower()}?",
-            f"Bạn thuộc team nào? {topic} kiểu A hay kiểu B?",
         ]
-        selected = hooks[:count]
         return AgentResult(
             task_id=f"hooks-{topic[:20]}",
             success=True,
-            data={"hooks": selected, "count": len(selected)},
+            data={"hooks": hooks[:count], "count": min(len(hooks), count), "generated_by": "template"},
         )
 
     def _rewrite_variant(self, variant_id: str, feedback: str) -> AgentResult:
-        """Revise a variant (placeholder for LLM orchestration)."""
+        """Revise a variant — LLM rewrite or stub."""
+        if self._llm and feedback:
+            prompt = f"""Viết LẠI caption dựa trên phản hồi sau:
+
+Variant ID: {variant_id}
+Phản hồi: {feedback}
+
+Output JSON:
+{{
+  "variant_id": "{variant_id}",
+  "revised_caption": "caption đã sửa theo feedback",
+  "changes": "mô tả ngắn những gì đã thay đổi"
+}}"""
+            data = self._llm.generate_json(_WRITER_SYSTEM_PROMPT, prompt)
+            if data:
+                return AgentResult(
+                    task_id=f"rewrite-{variant_id}",
+                    success=True,
+                    data={**data, "feedback": feedback, "generated_by": "llm"},
+                )
+
         return AgentResult(
             task_id=f"rewrite-{variant_id}",
             success=True,
-            data={"variant_id": variant_id, "feedback": feedback, "revised": True},
+            data={"variant_id": variant_id, "feedback": feedback, "revised": True, "generated_by": "template"},
         )
 
     @staticmethod

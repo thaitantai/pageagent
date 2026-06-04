@@ -10,6 +10,7 @@ from typing import Any
 
 class AgentRole(str, Enum):
     ORCHESTRATOR = "orchestrator"
+    RESEARCHER = "researcher"
     STRATEGIST = "strategist"
     WRITER = "writer"
     DESIGNER = "designer"

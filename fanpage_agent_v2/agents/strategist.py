@@ -1,84 +1,54 @@
-"""StrategistAgent — content strategy, trend analysis, and calendar planning."""
+"""StrategistAgent — content strategy, trend analysis, and calendar planning.
 
+Now uses LLM (via LLMAdapter) to generate real, brand-tailored strategies
+and content ideas. Falls back to templates if no LLM is configured.
+"""
 from __future__ import annotations
 
 import json
-import random
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
+from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
 from fanpage_agent_v2.core.agent import BaseAgent
 from fanpage_agent_v2.core.types import (
     AgentRole,
     AgentResult,
     AgentTask,
     ActionPriority,
-    ContentPackage,
-    ContentVariant,
-    PerformancePattern,
 )
+
+_STRATEGIST_SYSTEM_PROMPT = """Bạn là Strategist của một fanpage skincare/healthcare cho GenZ (18-25 tuổi).
+
+NHIỆM VỤ: Lên chiến lược nội dung, đề xuất chủ đề, phân tích xu hướng.
+
+PHONG CÁCH: chân thật, ấm áp, dễ hiểu, chuyên môn, gần gũi. Ngắn gọn, không phóng đại.
+
+PILLARS (cột nội dung):
+- skincare_routine: Routine chăm sóc da các bước
+- ingredient_deepdive: Phân tích thành phần mỹ phẩm
+- myth_busting: Vạch trần lầm tưởng skincare
+- product_review: Review/so sánh sản phẩm
+- genz_lifestyle: Lối sống, self-care cho GenZ
+- medical_reference: Kiến thức y khoa tham khảo
+
+Trả lời bằng JSON thuần, không markdown."""
 
 
 class StrategistAgent(BaseAgent):
-    """Strategist — plans content strategy based on trends and learned patterns.
-
-    Capabilities:
-    - analyse_trends: Scan for trending topics and hooks
-    - plan_weekly: Create weekly content calendar with pillar mix
-    - gap_analysis: Find calendar gaps and suggest fills
-    - pillar_recommend: Recommend pillar balance based on performance
-    - generate_ideas: Generate N content ideas for a given pillar
-    """
+    """Strategist — plans content strategy using LLM or template fallback."""
 
     def __init__(
         self,
         config: dict[str, Any] | None = None,
         performance_memory=None,
         brand_id: str = "skincare_genz",
+        llm: LLMAdapter | None = None,
     ) -> None:
         super().__init__(config)
         self._memory = performance_memory
         self._brand_id = brand_id
-        self._pillar_templates: dict[str, list[str]] = (config or {}).get("pillar_templates", {
-            "skincare_routine": [
-                "Morning routine với sản phẩm đơn giản",
-                "Night routine có tác động kép",
-                "Layering đúng thứ tự cho da dầu",
-                "Skincare minimalism vs maximalism",
-            ],
-            "ingredient_deepdive": [
-                "Vitamin C serum — cách chọn nồng độ phù hợp",
-                "Retinol cho người mới — bắt đầu thế nào",
-                "Niacinamide kết hợp cùng gì hiệu quả nhất",
-                "SPF hoá học vs vật lý — cái nào tốt hơn",
-                "Peptide có thực sự cần thiết?",
-            ],
-            "myth_busting": [
-                "[Myth] Dưỡng nhiều bước là tốt nhất",
-                "[Myth] Da dầu không cần dưỡng ẩm",
-                "[Myth] Đắt tiền = hiệu quả",
-                "[Myth] Chống nắng chỉ cần khi trời nắng",
-            ],
-            "product_review": [
-                "[Review] Sản phẩm giá rẻ dưới 200k",
-                "[Review] Toner cho da dầu mụn Top 5",
-                "[So sánh] Kem chống nắng Nhật vs Hàn",
-                "[Review] Mặt nạ giấy đáng thử nhất 2026",
-            ],
-            "genz_lifestyle": [
-                "Skincare cho dân văn phòng điều hoà cả ngày",
-                "Budget skincare cho sinh viên",
-                "Skincare khi đi du lịch — túi gọn nhẹ",
-                "Self-care routine tối giản cho GenZ",
-            ],
-            "medical_reference": [
-                "Bác sĩ da liễu nói gì về...",
-                "Khi nào cần gặp bác sĩ da liễu",
-                "Phân biệt mụn viêm và mụn không viêm",
-                "Dấu hiệu da cần đổi routine",
-            ],
-        })
+        self._llm = llm
 
     @property
     def role(self) -> AgentRole:
@@ -99,7 +69,8 @@ class StrategistAgent(BaseAgent):
         params = task.params
 
         if action == "plan_weekly":
-            return self._plan_weekly(params.get("days", 7), params.get("existing_calendar", []))
+            return self._plan_weekly(params.get("days", 7), params.get("existing_calendar", []),
+                                       params.get("research_brief", None))
         elif action == "gap_analysis":
             return self._gap_analysis(params.get("calendar", []))
         elif action == "pillar_recommend":
@@ -110,35 +81,124 @@ class StrategistAgent(BaseAgent):
             return self._analyse_trends(params.get("pillars", []))
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
-    def _plan_weekly(self, days: int, existing_calendar: list[dict]) -> AgentResult:
-        """Create a weekly content schedule with balanced pillars."""
-        # Get pillar performance from memory
-        pillar_perf: dict[str, float] = {}
-        if self._memory:
-            perf = self._memory.pillar_performance()
-            for p in perf:
-                pillar_perf[p["pillar"]] = p.get("avg_engagement", 0)
+    def _plan_weekly(self, days: int, existing_calendar: list[dict],
+                     research_brief: dict | None = None) -> AgentResult:
+        """Create a weekly content schedule — LLM or template fallback.
 
-        # Pillar weighting — prefer underperforming pillars to test
-        pillars = list(self._pillar_templates.keys())
-        weights: list[float] = []
-        for p in pillars:
-            if p in pillar_perf:
-                # Lower weight for high performers (already doing well)
-                weights.append(max(0.3, 1.0 - (pillar_perf[p] / 100)))
-            else:
-                weights.append(1.0)
+        Args:
+            days: Number of days to plan.
+            existing_calendar: Existing scheduled items.
+            research_brief: Optional research data from ResearchAgent.
+        """
+        if self._llm:
+            pillar_stats = ""
+            if self._memory:
+                perf = self._memory.pillar_performance()
+                if perf:
+                    pillar_stats = "\n".join(
+                        f"  - {p['pillar']}: avg_engagement={p.get('avg_engagement', '?')}"
+                        for p in perf
+                    )
 
-        # Generate schedule
+            # ── Inject research context if available ──
+            research_section = ""
+            if research_brief and research_brief.get("findings"):
+                findings = research_brief["findings"]
+                research_lines = []
+                for f in findings[:10]:  # top 10 findings
+                    research_lines.append(
+                        f"  - [{f.get('pillar','?')}] {f.get('topic','')[:100]}"
+                    )
+                research_section = (
+                    "\nDữ liệu nghiên cứu thực tế từ blog/web:\n"
+                    + "\n".join(research_lines)
+                    + "\n\nDựa vào dữ liệu trên để đề xuất chủ đề content thực tế."
+                )
+
+            prompt = f"""Lên lịch nội dung {days} ngày cho fanpage skincare GenZ.
+
+Thương hiệu: {self._brand_id}
+Số ngày: {days}
+
+Dữ liệu performance hiện tại:
+{pillar_stats or '  (chưa có dữ liệu)'}
+{research_section}
+Yêu cầu output JSON:
+{{
+  "schedule": [
+    {{
+      "day_offset": 0..{days-1},
+      "pillar": "tên_pillar",
+      "topic_template": "chủ đề cụ thể cho ngày này",
+      "platform": "facebook"
+    }}
+  ],
+  "pillar_distribution": {{"pillar_name": count}},
+  "recommended_posting_times": ["HH:MM", ...],
+  "reasoning": "lý do ngắn gọn cho chiến lược này"
+}}
+
+Đa dạng pillar, ưu tiên chủ đề GenZ skincare thực tế."""
+            data = self._llm.generate_json(_STRATEGIST_SYSTEM_PROMPT, prompt)
+            if data:
+                return AgentResult(
+                    task_id=f"plan-{days}d",
+                    success=True,
+                    data={
+                        "brand_id": self._brand_id,
+                        "schedule": data.get("schedule", []),
+                        "pillar_distribution": data.get("pillar_distribution", {}),
+                        "recommended_posting_times": data.get("recommended_posting_times", ["09:00", "12:00", "20:00"]),
+                        "reasoning": data.get("reasoning", ""),
+                        "generated_by": "llm",
+                    },
+                )
+
+        # ── Template fallback ──
+        import random
+
+        templates: dict[str, list[str]] = {
+            "skincare_routine": [
+                "Morning routine với sản phẩm đơn giản",
+                "Night routine có tác động kép",
+                "Layering đúng thứ tự cho da dầu",
+            ],
+            "ingredient_deepdive": [
+                "Vitamin C serum — cách chọn nồng độ phù hợp",
+                "Retinol cho người mới — bắt đầu thế nào",
+                "Niacinamide kết hợp cùng gì hiệu quả nhất",
+            ],
+            "myth_busting": [
+                "[Myth] Dưỡng nhiều bước là tốt nhất",
+                "[Myth] Da dầu không cần dưỡng ẩm",
+                "[Myth] Đắt tiền = hiệu quả",
+            ],
+            "product_review": [
+                "[Review] Sản phẩm giá rẻ dưới 200k",
+                "[Review] Toner cho da dầu mụn Top 5",
+                "[So sánh] Kem chống nắng Nhật vs Hàn",
+            ],
+            "genz_lifestyle": [
+                "Skincare cho dân văn phòng điều hoà cả ngày",
+                "Budget skincare cho sinh viên",
+                "Skincare khi đi du lịch — túi gọn nhẹ",
+            ],
+            "medical_reference": [
+                "Bác sĩ da liễu nói gì về...",
+                "Khi nào cần gặp bác sĩ da liễu",
+                "Phân biệt mụn viêm và mụn không viêm",
+            ],
+        }
+
+        pillars = list(templates.keys())
         schedule = []
         for day_offset in range(days):
-            chosen = random.choices(pillars, weights=weights, k=1)[0]
-            template = random.choice(self._pillar_templates[chosen])
-
+            chosen = random.choice(pillars)
+            topic = random.choice(templates[chosen])
             schedule.append({
                 "day_offset": day_offset,
                 "pillar": chosen,
-                "topic_template": template,
+                "topic_template": topic,
                 "platform": "facebook",
             })
 
@@ -149,10 +209,10 @@ class StrategistAgent(BaseAgent):
                 "brand_id": self._brand_id,
                 "schedule": schedule,
                 "pillar_distribution": {
-                    p: sum(1 for s in schedule if s["pillar"] == p)
-                    for p in pillars
+                    p: sum(1 for s in schedule if s["pillar"] == p) for p in pillars
                 },
                 "recommended_posting_times": self._recommend_times(),
+                "generated_by": "template",
             },
         )
 
@@ -168,8 +228,7 @@ class StrategistAgent(BaseAgent):
         gaps = []
         for i, item in enumerate(calendar):
             if i < len(calendar) - 1:
-                # Check for gaps > 24h
-                pass  # Would check timestamps
+                pass
         return AgentResult(
             task_id="gap-analysis",
             success=True,
@@ -202,28 +261,80 @@ class StrategistAgent(BaseAgent):
         )
 
     def _generate_ideas(self, pillar: str, count: int = 3) -> AgentResult:
-        """Generate content ideas for a specific pillar."""
-        templates = self._pillar_templates.get(pillar, [
-            f"Content về {pillar} — câu chuyện/kiến thức/mẹo"
-        ])
+        """Generate content ideas — LLM or template fallback."""
+        if self._llm and pillar:
+            prompt = f"""Đề xuất {count} ý tưởng content cho pillar "{pillar}" của fanpage skincare GenZ.
+
+Output JSON:
+{{
+  "ideas": [
+    {{
+      "pillar": "{pillar}",
+      "hook": "câu hook thu hút GenZ",
+      "format": "carousel|video|text_image|reel",
+      "tone": "mô tả giọng điệu ngắn"
+    }}
+  ]
+}}"""
+            data = self._llm.generate_json(_STRATEGIST_SYSTEM_PROMPT, prompt)
+            if data and "ideas" in data:
+                return AgentResult(
+                    task_id=f"ideas-{pillar}",
+                    success=True,
+                    data={"pillar": pillar, "ideas": data["ideas"], "generated_by": "llm"},
+                )
+
+        # ── Template fallback ──
+        import random
+
+        fallback_templates = [
+            f"Content về {pillar} — câu chuyện/kiến thức/mẹo",
+            f"Review/trải nghiệm {pillar} thực tế",
+            f"Hỏi đáp về {pillar} với GenZ",
+        ]
         ideas = []
         for i in range(count):
             ideas.append({
                 "id": f"idea-{pillar}-{i}",
                 "pillar": pillar,
-                "hook": random.choice(templates),
+                "hook": random.choice(fallback_templates),
                 "format": random.choice(["carousel", "video", "text_image", "reel"]),
                 "tone": "thân thiện, chuyên môn",
             })
         return AgentResult(
             task_id=f"ideas-{pillar}",
             success=True,
-            data={"pillar": pillar, "ideas": ideas},
+            data={"pillar": pillar, "ideas": ideas, "generated_by": "template"},
         )
 
     def _analyse_trends(self, pillars: list[str]) -> AgentResult:
-        """Analyse trends — stub that returns structure for LLM to fill."""
-        active = pillars or list(self._pillar_templates.keys())
+        """Analyse trends — LLM or stub."""
+        if self._llm:
+            active = pillars or ["skincare_routine", "ingredient_deepdive", "myth_busting", "product_review", "genz_lifestyle"]
+            prompt = f"""Phân tích xu hướng skincare GenZ hiện tại cho các pillars: {', '.join(active)}.
+
+Output JSON:
+{{
+  "observations": ["xu hướng 1", "xu hướng 2", ...],
+  "hot_topics": ["chủ đề hot 1", "chủ đề hot 2", ...],
+  "actionable_insights": ["gợi ý hành động 1", ...]
+}}"""
+            data = self._llm.generate_json(_STRATEGIST_SYSTEM_PROMPT, prompt)
+            if data:
+                return AgentResult(
+                    task_id="trends",
+                    success=True,
+                    data={
+                        "pillars_to_scan": active,
+                        "observations": data.get("observations", []),
+                        "hot_topics": data.get("hot_topics", []),
+                        "actionable_insights": data.get("actionable_insights", []),
+                        "analysis_time": datetime.now(timezone.utc).isoformat(),
+                        "generated_by": "llm",
+                    },
+                )
+
+        active = pillars or ["skincare_routine", "ingredient_deepdive"]
         return AgentResult(
             task_id="trends",
             success=True,
@@ -232,5 +343,6 @@ class StrategistAgent(BaseAgent):
                 "observations": [],
                 "hot_topics": [],
                 "analysis_time": datetime.now(timezone.utc).isoformat(),
+                "generated_by": "template",
             },
         )

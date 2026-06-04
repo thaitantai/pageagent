@@ -99,8 +99,17 @@ class OrchestratorAgent(BaseAgent):
         # Step 1: Gather state
         pipeline_state = self._gather_state()
 
-        # Step 2: Decide actions
+        # Step 2: Decide actions (community, analyst, etc.)
         actions = self._decide_actions(pipeline_state)
+
+        # Step 2b: Auto-generate content if calendar is empty or periodic
+        if self._should_generate_content(pipeline_state):
+            self._log_content_gen()
+            gen_result = self._run_pipeline(mode="full")
+            if gen_result.success:
+                pipeline_state.published_today += 1
+            else:
+                pipeline_state.errors_24h += 1
 
         # Step 3: Execute
         results = []
@@ -145,17 +154,28 @@ class OrchestratorAgent(BaseAgent):
 
         steps: list[str] = []
         if mode in ("full", "planning"):
-            steps.extend(["strategy", "ideation"])
+            steps.extend(["research", "strategy", "ideation"])
         if mode in ("full", "creation"):
             steps.extend(["writing", "design"])
         if mode in ("full", "publishing"):
             steps.append("publish")
 
         results = []
+        research_data: dict | None = None
         for step in steps:
-            if step == "strategy":
+            if step == "research":
                 r = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.STRATEGIST, "plan_weekly", {"days": 1}
+                    AgentRole.RESEARCHER, "research_trends", {"pillars": []}
+                ))
+                if r.success and r.data:
+                    research_data = r.data.get("brief")
+                results.append(r)
+            elif step == "strategy":
+                params = {"days": 1}
+                if research_data:
+                    params["research_brief"] = research_data
+                r = self._bus.dispatch(self._bus.create_task(
+                    AgentRole.STRATEGIST, "plan_weekly", params
                 ))
                 results.append(r)
             elif step == "writing":
@@ -166,6 +186,12 @@ class OrchestratorAgent(BaseAgent):
             elif step == "design":
                 r = self._bus.dispatch(self._bus.create_task(
                     AgentRole.DESIGNER, "generate_brief", {"format": "text_image"}
+                ))
+                results.append(r)
+            elif step == "publish":
+                r = self._bus.dispatch(self._bus.create_task(
+                    AgentRole.PUBLISHER, "publish_due",
+                    {"message": "Tin tức làm đẹp mỗi ngày ✨"},
                 ))
                 results.append(r)
 
@@ -252,6 +278,32 @@ class OrchestratorAgent(BaseAgent):
         }))
 
         return actions
+
+    def _should_generate_content(self, state: PipelineState) -> bool:
+        """Check if we need to auto-generate content this tick.
+
+        Triggers when:
+        - No posts published yet (fresh start)
+        - Nothing scheduled for today/tomorrow
+        - Every 2 ticks (periodic refresh, ~4h cycle)
+        """
+        calendar_empty = (
+            state.published_today == 0
+            and state.approved_ready == 0
+            and not state.next_publish_due
+            and not state.calendar_gap_days
+        )
+        periodic_refresh = self._tick_count > 0 and self._tick_count % 2 == 0
+        return calendar_empty or periodic_refresh
+
+    def _log_content_gen(self) -> None:
+        """Log content generation start to stdout (visible in Docker logs)."""
+        import sys
+        print(
+            f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
+            f"🔄 auto-generating content (tick #{self._tick_count})",
+            flush=True,
+        )
 
     def _save_state(self, state: PipelineState) -> None:
         """Persist pipeline state to disk."""

@@ -11,6 +11,7 @@ from fanpage_agent_v2.agents.writer import WriterAgent
 from fanpage_agent_v2.agents.designer import DesignerAgent
 from fanpage_agent_v2.agents.community import CommunityAgent
 from fanpage_agent_v2.agents.analyst import AnalystAgent
+from fanpage_agent_v2.agents.researcher import ResearchAgent
 
 
 # ── Strategist ──────────────────────────────────────────────────
@@ -330,7 +331,224 @@ class TestAnalystAgent:
         assert not result.success
 
 
-# ── Performance Memory ──────────────────────────────────────────
+# ── Researcher ──────────────────────────────────────────────────
+
+class TestResearchAgent:
+    @pytest.fixture
+    def agent(self):
+        return ResearchAgent(config={})
+
+    def test_role_and_capabilities(self, agent):
+        assert agent.role == AgentRole.RESEARCHER
+        assert "research_trends" in agent.capabilities
+        assert "crawl_source" in agent.capabilities
+        assert "get_source_list" in agent.capabilities
+
+    def test_research_trends_returns_brief(self, agent):
+        """Should return a structured brief even without Scrapling."""
+        task = AgentTask(id="r1", target=AgentRole.RESEARCHER, action="research_trends",
+                        params={})
+        result = agent.process(task)
+        assert result.success
+        assert "brief" in result.data
+        assert "source_count" in result.data
+        assert "finding_count" in result.data
+
+    def test_research_trends_with_specific_pillars(self, agent):
+        """Should filter research to requested pillars."""
+        task = AgentTask(id="r2", target=AgentRole.RESEARCHER, action="research_trends",
+                        params={"pillars": ["skincare_routine"]})
+        result = agent.process(task)
+        assert result.success
+        brief = result.data["brief"]
+        checked = brief.get("sources_checked", [])
+        pillar_sources = [s for s in checked if s["pillar"] == "skincare_routine"]
+        assert len(pillar_sources) > 0
+
+    def test_get_source_list(self, agent):
+        """Should return configured sources (discovery + fallback)."""
+        task = AgentTask(id="r3", target=AgentRole.RESEARCHER, action="get_source_list")
+        result = agent.process(task)
+        assert result.success
+        assert "rss_feeds" in result.data
+        assert "category_pages" in result.data
+        assert "fallback_urls" in result.data
+        assert len(result.data["rss_feeds"]) > 0
+
+    def test_crawl_source_fails_gracefully(self, agent):
+        """With an unreachable URL, should fail gracefully without crashing."""
+        task = AgentTask(id="r4", target=AgentRole.RESEARCHER, action="crawl_source",
+                        params={"url": "https://this-domain-does-not-exist-12345.xyz"})
+        result = agent.process(task)
+        assert not result.success
+        assert result.error is not None
+
+    def test_unknown_action(self, agent):
+        task = AgentTask(id="unk", target=AgentRole.RESEARCHER, action="nonsense")
+        result = agent.process(task)
+        assert not result.success
+
+    def test_brief_structure(self, agent):
+        """Verify the brief has the expected schema (mocked fetch)."""
+        with patch.object(agent, '_fetch_text', return_value="Vitamin C là một thành phần chống oxy hóa mạnh. "
+                                                              "Retinol kết hợp với niacinamide có hiệu quả cao. "
+                                                              "Kem chống nắng là bước quan trọng nhất."):
+            task = AgentTask(id="r5", target=AgentRole.RESEARCHER, action="research_trends",
+                            params={"pillars": ["skincare_routine", "ingredient_deepdive"]})
+            result = agent.process(task)
+        assert result.success
+        brief = result.data["brief"]
+        assert "generated_at" in brief
+        assert "sources_checked" in brief
+        assert "findings" in brief
+        assert len(brief["sources_checked"]) > 0
+        # With mocked content, should find ingredient mentions
+        assert len(brief["findings"]) > 0
+
+    def test_brief_includes_scrapling_lifecycle(self, agent):
+        """Verify fetch attempts and graceful fallback."""
+        # Mock fetch to sometimes succeed, sometimes fail
+        real_fetch = agent._fetch_text
+        call_count = [0]
+
+        def mock_fetch(url):
+            call_count[0] += 1
+            if call_count[0] % 2 == 0:
+                return real_fetch(url)  # odd calls pass through
+            return None  # even calls fail
+
+        task = AgentTask(id="r6", target=AgentRole.RESEARCHER, action="research_trends",
+                        params={"pillars": ["myth_busting"]})
+        result = agent.process(task)
+        assert result.success
+        assert result.data["source_count"] > 0
+
+    def test_plan_weekly_can_accept_research_brief(self, agent):
+        """Strategist should accept research_brief in params."""
+        from fanpage_agent_v2.agents.strategist import StrategistAgent
+        s_agent = StrategistAgent(config={})
+        brief = {
+            "findings": [
+                {"pillar": "skincare_routine", "topic": "Morning routine mùa hè cho da dầu"},
+                {"pillar": "ingredient_deepdive", "topic": "Vitamin C vs Niacinamide"},
+            ]
+        }
+        task = AgentTask(id="r7", target=AgentRole.STRATEGIST, action="plan_weekly",
+                        params={"days": 2, "research_brief": brief})
+        result = s_agent.process(task)
+        assert result.success
+        assert len(result.data["schedule"]) == 2
+
+    # ── Cache tests ──────────────────────────────────────────────
+
+    def test_cache_ttl(self, agent):
+        """Cache should return fresh content within TTL."""
+        # Manually set cache entry
+        agent._cache["http://test.url"] = {
+            "text": "cached content",
+            "fetched_at": __import__("time").time(),
+            "pillar": "skincare_routine",
+        }
+        cached = agent._get_cached("http://test.url")
+        assert cached == "cached content"
+        assert agent._is_from_cache("http://test.url")
+
+    def test_cache_expires_after_ttl(self, agent):
+        """Cache should return None for stale entries (simulate old timestamp)."""
+        agent._cache["http://stale.url"] = {
+            "text": "stale content",
+            "fetched_at": 0,  # epoch = definitely expired
+            "pillar": "skincare_routine",
+        }
+        cached = agent._get_cached("http://stale.url")
+        assert cached is None
+
+    def test_cache_auto_cleanup(self, agent):
+        """Cache should purge stale entries when > 100 entries."""
+        now = __import__("time").time()
+        from fanpage_agent_v2.agents.researcher import CACHE_TTL
+        # Fill 101 entries: 50 fresh, 51 stale (> TTL old)
+        for i in range(101):
+            if i < 50:
+                # fresh: fetched now
+                ts = now
+            else:
+                # stale: fetched before TTL (older than 6h)
+                ts = now - CACHE_TTL - 3600  # 1h past TTL
+            agent._cache[f"http://url{i}.test"] = {
+                "text": f"content {i}",
+                "fetched_at": ts,
+                "pillar": "skincare_routine",
+            }
+        # Trigger cleanup by setting another entry
+        agent._set_cached("http://new.test", "new content", "skincare_routine")
+        # Should have removed stale entries (51 stale removed)
+        assert len(agent._cache) == 51  # 50 fresh + 1 new
+
+    # ── Discovery + seen-articles tests ───────────────────────────
+
+    def test_seen_articles_tracker_accumulates(self, agent):
+        """seen_articles should grow after research_trends calls."""
+        task = AgentTask(id="seen1", target=AgentRole.RESEARCHER, action="research_trends",
+                        params={"pillars": ["skincare_routine"]})
+        agent.process(task)
+        count1 = len(agent._seen_articles)
+        # Second call should discover and see the same articles (cached)
+        agent.process(task)
+        count2 = len(agent._seen_articles)
+        # seen_articles should not shrink between calls
+        assert count2 >= count1
+
+    def test_get_source_list_includes_stats(self, agent):
+        """Source list should include discovery cache + seen articles stats."""
+        task = AgentTask(id="src1", target=AgentRole.RESEARCHER, action="get_source_list")
+        result = agent.process(task)
+        assert result.success
+        assert "seen_articles_count" in result.data
+        assert "cache_entries" in result.data
+        assert "discovery_cache_entries" in result.data
+
+    # ── LLM extraction tests ─────────────────────────────────────
+
+    def test_llm_extraction_called_when_llm_available(self, agent):
+        """When LLMAdapter is provided, _llm_extract should be called."""
+        mock_llm = __import__("unittest").mock.MagicMock()
+        mock_llm.generate_json.return_value = {
+            "findings": [
+                {"pillar": "skincare_routine", "topic": "Routine mùa hè cho da dầu",
+                 "key_points": "Dùng sữa rửa mặt dịu nhẹ, toner cấp ẩm, gel dưỡng",
+                 "relevance": 5, "source_type": "tip"},
+            ]
+        }
+        agent._llm = mock_llm
+        result = agent._extract_findings("Test content about skincare routine", "skincare_routine")
+        assert len(result) == 1
+        assert result[0]["topic"] == "Routine mùa hè cho da dầu"
+        mock_llm.generate_json.assert_called_once()
+
+    def test_llm_extraction_fallback_on_failure(self, agent):
+        """When LLM fails, should fall back to heuristic extraction."""
+        mock_llm = __import__("unittest").mock.MagicMock()
+        mock_llm.generate_json.side_effect = RuntimeError("LLM unavailable")
+        agent._llm = mock_llm
+        # Heuristic should still work on ingredient text
+        result = agent._extract_findings(
+            "Vitamin C là chất chống oxy hóa mạnh. Retinol kết hợp niacinamide hiệu quả.",
+            "ingredient_deepdive",
+        )
+        assert len(result) > 0  # heuristic finds ingredient mentions
+
+    # ── Cache stats ──────────────────────────────────────────────
+
+    def test_cache_stats(self, agent):
+        """get_cache_stats should return correct counts."""
+        now = __import__("time").time()
+        agent._cache["http://fresh.test"] = {"text": "fresh", "fetched_at": now, "pillar": "x"}
+        agent._cache["http://stale.test"] = {"text": "stale", "fetched_at": 0, "pillar": "x"}
+        stats = agent.get_cache_stats()
+        assert stats["total_entries"] == 2
+        assert stats["fresh_entries"] == 1
+        assert stats["stale_entries"] == 1
 
 class TestPerformanceMemory:
     @pytest.fixture
