@@ -18,7 +18,7 @@ services:
       - ./.env:/app/.env:ro
       - ./encoded-might-498016-q3-1ff99b2c609b.json:/app/encoded-might-498016-q3-1ff99b2c609b.json:ro
     entrypoint: ["python", "-m", "fanpage_agent_v2.main"]
-    command: ["daemon", "--interval", "7200"]
+    command: ["daemon", "--interval", "600"]
     restart: unless-stopped
     profiles:
       - agent
