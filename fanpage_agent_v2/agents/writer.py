@@ -357,9 +357,10 @@ Output JSON:
             persona_key, persona_label = assigned[i]
             templates = persona_templates[persona_key]
             variant_id = f"var-{package_id}-{i}"
-            hook = random.choice(templates["hooks"])
-            caption = random.choice(templates["captions"])
-            cta = random.choice(templates["ctas"])
+            # Rotate hooks/captions/ctas by (tick_offset + i) for diversity across ticks
+            hook = templates["hooks"][(tick_offset + i) % len(templates["hooks"])]
+            caption = templates["captions"][(tick_offset + i) % len(templates["captions"])]
+            cta = templates["ctas"][(tick_offset + i) % len(templates["ctas"])]
             variants.append(ContentVariant(
                 variant_id=variant_id,
                 topic=topic,
