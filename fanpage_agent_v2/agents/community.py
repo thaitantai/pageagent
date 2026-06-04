@@ -2,14 +2,30 @@
 
 Uses LLM (via LLMAdapter) for contextual reply generation.
 Keeps keyword-based triage for speed, with optional LLM enhancement.
+Includes self-reply on new posts for early engagement boost.
 """
+
 from __future__ import annotations
 
+import json
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
 from fanpage_agent_v2.core.agent import BaseAgent
 from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask
+
+# ── Quality thresholds ──────────────────────────────────────────────
+_MIN_REPLY_LENGTH = 10
+_MAX_REPLY_LENGTH = 200
+_QUALITY_SCORE_THRESHOLD = 0.4
+_GENERIC_REPLY_MODELS = [
+    "cảm ơn bạn", "cảm ơn em", "cảm ơn chị", "cảm ơn anh",
+    "thanks bạn", "ok bạn", "ok em", "ok chị", "ok anh",
+]
+_REPLY_TIMESTAMPS_FILE = "data/v2/reply_timestamps.json"
 
 _COMMUNITY_SYSTEM_PROMPT = """Bạn là Community Manager cho fanpage skincare GenZ.
 
@@ -38,11 +54,45 @@ class CommunityAgent(BaseAgent):
         config: dict[str, Any] | None = None,
         llm: LLMAdapter | None = None,
         fb_adapter: Any = None,  # FacebookAdapter | None
+        data_dir: str | Path | None = None,
     ) -> None:
         super().__init__(config)
         self._llm = llm
         self._fb = fb_adapter
         self._last_fetched: list[dict] = []
+
+        # Reply tracking — avoids double-reply, supports scheduling
+        data_path = Path(data_dir) if data_dir else Path("data/v2")
+        self._reply_cache_path = data_path / "replied_comments.json"
+        self._reply_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        self._replied_comment_ids: set[str] = self._load_replied_ids()
+
+    # ── Persistence ──────────────────────────────────────────────
+
+    def _load_replied_ids(self) -> set[str]:
+        """Load already-replied comment IDs from disk."""
+        try:
+            data = json.loads(self._reply_cache_path.read_text())
+            return set(data.get("ids", []))
+        except (FileNotFoundError, json.JSONDecodeError, ValueError):
+            return set()
+
+    def _save_replied_ids(self) -> None:
+        """Persist replied comment IDs to disk."""
+        try:
+            self._reply_cache_path.write_text(
+                json.dumps({"ids": list(self._replied_comment_ids)}, ensure_ascii=False)
+            )
+        except Exception:
+            pass  # Non-critical
+
+    def _mark_replied(self, comment_id: str) -> None:
+        """Mark a comment as already replied to."""
+        self._replied_comment_ids.add(comment_id)
+        if len(self._replied_comment_ids) > 200:
+            # Trim oldest entries to keep file small
+            self._replied_comment_ids = set(list(self._replied_comment_ids)[-200:])
+        self._save_replied_ids()
 
     @property
     def role(self) -> AgentRole:
@@ -50,7 +100,10 @@ class CommunityAgent(BaseAgent):
 
     @property
     def capabilities(self) -> list[str]:
-        return ["fetch_and_triage", "triage_comments", "suggest_reply", "sentiment_summary", "auto_reply"]
+        return [
+            "fetch_and_triage", "triage_comments", "suggest_reply",
+            "sentiment_summary", "auto_reply", "self_reply_post",
+        ]
 
     def handle_task(self, task: AgentTask) -> AgentResult:
         action = task.action
@@ -78,16 +131,67 @@ class CommunityAgent(BaseAgent):
             return self._auto_reply(
                 comments=params.get("comments", []),
                 limit=params.get("limit", 5),
+                max_replies=params.get("max_replies", 3),
+            )
+        elif action == "self_reply_post":
+            return self._self_reply_post(
+                fb_post_id=params.get("fb_post_id", ""),
+                post_topic=params.get("topic", ""),
             )
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
-    def _fetch_and_triage(self, limit: int = 50) -> AgentResult:
-        """Fetch recent comments from Facebook and triage them.
+    # ── Self-reply on own post (early engagement boost) ──────────
 
-        Gets recent posts, fetches comments for each, classifies them,
-        and returns the triage result. Falls back gracefully if no FB
-        adapter is available.
+    def _self_reply_post(
+        self, fb_post_id: str, post_topic: str = ""
+    ) -> AgentResult:
+        """Post a natural comment on the page's own new post to boost early engagement.
+
+        This simulates the first comment to break the ice and encourage
+        the audience to join the conversation.
         """
+        if not self._fb:
+            return AgentResult(
+                task_id="self-reply", success=True,
+                data={"replied": 0, "note": "No FacebookAdapter — skip self-reply"},
+            )
+
+        self_replies = [
+            "Mình vừa chia sẻ xong, hy vọng có ích cho mọi người! Có ai đã thử cách này chưa? 👇",
+            "Bài viết mới nóng hổi vừa ra lò! Mọi người đọc thử rồi cho mình biết nghĩ sao nhé ✨",
+            "Vừa viết xong bài này, mình cũng bất ngờ với mấy tips này luôn đó! Các bạn thấy sao?",
+            "Chia sẻ với mọi người bài mới đây! Cảm ơn đã ghé đọc và ủng hộ fanpage nha 💕",
+            "Mới đăng nè! Mình mong là tips này sẽ giúp ích được cho các bạn đang gặp vấn đề tương tự 🤗",
+        ]
+
+        import random
+        comment = random.choice(self_replies)
+        if post_topic:
+            short_topic = post_topic[:30]
+            comment = f"Mình vừa chia sẻ về {short_topic}, hy vọng có ích cho mọi người! Cảm ơn đã ghé đọc nha 💕"
+
+        try:
+            self._fb.comment_on_post(fb_post_id=fb_post_id, message=comment)
+            return AgentResult(
+                task_id="self-reply",
+                success=True,
+                data={
+                    "replied": 1,
+                    "post_id": fb_post_id,
+                    "comment_preview": comment[:60],
+                },
+            )
+        except Exception as e:
+            return AgentResult(
+                task_id="self-reply",
+                success=False,
+                error=f"Self-reply failed: {e}",
+            )
+
+    # ── Fetch + Triage ────────────────────────────────────────────
+
+    def _fetch_and_triage(self, limit: int = 50) -> AgentResult:
+        # ... unchanged from original ...
         if self._fb is None:
             return AgentResult(
                 task_id="fetch-triage",
@@ -123,11 +227,11 @@ class CommunityAgent(BaseAgent):
                 error=f"Failed to fetch posts: {e}",
             )
 
-        self._last_fetched = all_comments  # cache for sentiment_summary
+        self._last_fetched = all_comments
         return self._triage_comments(all_comments, limit)
 
     def _triage_comments(self, comments: list[dict], limit: int) -> AgentResult:
-        """Classify comments into categories using keyword matching."""
+        # ... unchanged from original ...
         categories = {"spam": [], "question": [], "praise": [], "complaint": [], "neutral": []}
 
         for c in comments[:limit]:
@@ -153,8 +257,13 @@ class CommunityAgent(BaseAgent):
             },
         )
 
+    # ── Reply Suggestion (with quality control) ──────────────────
+
     def _suggest_reply(self, comment_text: str, sentiment: str) -> AgentResult:
-        """Generate a reply suggestion — LLM or template fallback."""
+        """Generate a reply suggestion — LLM or template fallback.
+        
+        Adds quality checks: minimum length, generic reply detection.
+        """
         # ── Try LLM ──
         if self._llm and comment_text:
             prompt = f"""Đề xuất câu trả lời cho bình luận sau trên fanpage skincare:
@@ -162,44 +271,94 @@ class CommunityAgent(BaseAgent):
 Bình luận: "{comment_text}"
 Sentiment: {sentiment}
 
+YÊU CẦU CHẤT LƯỢNG:
+- Trả lời phải dài tối thiểu 10 ký tự, tối đa 200 ký tự
+- KHÔNG dùng các câu chung chung như "Cảm ơn bạn", "Ok bạn", "Thanks"
+- Phải có nội dung cụ thể liên quan đến bình luận
+- Phải có câu hỏi tương tác ở cuối để khuyến khích reply tiếp
+
 Output JSON:
 {{
   "suggestion": "câu trả lời tự nhiên, friendly, bằng tiếng Việt",
   "sentiment": "{sentiment}",
   "auto_reply": false,
-  "reasoning": "tại sao reply thế này"
+  "reasoning": "tại sao reply thế này",
+  "quality_score": 0.0
 }}"""
             data = self._llm.generate_json(_COMMUNITY_SYSTEM_PROMPT, prompt)
             if data:
-                return AgentResult(
-                    task_id=f"reply-{hash(comment_text) % 10**6}",
-                    success=True,
-                    data={
-                        "suggestion": data.get("suggestion", ""),
-                        "sentiment": sentiment,
-                        "auto_reply": data.get("auto_reply", False),
-                        "generated_by": "llm",
-                    },
-                )
+                suggestion = data.get("suggestion", "")
+                quality = data.get("quality_score", 0.5)
+                # Quality gate: check length and generic patterns
+                if self._passes_quality_gate(suggestion, quality):
+                    return AgentResult(
+                        task_id=f"reply-{hash(comment_text) % 10**6}",
+                        success=True,
+                        data={
+                            "suggestion": suggestion,
+                            "sentiment": sentiment,
+                            "auto_reply": data.get("auto_reply", False),
+                            "generated_by": "llm",
+                            "quality_score": quality,
+                        },
+                    )
 
-        # ── Template fallback ──
-        suggestions = {
-            "praise": "Cảm ơn bạn đã chia sẻ! Mình rất vui vì điều đó 🤗",
-            "question": "Mình xin phép giải thích nhé! ...",
-            "complaint": "Mình rất tiếc về trải nghiệm này. Bạn có thể inbox cho mình để được hỗ trợ chi tiết hơn không ạ?",
+        # ── Template fallback with personalization ──
+        # Use a piece of the comment to make reply less generic
+        snippet = comment_text[:30].strip() if comment_text else ""
+        templates = {
+            "praise": (
+                f"Cảm ơn bạn đã chia sẻ! Mình rất vui vì '{snippet}' có ích với bạn. "
+                "Bạn đã thử sản phẩm/dịch vụ này chưa? 🤗"
+            ),
+            "question": (
+                f"Mình xin phép giải thích nhé! Về '{snippet}', "
+                "mình recommend inbox để được tư vấn chi tiết hơn phù hợp với da của bạn nha!"
+            ),
+            "complaint": (
+                "Mình rất tiếc về trải nghiệm này. Bạn có thể inbox cho mình "
+                "để được hỗ trợ chi tiết hơn không ạ? Mình muốn giúp bạn giải quyết vấn đề này! 💪"
+            ),
             "spam": "",
         }
+
+        reply = templates.get(sentiment, "")
+        if reply and not self._passes_template_gate(reply):
+            reply = ""  # Spam catches will just get silence
 
         return AgentResult(
             task_id=f"reply-{hash(comment_text) % 10**6}",
             success=True,
             data={
-                "suggestion": suggestions.get(sentiment, ""),
+                "suggestion": reply,
                 "sentiment": sentiment,
                 "auto_reply": sentiment in ("spam",),
                 "generated_by": "template",
+                "quality_score": 0.5,
             },
         )
+
+    @staticmethod
+    def _passes_quality_gate(suggestion: str, quality_score: float) -> bool:
+        """Check if a reply suggestion meets minimum quality standards."""
+        if len(suggestion.strip()) < _MIN_REPLY_LENGTH:
+            return False
+        if len(suggestion) > _MAX_REPLY_LENGTH:
+            return False
+        if quality_score < _QUALITY_SCORE_THRESHOLD:
+            return False
+        sug_lower = suggestion.lower().strip()
+        for generic in _GENERIC_REPLY_MODELS:
+            if generic in sug_lower:
+                return False
+        return True
+
+    @staticmethod
+    def _passes_template_gate(reply: str) -> bool:
+        """Minimal check for template replies."""
+        return len(reply.strip()) >= _MIN_REPLY_LENGTH
+
+    # ── Sentiment Summary ─────────────────────────────────────────
 
     def _sentiment_summary(self, comments: list[dict]) -> AgentResult:
         """Summarise community sentiment."""
@@ -265,11 +424,16 @@ Output JSON:
             },
         )
 
-    def _auto_reply(self, comments: list[dict], limit: int = 5) -> AgentResult:
+    # ── Auto-reply (with scheduling + quality gate) ──────────────
+
+    def _auto_reply(self, comments: list[dict], limit: int = 5, max_replies: int = 3) -> AgentResult:
         """Auto-reply to comments that qualify (praise, simple questions).
 
-        Requires fb_adapter to actually post replies. Generates reply
-        via LLM or template, then posts via Graph API.
+        Respects ``max_replies`` cap per tick. Uses replied-IDs cache to
+        avoid double-replying. Filters by quality gate so generic replies
+        don't get posted.
+
+        Requires fb_adapter to actually post replies.
         """
         if not self._fb:
             return AgentResult(
@@ -282,14 +446,22 @@ Output JSON:
         replies: list[dict] = []
 
         for c in comments[:limit]:
+            # Respect max_replies cap
+            if replied >= max_replies:
+                break
+
             text = c.get("message", "")
             cid = c.get("id", "")
             if not cid or not text:
                 continue
 
+            # Skip already-replied comments
+            if cid in self._replied_comment_ids:
+                continue
+
             sentiment = self._classify(text)
 
-            # Only auto-reply to praise and simple questions
+            # Only auto-reply to praise, questions, neutral
             if sentiment not in ("praise", "question", "neutral"):
                 continue
 
@@ -300,17 +472,25 @@ Output JSON:
                 continue
 
             reply_text = suggestion.data.get("suggestion", "")
+            quality = suggestion.data.get("quality_score", 0.0)
             if not reply_text:
+                continue
+
+            # Quality gate for auto-reply (stricter than suggest)
+            if not self._passes_quality_gate(reply_text, quality):
+                errors += 1
                 continue
 
             # Post reply to Facebook
             try:
                 self._fb.reply_to_comment(comment_id=cid, message=reply_text)
                 replied += 1
+                self._mark_replied(cid)
                 replies.append({
                     "comment_id": cid,
                     "sentiment": sentiment,
                     "reply_preview": reply_text[:60],
+                    "quality_score": quality,
                 })
             except Exception as e:
                 errors += 1
@@ -323,17 +503,49 @@ Output JSON:
                 "replied": replied,
                 "errors": errors,
                 "replies": replies,
+                "max_replies_hit": replied >= max_replies,
             },
         )
 
+    # ── Classification (improved) ─────────────────────────────────
+
     @staticmethod
     def _classify(text: str) -> str:
-        """Simple keyword-based classification."""
+        """Improved keyword-based classification.
+
+        Changes from original:
+        - "mua", "giá" moved to question (they're sales leads, not spam)
+        - Added skincare-specific keywords for better triage
+        """
         text_lower = text.lower()
-        spam_words = ["mua", "giá", "khuyến mãi", "spam", "link", "http"]
-        question_words = ["có", "không", "sao", "thế nào", "bao nhiêu", "gì", "?", "tại sao"]
-        praise_words = ["tốt", "hay", "cảm ơn", "thích", "đẹp", "tuyệt", "hiệu quả", "👍", "❤️"]
-        complaint_words = ["tệ", "kém", "thất vọng", "lừa", "giả", "không hiệu quả", "phí tiền"]
+
+        # Spam — only actual spam patterns
+        spam_words = [
+            "http://", "https://", "bit.ly", "tặng quà", "trúng thưởng",
+            "spam", "lừa đảo",
+        ]
+
+        # Complaint — negative experiences
+        complaint_words = [
+            "tệ", "kém", "thất vọng", "lừa", "giả", "không hiệu quả",
+            "phí tiền", "kích ứng", "dị ứng", "mụn thêm", "bỏng rát",
+            "không đúng", "hàng fake", "hàng giả", "tiền mất",
+        ]
+
+        # Praise — positive feedback
+        praise_words = [
+            "tốt", "hay", "cảm ơn", "thích", "đẹp", "tuyệt", "hiệu quả",
+            "👍", "❤️", "😍", "🥰", "xoá mụn", "giảm mụn", "cải thiện",
+        ]
+
+        # Question — inquiries, buying intent, advice seeking
+        question_words = [
+            "?", "có", "không", "sao", "thế nào", "bao nhiêu", "gì",
+            "tại sao", "mua", "giá", "ở đâu", "khi nào", "loại nào",
+            "còn không", "có tốt", "dùng được", "phù hợp", "nên dùng",
+            "bôi", "uống", "dùng", "cần", "tư vấn", "inbox",
+            "spf", "retinol", "aha", "bha", "niacinamide",
+        ]
 
         if any(w in text_lower for w in spam_words):
             return "spam"

@@ -58,14 +58,15 @@ class PerformanceMemory:
             conn.execute(
                 """INSERT INTO published_posts
                 (package_id, variant_id, brand_id, scheduled_date, topic, pillar,
-                 format, hook, cta, tone_tags, reach, engagements, engagement_rate,
+                 format, hook, cta, tone_tags, hashtags, reach, engagements, engagement_rate,
                  permalink, published_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     package.package_id, variant_id, package.brand_id,
                     package.scheduled_date, variant.topic, variant.pillar,
                     variant.format, variant.hook, variant.cta,
                     json.dumps(variant.tone_tags, ensure_ascii=False),
+                    json.dumps(variant.hashtags, ensure_ascii=False),
                     reach, engagements, round(engagement_rate, 2),
                     permalink, now,
                 ),
@@ -212,6 +213,7 @@ class PerformanceMemory:
                     hook TEXT NOT NULL DEFAULT '',
                     cta TEXT NOT NULL DEFAULT '',
                     tone_tags TEXT NOT NULL DEFAULT '[]',
+                    hashtags TEXT DEFAULT '[]',
                     reach INTEGER NOT NULL DEFAULT 0,
                     engagements INTEGER NOT NULL DEFAULT 0,
                     engagement_rate REAL NOT NULL DEFAULT 0.0,

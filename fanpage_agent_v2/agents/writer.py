@@ -109,11 +109,13 @@ class WriterAgent(BaseAgent):
         brand_id: str = "skincare_genz",
         default_variants: int = 2,
         llm: LLMAdapter | None = None,
+        memory_dir: str = "data/v2",
     ) -> None:
         super().__init__(config)
         self._brand_id = brand_id
         self._default_variants = default_variants
         self._llm = llm
+        self._memory_dir = memory_dir
 
     @property
     def role(self) -> AgentRole:
@@ -230,7 +232,7 @@ Output JSON:
                         cta=v.get("cta", ""),
                         format=v.get("format", self._pick_format(i, tick_offset)),
                         tone_tags=v.get("tone_tags", []),
-                        hashtags=v.get("hashtags", self._base_hashtags(pillar, tick_offset)),
+                        hashtags=v.get("hashtags") or self._base_hashtags(pillar, tick_offset),
                         visual_brief=v.get("visual_brief", None),
                     )
                     for i, v in enumerate(data["variants"][:count])
@@ -618,9 +620,10 @@ Output JSON:
         formats = ["text_image", "carousel", "reel", "text_image", "reel"]
         return formats[(index + tick_offset) % len(formats)]
 
-    @staticmethod
-    def _base_hashtags(pillar: str = "", tick_offset: int = 0) -> list[str]:
-        """Base hashtags with pillar-specific rotation for content diversity."""
+    def _base_hashtags(self, pillar: str = "", tick_offset: int = 0) -> list[str]:
+        """Base hashtags with pillar-specific rotation and dedup from memory."""
+        import json, os, sqlite3
+
         base: list[str] = ["skincare", "skincareroutine", "genzskincare", "damatdep"]
 
         pillar_pool: dict[str, list[str]] = {
@@ -657,4 +660,33 @@ Output JSON:
         else:
             extra = pool
 
-        return base + extra
+        result = base + extra
+
+        # ── Dedup: exclude hashtags used in recent posts ──
+        mem_db = os.path.join(self._memory_dir, "memory.db")
+        if os.path.isfile(mem_db):
+            try:
+                conn = sqlite3.connect(mem_db)
+                # Check if hashtags column exists
+                col_check = conn.execute(
+                    "SELECT COUNT(*) FROM pragma_table_info('published_posts') WHERE name='hashtags'"
+                ).fetchone()[0]
+                if col_check:
+                    cur = conn.execute(
+                        "SELECT hashtags FROM published_posts WHERE hashtags IS NOT NULL AND hashtags != '[]' ORDER BY id DESC LIMIT 10"
+                    )
+                    recent_tags: set[str] = set()
+                    for (row,) in cur.fetchall():
+                        try:
+                            parsed = json.loads(row)
+                            if isinstance(parsed, list):
+                                recent_tags.update(h.lower().lstrip("#") for h in parsed if h)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    if recent_tags:
+                        result = [h for h in result if h.lower().lstrip("#") not in recent_tags]
+                conn.close()
+            except Exception:
+                pass  # silence db read errors
+
+        return result

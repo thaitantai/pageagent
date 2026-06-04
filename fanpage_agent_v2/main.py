@@ -66,11 +66,13 @@ def create_pipeline(
         brand_id=brand_id,
         default_variants=2,
         llm=llm,
+        memory_dir=str(data_path),
     )
     designer = DesignerAgent(config={})
     community = CommunityAgent(
         config={},
         llm=llm,
+        data_dir=str(data_path),
     )
 
     # ── Facebook Adapter (shared across agents that need it) ─────

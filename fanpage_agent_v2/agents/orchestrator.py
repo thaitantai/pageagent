@@ -209,11 +209,21 @@ class OrchestratorAgent(BaseAgent):
             elif step == "publish":
                 # Compose message from writer's best variant
                 message, image_path = self._compose_message(writer_package)
-                r = self._bus.dispatch(self._bus.create_task(
+                pub_result = self._bus.dispatch(self._bus.create_task(
                     AgentRole.PUBLISHER, "publish_due",
                     {"message": message, "image_path": image_path},
                 ))
-                results.append(r)
+                results.append(pub_result)
+
+                # ── Self-reply on new post for early engagement ──
+                fb_post_id = pub_result.data.get("fb_post_id", "") if pub_result.success else ""
+                if fb_post_id:
+                    topic = writer_package.best_variant().topic if writer_package and hasattr(writer_package, 'best_variant') else ""
+                    self_reply = self._bus.dispatch(self._bus.create_task(
+                        AgentRole.COMMUNITY, "self_reply_post",
+                        {"fb_post_id": fb_post_id, "topic": topic},
+                    ))
+                    results.append(self_reply)
 
         return AgentResult(
             task_id=f"pipeline-{mode}",

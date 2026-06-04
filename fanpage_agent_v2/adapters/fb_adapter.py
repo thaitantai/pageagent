@@ -56,6 +56,14 @@ class FacebookAdapter:
 
     # ── Comments ─────────────────────────────────────────────────
 
+    def comment_on_post(self, fb_post_id: str, message: str) -> dict[str, Any]:
+        """Comment on a post (can be used to self-reply on own post).
+        
+        Uses the same endpoint as reply_to_comment but targeting a post_id
+        adds a top-level comment on the post.
+        """
+        return self._client.reply_to_comment(comment_id=fb_post_id, message=message)
+
     def get_comments(self, fb_post_id: str, limit: int = 25) -> list[dict[str, Any]]:
         """Fetch comments on a post.
 
