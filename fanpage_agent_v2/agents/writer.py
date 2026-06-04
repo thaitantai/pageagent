@@ -83,11 +83,17 @@ VÍ DỤ GIỌNG VIẾT CẦN TRÁNH:
 • Quá dài dòng: viết 3-4 đoạn văn không điểm nhấn ❌
 
 YÊU CẦU BẮT BUỘC:
-- Hook (câu mở): gây tò mò, chạm cảm xúc, hoặc đặt câu hỏi
-- Caption: 2-3 câu ngắn, có emoji, tự nhiên
-- CTA: 1 câu hỏi tương tác cuối bài (không kêu gọi mua hàng)
-- tone_tags: gồm 2-3 từ khóa, PHẢI có tên tone persona được giao (vd: ["chia_sẻ_thật", "gần_gũi"])
-- Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan chi tiết (vd: #dau #trimun #duongam)
+|- Hook: chọn 1 trong 6 style mở đầu bên dưới, phù hợp với tone persona:
+|  (A) Câu hỏi — "Bạn có bao giờ…?" (gắn với pain point cụ thể)
+|  (B) Sự thật ngược — "Mình từng nghĩ X, nhưng thực ra Y" (tạo surprise)
+|  (C) Con số — "3 bước/5 phút/2 loại serum…" (định lượng dễ nhớ)
+|  (D) Kể chuyện — "Hôm bữa mình…" (personal vignette, relatable)
+|  (E) Đánh đố — "Bạn có biết [sự thật bất ngờ về skincare] không?" (trivia hook)
+|  (F) Đồng cảm — "Có bạn nào…? Mình cũng từng vậy" (shared experience)
+|- Caption: 2-3 câu ngắn, có emoji, tự nhiên
+|- CTA: 1 câu hỏi tương tác cuối bài (không kêu gọi mua hàng)
+|- tone_tags: gồm 2-3 từ khóa, PHẢI có tên tone persona được giao (vd: ["chia_sẻ_thật", "gần_gũi"])
+|- Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan chi tiết (vd: #dau #trimun #duongam)
 
 FORMATS: text_image (ảnh + chữ), carousel (nhiều ảnh), reel (video).
 
