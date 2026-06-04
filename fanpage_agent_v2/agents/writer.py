@@ -153,7 +153,15 @@ class WriterAgent(BaseAgent):
         now = datetime.now(timezone.utc).isoformat()
         package_id = f"pkg-{uuid.uuid4().hex[:8]}"
         date = scheduled_date or now[:10]
-        time = scheduled_time or "09:00"
+        # ── Smart scheduling: different pillars perform best at different times ──
+        pillar_time_map: dict[str, str] = {
+            "education": "07:30",    # sáng sớm — tâm lý học hỏi
+            "trust": "08:00",        # sáng — xây dựng niềm tin
+            "review": "12:00",       # trưa — giờ nghỉ, đọc review
+            "entertainment": "19:00",# tối — giải trí, thư giãn
+            "engagement": "20:30",   # tối muộn — tương tác cao
+        }
+        time = scheduled_time or pillar_time_map.get(pillar.strip().lower(), "09:00")
 
         # ── Assign tone personas round-robin ──
         persona_keys = list(_TONE_PERSONAS.keys())
