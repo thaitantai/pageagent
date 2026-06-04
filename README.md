@@ -174,8 +174,8 @@ python3 -m fanpage_agent.main ops-status
 python3 -m fanpage_agent.main ops-status --fail-on-stale
 ```
 
-Chi tiết mapping job/schedule/wrapper/runbook xem: [`docs/cron/hermes-jobs.md`](docs/cron/hermes-jobs.md).
 ---
+
 ## V2 Multi-Agent Pipeline
 
 V2 is a multi-agent orchestrator that runs as a Docker daemon and auto-generates content for Facebook.
@@ -183,32 +183,80 @@ V2 is a multi-agent orchestrator that runs as a Docker daemon and auto-generates
 ### Architecture
 
 ```
-🕐 Daemon (tick 7200s)
+🕐 Daemon (tick 600s)
   ├─ 1. Gather state (calendar, community, performance, system)
-  ├─ 2. Decide actions (auto-generate if calendar empty or periodic)
+  ├─ 2. Decide actions
+  │     ├─ auto-generate if calendar empty or periodic
+  │     └─ refresh_metrics every 3 ticks
   ├─ 3. Run pipeline (when content needed):
   │      Research → Strategist → Writer → Designer → Publisher
-  └─ 4. Analyst (weekly report, low priority)
+  │        ├─ Writer: 6 hook patterns, deterministic rotation, rotating hashtag pool per pillar
+  │        ├─ ContentVariant: visual_brief field for template paths
+  │        └─ Publisher:
+  │            ├─ publish to Facebook via API
+  │            ├─ auto self-reply (LLM comment right after publish)
+  │            ├─ track_performance (reach/impressions via /insights edge)
+  │            └─ record to PerformanceMemory
+  ├─ 4. CommunityAgent (each tick)
+  │     ├─ fetch new comments from Facebook API
+  │     ├─ triage + LLM auto-reply (quality-gated)
+  │     └─ replied_comments.json dedup
+  └─ 5. Analyst (weekly report, low priority)
 ```
 
 ### Agents
 
-| Agent | Role |
-|---|---|
-| **Orchestrator** | Master tick loop, state gathering, decision making |
-| **ResearchAgent** | Web search for trending topics |
-| **StrategistAgent** | Plan weekly content strategy |
-| **WriterAgent** | Generate captions and variants |
-| **DesignerAgent** | Create visual briefs |
-| **PublisherAgent** | Publish to Facebook via API |
-| **CommunityAgent** | Comment fetch & triage via Facebook API + LLM replies |
-| **AnalystAgent** | Performance reporting (weekly via Hermes cron) |
+| Agent | Role | Key Capabilities |
+|---|---|---|
+| **Orchestrator** | Master tick loop, state gathering, decision making | gather_state → decide_actions → delegate to agents |
+| **ResearchAgent** | Web search for trending topics | Topic discovery, trend analysis |
+| **StrategistAgent** | Plan weekly content strategy | Pillar matching, format selection |
+| **WriterAgent** | Generate captions and variants | 6 hook patterns (education, problem, emotion, story, list, curiosity), deterministic rotation, rotating hashtag pool per pillar, visual_brief field |
+| **DesignerAgent** | Create visual briefs | Image prompt generation |
+| **PublisherAgent** | Publish + track + self-reply | Facebook Graph API publish, auto LLM comment after post, Facebook /insights edge fetch (reach, engaged_users, engagement_rate), PerformanceMemory recording, periodic refresh_metrics |
+| **CommunityAgent** | Comment fetch, triage, auto-reply | Live Facebook comment fetch, LLM reply generation, quality gate (substring pattern matching, 10–200 char filtering), generic reply rejection, replied_comments.json dedup |
+| **AnalystAgent** | Performance reporting | Weekly analytics via Hermes cron |
+
+### Quality Gate — Comment Filtering
+
+All auto-generated replies pass through a quality gate before being posted:
+
+- **Generic pattern rejection** — 9 patterns blocked (cảm ơn bạn/em/chị/anh, thanks bạn, ok bạn/em/chị/anh)
+- **Length bounds** — min 10 chars, max 200 chars
+- **Substring matching** — `in` operator for broader detection
+- Replies that pass → posted to Facebook
+- Replies that fail → logged + skipped (no crash)
+
+### Facebook Insights Tracking
+
+After each publish, the pipeline:
+
+1. Calls `GET /{api_version}/{post_id}/insights?metric=post_impressions_unique,post_engaged_users`
+2. Records `reach`, `engaged_users`, `engagement_rate`
+3. Stores in PerformanceMemory via `record_metrics_update(package_id, variant_id, reach, engagements)`
+4. Every 3 ticks, `refresh_metrics` batch-updates all existing posts (data available after ~24h)
 
 ### Memory System
 
 - **PerformanceMemory** — SQLite-backed store tracking posts, patterns, and recommendations
+- Tables:
+  - `published_posts` — fb_post_id, pillar, format, variant_id, package_id, reach, engagements, engagement_rate, recorded_at
 - Records: pillar performance, format effectiveness, hook styles, posting hour patterns, tone analysis
 - Auto-generates actionable recommendations from learned patterns
+
+### Data Files
+
+```
+data/v2/
+├── memory.db              # PerformanceMemory SQLite DB
+│   ├── published_posts    # Post records + metrics
+│   └── ...                # Patterns, recommendations
+├── memory.db-shm          # SQLite shared memory
+├── memory.db-wal          # SQLite WAL
+├── state.json             # Tick state (calendar, community, performance, system)
+├── state.json.lock        # Concurrency lock
+└── replied_comments.json  # Comment dedup tracking
+```
 
 ### Deployment
 
@@ -216,7 +264,7 @@ V2 is a multi-agent orchestrator that runs as a Docker daemon and auto-generates
 # Build image
 docker build -t fanpage-agent:latest -f Dockerfile .
 
-# Run container
+# Run container (interval=600s, writer_temp=0.7, hooks_temp=0.8, writer_max_tokens=3000)
 docker rm -f fanpage-agent-v2 2>/dev/null
 docker run -d --name fanpage-agent-v2 --restart unless-stopped \
   --env-file .env \
@@ -227,11 +275,17 @@ docker run -d --name fanpage-agent-v2 --restart unless-stopped \
 # Check logs
 docker logs fanpage-agent-v2 --tail 20
 
+# Watch live output
+docker logs -f fanpage-agent-v2
+
 # Run single tick (CLI)
 python3 -m fanpage_agent_v2.main tick
 
 # Run daemon (foreground)
 python3 -m fanpage_agent_v2.main daemon
+
+# Check container health
+docker ps --filter name=fanpage-agent-v2 --format "{{.Status}}"
 ```
 
 ### Cron Jobs
@@ -241,34 +295,34 @@ python3 -m fanpage_agent_v2.main daemon
 | `fanpage-v2-status` | `0 */6 * * *` | V2 container health + memory report via no-agent script |
 | `fanpage-v2-weekly-report` | `0 2 * * 1` | Weekly analytics report (posts, reach, engagement, patterns) |
 
-### Data Files
-
-```
-data/v2/
-├── memory.db         # PerformanceMemory SQLite DB
-├── state.json        # Tick state (calendar, community, performance, system)
-└── state.json.lock   # Concurrency lock
-```
-
 ### Current Status
 
-| ✅ Container running with auto-restart
+| ✅ Container running with auto-restart (interval 600s)
 | ✅ Tick cycle: gather → decide → auto-generate → publish → repeat
 | ✅ Facebook API publishing with PerformanceMemory recording
 | ✅ Publisher fix: posts now recorded in memory.db
-| ✅ Settings fix: .env auto-loaded from cwd
+| ✅ Settings fix: .env auto-loaded from cwd, load_dotenv=True in V2
 | ✅ CLI `tick` and `daemon` modes work
 | ✅ Hermes cron V2 status reporter configured
 | ✅ Content pipe: writer output → publisher message (non-hardcoded)
 | ✅ CommunityAgent: live comment fetch + triage from Facebook API
 | ✅ Weekly analytics report cron (no-agent, every Monday)
+| ✅ **Auto self-reply**: LLM-generated comment posted right after publish
+| ✅ **Quality gate**: generic pattern rejection (9 patterns), 10–200 char bounds
+| ✅ **Facebook Insights**: real reach / engaged_users / engagement_rate via /insights edge
+| ✅ **track_performance** wired after publish in orchestrator pipeline
+| ✅ **refresh_metrics** periodic refresh every 3 ticks
+| ✅ **Writer: 6 hook patterns** (education, problem, emotion, story, list, curiosity) with deterministic rotation
+| ✅ **Rotating hashtag pool** per pillar for organic diversity
+| ✅ **visual_brief** field in ContentVariant for template/image-prompt paths
+| ✅ **replied_comments.json** dedup tracking for auto-replies
 
 ## Next implementation tasks
 
-- **P1:** Add daily community digests — cron job that fetches comments and delivers triage summary to Telegram
-- **P2:** Add dashboard HTML/Markdown local tổng hợp cron health + artifact health
-- **P2:** Auto-reply to triaged comments via Facebook Graph API
-- **P3:** A/B testing variants: writer generates 2+ variants, publisher picks best by pattern score
+- **P1:** A/B testing variants — writer generates 2+ variants, publisher picks best by pattern score
+- **P2:** Daily community digests — cron job that fetches comments and delivers triage summary to Telegram
+- **P2:** Dashboard HTML/Markdown tổng hợp cron health + artifact health + reach/engagement metrics
+- **P3:** Multi-language support for auto-replies based on comment language detection
 
 ## Ghi chú
 - Bản này đã có lane OpenAI-compatible thật.
