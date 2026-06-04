@@ -231,15 +231,12 @@ class PublisherAgent(BaseAgent):
 
         # Record in performance memory
         if self._memory and fb_result.success:
-            self._memory.record(
-                content_type=variant.pillar,
+            self._memory.record_publish(
+                package=package,
                 variant_id=variant.variant_id,
-                hook=variant.hook,
-                format=variant.format,
-                tone_tags=",".join(variant.tone_tags),
-                fb_post_id=fb_result.data.get("fb_post_id", ""),
+                reach=0,
+                engagements=0,
                 permalink=fb_result.data.get("permalink", ""),
-                published_at=fb_result.data.get("published_at", ""),
             )
 
         return AgentResult(
@@ -273,7 +270,8 @@ class PublisherAgent(BaseAgent):
 
             # Update performance memory
             if self._memory and variant_id:
-                self._memory.update_performance(
+                self._memory.record_metrics_update(
+                    package_id=variant_id,
                     variant_id=variant_id,
                     reach=reach,
                     engagements=engagements,

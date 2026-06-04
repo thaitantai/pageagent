@@ -50,7 +50,7 @@ class CommunityAgent(BaseAgent):
 
     @property
     def capabilities(self) -> list[str]:
-        return ["fetch_and_triage", "triage_comments", "suggest_reply", "sentiment_summary"]
+        return ["fetch_and_triage", "triage_comments", "suggest_reply", "sentiment_summary", "auto_reply"]
 
     def handle_task(self, task: AgentTask) -> AgentResult:
         action = task.action
@@ -73,6 +73,11 @@ class CommunityAgent(BaseAgent):
         elif action == "sentiment_summary":
             return self._sentiment_summary(
                 comments=params.get("comments", []),
+            )
+        elif action == "auto_reply":
+            return self._auto_reply(
+                comments=params.get("comments", []),
+                limit=params.get("limit", 5),
             )
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
@@ -257,6 +262,67 @@ Output JSON:
                 "summary": f"{cats['positive']} tích cực, {cats['negative']} tiêu cực, {cats['neutral']} trung tính",
                 "trend": "positive" if cats["positive"] > cats["negative"] else "negative",
                 "generated_by": "template",
+            },
+        )
+
+    def _auto_reply(self, comments: list[dict], limit: int = 5) -> AgentResult:
+        """Auto-reply to comments that qualify (praise, simple questions).
+
+        Requires fb_adapter to actually post replies. Generates reply
+        via LLM or template, then posts via Graph API.
+        """
+        if not self._fb:
+            return AgentResult(
+                task_id="auto-reply", success=True,
+                data={"replied": 0, "note": "No FacebookAdapter — skip auto-reply"},
+            )
+
+        replied = 0
+        errors = 0
+        replies: list[dict] = []
+
+        for c in comments[:limit]:
+            text = c.get("message", "")
+            cid = c.get("id", "")
+            if not cid or not text:
+                continue
+
+            sentiment = self._classify(text)
+
+            # Only auto-reply to praise and simple questions
+            if sentiment not in ("praise", "question", "neutral"):
+                continue
+
+            # Generate reply
+            suggestion = self._suggest_reply(text, sentiment)
+            if not suggestion.success:
+                errors += 1
+                continue
+
+            reply_text = suggestion.data.get("suggestion", "")
+            if not reply_text:
+                continue
+
+            # Post reply to Facebook
+            try:
+                self._fb.reply_to_comment(comment_id=cid, message=reply_text)
+                replied += 1
+                replies.append({
+                    "comment_id": cid,
+                    "sentiment": sentiment,
+                    "reply_preview": reply_text[:60],
+                })
+            except Exception as e:
+                errors += 1
+
+        return AgentResult(
+            task_id="auto-reply",
+            success=True,
+            data={
+                "total_processed": len(comments[:limit]),
+                "replied": replied,
+                "errors": errors,
+                "replies": replies,
             },
         )
 

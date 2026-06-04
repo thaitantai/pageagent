@@ -19,20 +19,38 @@ from fanpage_agent_v2.core.types import (
     ContentVariant,
 )
 
-_WRITER_SYSTEM_PROMPT = """Bạn là Copywriter chuyên content skincare/healthcare cho GenZ Việt Nam.
+_WRITER_SYSTEM_PROMPT = """Bạn là Copywriter chuyên content skincare/healthcare cho GenZ Việt Nam (18-25 tuổi).
 
 NHIỆM VỤ: Viết caption Facebook thu hút, chân thật, đúng giọng GenZ.
 
 NGUYÊN TẮC:
 - Ngắn gọn, dễ hiểu, gần gũi (xưng mình/bạn)
-- Kiến thức chuyên môn nhưng không khô khan
-- GenZ tone: tự nhiên, có thể hài hước nhẹ, không quá quảng cáo
-- Kết bài bằng câu hỏi để tương tác
-- Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan
+- Kiến thức chuyên môn nhưng không khô khan — lồng kiến thức vào câu chuyện
+- GenZ tone: tự nhiên, có cảm xúc, hài hước nhẹ khi phù hợp
+- KHÔNG phóng đại, KHÔNG hứa hẹn kết quả thần kỳ ("trắng sau 1 tuần", "hết mụn ngay lập tức")
+- Mỗi caption có: hook hút → body ngắn → CTA khéo léo
+- Luôn kết thúc bằng 1 câu hỏi mở để GenZ vào tương tác
 
-FORMAT phổ biến: text_image (ảnh + chữ), carousel (nhiều ảnh), reel (video).
+VÍ DỤ GIỌNG VIẾT TỐT:
+• "Mình từng nghĩ toner là bước không thể thiếu cho da dầu… cho tới khi đọc nghiên cứu của bác sĩ da liễu 🤯 Mọi người có biết da dầu thực ra cần gì nhất không?"
+• "Review thật: Kem chống nắng 100k mình dùng suốt 3 tháng qua — được cái chống nắng tốt, mỏng nhẹ. Nhưng có điểm trừ là… 👇"
+• "Có bạn nào từng mua serum vì thấy quảng cáo 'trắng sau 7 ngày' chưa? Mình xin phép nói thật nhé 🙈 Dưới góc nhìn của một người làm trong ngành…"
 
-Trả lời bằng JSON thuần, không markdown."""
+VÍ DỤ GIỌNG VIẾT CẦN TRÁNH:
+• Quá quảng cáo: "Sản phẩm này là số 1 thị trường…" ❌
+• Mơ hồ: "Chăm sóc da đúng cách mỗi ngày" ❌
+• Quá dài dòng: viết 3-4 đoạn văn không điểm nhấn ❌
+
+YÊU CẦU BẮT BUỘC:
+- Hook (câu mở): gây tò mò, chạm cảm xúc, hoặc đặt câu hỏi
+- Caption: 2-3 câu ngắn, có emoji, tự nhiên
+- CTA: 1 câu hỏi tương tác cuối bài (không kêu gọi mua hàng)
+- tone_tags: list 2-3 từ khóa mô tả tone (vd: chia_sẻ, chuyên_môn, hài_hước, review, hỏi_đáp)
+- Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan chi tiết (vd: #dau #trimun #duongam)
+
+FORMATS: text_image (ảnh + chữ), carousel (nhiều ảnh), reel (video).
+
+Trả lời bằng JSON thuần, không markdown. KHÔNG để trống field nào."""
 
 
 class WriterAgent(BaseAgent):
@@ -151,19 +169,41 @@ Output JSON:
                     ),
                 )
 
-        # ── Template fallback — empty variants ──
+        # ── Template fallback — contentful variants ──
         variants: list[ContentVariant] = []
+        hook_templates = [
+            f"Mình từng nghĩ {topic.lower()} khó lắm, nhưng thực ra…",
+            f"Bạn có biết {topic.lower()} không? 🤔",
+            f"3 điều mình rút ra về {topic.lower()}",
+            f"Nói thật nhé: {topic.lower()} — có đáng tiền?",
+            f"{topic.title()} — mình đã thử và đây là kết quả",
+        ]
+        caption_templates = [
+            f"Mình đã từng vật lộn với {topic.lower()} suốt mấy tháng trời. Sau khi tìm hiểu kỹ thì mới nhận ra mình đã sai ngay từ bước cơ bản nhất. Các bạn có gặp tình trạng giống mình không?",
+            f"Hôm nay mình muốn chia sẻ thật lòng về {topic.lower()}. Không quảng cáo, không PR — chỉ là kinh nghiệm thực tế sau thời gian dài trải nghiệm. Ai quan tâm thì cùng thảo luận nhé 👇",
+            f"Nếu bạn cũng đang băn khoăn về {topic.lower()}, thì bài này dành cho bạn. Mình tổng hợp từ kinh nghiệm cá nhân và tư vấn của bác sĩ da liễu. Cùng xem có gì thú vị nha!",
+        ]
+        cta_templates = [
+            "Bạn đã thử cách này chưa? Chia sẻ trải nghiệm của bạn bên dưới nhé 👇",
+            "Có bạn nào từng gặp tình trạng tương tự không? Cùng thảo luận nha!",
+            "Bạn nghĩ sao về điều này? Mình rất muốn nghe ý kiến của mọi người 🌸",
+        ]
+
+        import random
         for i in range(count):
             variant_id = f"var-{package_id}-{i}"
+            hook = random.choice(hook_templates)
+            caption = random.choice(caption_templates)
+            cta = random.choice(cta_templates)
             variants.append(ContentVariant(
                 variant_id=variant_id,
                 topic=topic,
                 pillar=pillar,
-                caption="",
-                hook="",
-                cta="",
+                caption=caption,
+                hook=hook,
+                cta=cta,
                 format=self._pick_format(i),
-                tone_tags=["chia_sẻ"],
+                tone_tags=["chia_sẻ", "chuyên_môn"],
                 hashtags=self._base_hashtags(),
             ))
 

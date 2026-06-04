@@ -315,6 +315,12 @@ class OrchestratorAgent(BaseAgent):
                 "action": "fetch_and_triage",
                 "params": {"limit": 50},
             }))
+            # Auto-reply after fetch (limit to 5 per tick to be safe)
+            actions.append((ActionPriority.HIGH, {
+                "agent": AgentRole.COMMUNITY,
+                "action": "auto_reply",
+                "params": {"limit": 5, "max_replies": 3},
+            }))
         elif state.pending_triage > 0 or state.new_comments_24h > 0:
             actions.append((ActionPriority.HIGH, {
                 "agent": AgentRole.COMMUNITY,
