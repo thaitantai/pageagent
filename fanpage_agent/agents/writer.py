@@ -20,6 +20,36 @@ from fanpage_agent.core.types import (
     ContentVariant,
 )
 
+def _extract_research_grounding(research_packet: dict[str, Any] | None) -> tuple[str, list[dict[str, Any]], str]:
+    """Return concise writer grounding from a ResearchPacket-shaped dict."""
+    if not research_packet:
+        return "", [], ""
+    brief = research_packet.get("brief", {}) if isinstance(research_packet, dict) else {}
+    evidence = brief.get("evidence", []) if isinstance(brief, dict) else []
+    refs: list[dict[str, Any]] = []
+    for item in evidence[:3]:
+        if not isinstance(item, dict):
+            continue
+        refs.append({
+            "claim": item.get("claim", ""),
+            "source": item.get("source", ""),
+            "url": item.get("url", ""),
+            "confidence": item.get("confidence", 0.0),
+        })
+    packet_id = str(research_packet.get("packet_id", "")) if isinstance(research_packet, dict) else ""
+    lines = [f"- {ref['claim']} (source: {ref['source']})" for ref in refs if ref.get("claim")]
+    return "\n".join(lines), refs, packet_id
+
+
+def _normalise_page_context(page_context: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(page_context, dict):
+        return {}
+    allowed = {
+        "page_id", "name", "topic_focus", "community_value", "target_audience",
+        "content_tone", "quality_standards", "posting_frequency",
+    }
+    return {key: value for key, value in page_context.items() if key in allowed and value}
+
 # ── 5 tone personas for GenZ skincare ──
 # Each persona has distinct voice, energy, and structure - variants cycle through these.
 _TONE_PERSONAS: dict[str, dict[str, str]] = {
@@ -137,6 +167,8 @@ class WriterAgent(BaseAgent):
                 count=params.get("variants", self._default_variants),
                 scheduled_date=params.get("scheduled_date"),
                 scheduled_time=params.get("scheduled_time"),
+                page_context=_normalise_page_context(params.get("page_context")),
+                research_packet=params.get("research_packet"),
             )
             if result.success:
                 pkg = result.data
@@ -196,6 +228,8 @@ class WriterAgent(BaseAgent):
         count: int,
         scheduled_date: str | None,
         scheduled_time: str | None,
+        page_context: dict[str, Any] | None = None,
+        research_packet: dict[str, Any] | None = None,
     ) -> AgentResult:
         """Generate N content variants - LLM or template fallback."""
         now = datetime.now(timezone.utc).isoformat()
@@ -210,6 +244,9 @@ class WriterAgent(BaseAgent):
             "engagement": "20:30",   # tối muộn - tương tác cao
         }
         time = scheduled_time or pillar_time_map.get(pillar.strip().lower(), "09:00")
+        page_context = _normalise_page_context(page_context)
+        evidence_text, evidence_refs, research_packet_id = _extract_research_grounding(research_packet)
+        page_id = str(page_context.get("page_id", ""))
 
         # ── Tick offset for format rotation across days ──
         tick_offset = sum(int(part) for part in date.split("-"))
@@ -234,6 +271,9 @@ Thương hiệu: {self._brand_id}
 Chủ đề: {topic}
 Pillar: {pillar}
 Số lượng variant: {count}
+Page context: {page_context or 'khong co'}
+Research evidence bat buoc bam theo:
+{evidence_text or '- Khong co evidence; viet can trong va noi ro la goc nhin tong hop.'}
 
 MỖI VARIANT PHẢI DÙNG ĐÚNG TONE PERSONA được chỉ định:
 
@@ -274,6 +314,7 @@ Output JSON:
                         tone_tags=v.get("tone_tags", []),
                         hashtags=v.get("hashtags") or self._base_hashtags(pillar, tick_offset),
                         visual_brief=v.get("visual_brief", None),
+                        evidence_refs=evidence_refs,
                     )
                     for i, v in enumerate(data["variants"][:count])
                 ]
@@ -317,6 +358,9 @@ Output JSON:
                         scheduled_date=date,
                         scheduled_time=time,
                         variants=variants,
+                        page_id=page_id,
+                        page_context=page_context,
+                        research_packet_id=research_packet_id,
                         status="draft",
                     ),
                 )
@@ -495,6 +539,10 @@ Output JSON:
             # Rotate hooks/captions/ctas by (tick_offset + i) for diversity across ticks
             hook = templates["hooks"][(tick_offset + i) % len(templates["hooks"])]
             caption = templates["captions"][(tick_offset + i) % len(templates["captions"])]
+            if evidence_refs:
+                caption = f"{caption} Mình dựa trên nguồn: {evidence_refs[0].get('source', 'research')} - {evidence_refs[0].get('claim', '')}."
+            if page_context.get("community_value"):
+                caption = f"{caption} Gắn với mục tiêu cộng đồng: {page_context['community_value']}."
             cta = templates["ctas"][(tick_offset + i) % len(templates["ctas"])]
             # Rotate visual briefs
             brief_pool = _VISUAL_BRIEFS.get(persona_key, {}).get(fmt, [""])
@@ -510,6 +558,7 @@ Output JSON:
                 visual_brief=visual_brief or None,
                 tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
                 hashtags=self._base_hashtags(pillar, tick_offset),
+                evidence_refs=evidence_refs,
             ))
 
         return AgentResult(
@@ -521,6 +570,9 @@ Output JSON:
                 scheduled_date=date,
                 scheduled_time=time,
                 variants=variants,
+                page_id=page_id,
+                page_context=page_context,
+                research_packet_id=research_packet_id,
                 status="draft",
             ),
         )

@@ -116,6 +116,7 @@ class ContentVariant:
     image_path: str | None = None
     hashtags: list[str] = field(default_factory=list)
     risk_notes: list[str] = field(default_factory=list)
+    evidence_refs: list[dict[str, Any]] = field(default_factory=list)
 
     # Filled after publishing
     published: bool = False
@@ -133,6 +134,9 @@ class ContentPackage:
     scheduled_date: str
     scheduled_time: str | None = None
     variants: list[ContentVariant] = field(default_factory=list)
+    page_id: str = ""
+    page_context: dict[str, Any] = field(default_factory=dict)
+    research_packet_id: str = ""
     winning_variant: ContentVariant | None = None
     status: str = "draft"  # draft | approved | published | analysed
 

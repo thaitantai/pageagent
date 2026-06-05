@@ -181,6 +181,40 @@ class TestWriterAgent:
         assert result.data.scheduled_date == "2026-06-15"
         assert result.data.scheduled_time == "10:00"
 
+    def test_write_variants_uses_page_context_and_research_evidence(self, agent):
+        task = AgentTask(
+            id="w-grounded",
+            target=AgentRole.WRITER,
+            action="write_variants",
+            params={
+                "topic": "SPF cho da dầu",
+                "pillar": "education",
+                "variants": 1,
+                "page_context": {
+                    "page_id": "page-skincare",
+                    "community_value": "giúp cộng đồng hiểu skincare an toàn",
+                    "token": "should-not-leak",
+                },
+                "research_packet": {
+                    "packet_id": "rpkt-test",
+                    "brief": {
+                        "evidence": [
+                            {"claim": "SPF cần bôi đủ lượng", "source": "AAD", "url": "https://example.test/aad"}
+                        ]
+                    },
+                },
+            },
+        )
+        result = agent.process(task)
+        assert result.success
+        package = result.data
+        assert package.page_id == "page-skincare"
+        assert package.research_packet_id == "rpkt-test"
+        assert "token" not in package.page_context
+        assert package.variants[0].evidence_refs[0]["source"] == "AAD"
+        assert "AAD" in package.variants[0].caption
+        assert "giúp cộng đồng" in package.variants[0].caption
+
     def test_generate_hooks(self, agent):
         task = AgentTask(id="h1", target=AgentRole.WRITER, action="generate_hooks",
                         params={"topic": "Chống nắng", "count": 3})
