@@ -24,7 +24,12 @@ class AnalyticsService:
         now: datetime | None = None,
         days: int = 7,
     ) -> AnalyticsReport:
-        ref = now or datetime.now(timezone.utc)
+        if now is not None:
+            ref = now
+        elif metrics:
+            ref = max(_parse_date(item.published_at) for item in metrics)
+        else:
+            ref = datetime.now(timezone.utc)
         period_start = ref - timedelta(days=days)
 
         # Split into current and previous period

@@ -1,6 +1,6 @@
-# Fanpage Agent V1 Local Scaffold
+# Fanpage Agent
 
-Local scaffold cho Fanpage Agent V1.
+Fanpage Agent la runtime duy nhat dang duoc phat trien lien tuc cho viec lap ke hoach, tao noi dung, duyet, xuat ban, cham soc cong dong va bao cao hieu qua fanpage.
 
 ## Setup OpenRouter để test thật
 1. Copy env template:
@@ -26,6 +26,14 @@ LLM_MAX_TOKENS=900
 ## Chạy test
 ```bash
 python3 -m unittest discover -s tests -v
+```
+
+## Roadmap va trang thai phat trien
+Roadmap giai doan tiep theo nam tai `docs/roadmap-next.md`.
+
+```bash
+python3 -m fanpage_agent.main roadmap-status
+python3 -m fanpage_agent.main harness-status --data-dir data/agent --limit 5
 ```
 
 ## Sinh weekly plan

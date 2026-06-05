@@ -24,6 +24,15 @@ from fanpage_agent.agents.community import CommunityAgent
 from fanpage_agent.agents.analyst import AnalystAgent
 from fanpage_agent.agents.publisher import PublisherAgent
 from fanpage_agent.agents.researcher import ResearchAgent
+from fanpage_agent.legacy_cli import (
+    DEFAULT_CALENDAR_FILE,
+    DEFAULT_HISTORY_FILE,
+    DEFAULT_METRICS_FILE,
+    EXPECTED_HERMES_CRON_JOBS,
+    build_daily_artifacts,
+    build_ops_status_payload,
+    main as legacy_cli_main,
+)
 from fanpage_agent.memory.performance import PerformanceMemory
 
 
@@ -182,13 +191,20 @@ def run_status(
 
 
 def cli() -> None:
-    """CLI entry point for."""
+    """CLI entry point."""
     import argparse
+
+    runtime_actions = {
+        "tick", "status", "daemon", "backup", "restore", "list-backups",
+        "check-db", "harness-status", "roadmap-status",
+    }
+    if len(sys.argv) > 1 and sys.argv[1] not in runtime_actions:
+        raise SystemExit(legacy_cli_main())
 
     parser = argparse.ArgumentParser(description="Fanpage Agent")
     parser.add_argument(
         "action",
-        choices=["tick", "status", "daemon", "backup", "restore", "list-backups", "check-db", "harness-status"],
+        choices=sorted(runtime_actions),
         help="Action to perform",
     )
     parser.add_argument("--data-dir", default="data/agent",
@@ -228,6 +244,9 @@ def cli() -> None:
 
     elif args.action == "harness-status":
         _run_harness_status(data_dir=args.data_dir, limit=args.limit)
+
+    elif args.action == "roadmap-status":
+        _run_roadmap_status()
 
     elif args.action == "daemon":
         pages = _load_pages()
@@ -348,6 +367,32 @@ def _run_harness_status(data_dir: str, limit: int = 20) -> None:
         "summary_24h": audit.summary(),
         "harness_events_total": audit.count(source="AgentHarness"),
         "recent": recent,
+    }, ensure_ascii=False, indent=2))
+
+
+def _run_roadmap_status() -> None:
+    roadmap_path = Path(__file__).resolve().parent.parent / "docs" / "roadmap-next.md"
+    phases: list[str] = []
+    priority_items: list[str] = []
+    section: str | None = None
+
+    if roadmap_path.exists():
+        for line in roadmap_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("## Phase "):
+                phases.append(line.removeprefix("## ").strip())
+                section = "phase"
+            elif line == "## Uu tien thuc thi ngay":
+                section = "priority"
+            elif section == "priority" and line[:2] in {"1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9."}:
+                priority_items.append(line.strip())
+
+    print(json.dumps({
+        "status": "ok",
+        "roadmap": str(roadmap_path),
+        "current_phase": phases[0] if phases else "Phase 1: Don dep nen tang va tang kha nang quan sat",
+        "next_phase": phases[1] if len(phases) > 1 else None,
+        "phases_total": len(phases),
+        "immediate_priorities": priority_items,
     }, ensure_ascii=False, indent=2))
 
 

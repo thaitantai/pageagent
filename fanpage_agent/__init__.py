@@ -1,4 +1,4 @@
-"""Fanpage Agent V1 local scaffold."""
+"""Fanpage Agent runtime package."""
 
 __all__ = [
     "models",

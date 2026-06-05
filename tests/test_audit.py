@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fanpage_agent.audit import AuditManager, audit, audit_sync
 from fanpage_agent.audit.auditor import AuditEntry
-from fanpage_agent.main import _run_harness_status
+from fanpage_agent.main import _run_harness_status, _run_roadmap_status
 
 
 class AuditManagerTest(unittest.TestCase):
@@ -351,6 +351,20 @@ class HarnessStatusCliTest(unittest.TestCase):
             self.assertEqual(payload["harness_events_total"], 1)
             self.assertEqual(payload["recent"][0]["event_type"], "harness.blocked")
             self.assertEqual(payload["recent"][0]["event_data"]["action"], "publish_post")
+
+
+class RoadmapStatusCliTest(unittest.TestCase):
+    def test_roadmap_status_reads_next_roadmap(self) -> None:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            _run_roadmap_status()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "ok")
+        self.assertTrue(payload["roadmap"].endswith("docs/roadmap-next.md"))
+        self.assertGreaterEqual(payload["phases_total"], 5)
+        self.assertIn("Phase 1", payload["current_phase"])
+        self.assertGreaterEqual(len(payload["immediate_priorities"]), 1)
 
 
 if __name__ == "__main__":
