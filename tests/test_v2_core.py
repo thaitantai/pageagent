@@ -6,6 +6,7 @@ from fanpage_agent_v2.core.types import (
 )
 from fanpage_agent_v2.core.agent import BaseAgent
 from fanpage_agent_v2.core.bus import AgentBus
+from fanpage_agent_v2.core.harness import AgentHarness, HarnessPolicy
 
 
 class DummyAgent(BaseAgent):
@@ -216,3 +217,47 @@ class TestAgentBus:
         summary = bus.summary()
         assert "strategist" in summary["agents"]
         assert summary["dispatches"] == 1
+        assert summary["harness"]["events"] == 1
+
+
+class TestAgentHarness:
+    def test_harness_records_success(self):
+        harness = AgentHarness()
+        agent = DummyAgent()
+        task = AgentTask(id="h1", target=AgentRole.STRATEGIST, action="test_action")
+        result = harness.run(agent, task)
+        assert result.success
+        assert result.metrics["harness_status"] == "success"
+        assert harness.summary()["counts"]["success"] == 1
+
+    def test_harness_blocks_disallowed_action(self):
+        policy = HarnessPolicy(allowed_actions={AgentRole.STRATEGIST: {"other_action"}})
+        harness = AgentHarness(policy)
+        agent = DummyAgent()
+        task = AgentTask(id="h2", target=AgentRole.STRATEGIST, action="test_action")
+        result = harness.run(agent, task)
+        assert not result.success
+        assert "blocked" in (result.error or "")
+        assert harness.summary()["counts"]["blocked"] == 1
+
+    def test_harness_requires_approval_for_sensitive_action(self):
+        policy = HarnessPolicy(approval_required_actions={"test_action"})
+        harness = AgentHarness(policy)
+        agent = DummyAgent()
+        task = AgentTask(id="h3", target=AgentRole.STRATEGIST, action="test_action")
+        result = harness.run(agent, task)
+        assert not result.success
+        assert "requires explicit approval" in (result.error or "")
+
+    def test_harness_allows_approved_sensitive_action(self):
+        policy = HarnessPolicy(approval_required_actions={"test_action"})
+        harness = AgentHarness(policy)
+        agent = DummyAgent()
+        task = AgentTask(
+            id="h4",
+            target=AgentRole.STRATEGIST,
+            action="test_action",
+            context={"approved": True},
+        )
+        result = harness.run(agent, task)
+        assert result.success

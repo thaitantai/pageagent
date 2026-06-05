@@ -15,6 +15,7 @@ from typing import Any
 
 from fanpage_agent_v2.core.types import AgentRole, AgentTask, AgentResult, ActionPriority
 from fanpage_agent_v2.core.agent import BaseAgent
+from fanpage_agent_v2.core.harness import AgentHarness
 
 
 class AgentBus:
@@ -27,10 +28,13 @@ class AgentBus:
         result = bus.dispatch(AgentTask(...))
     """
 
-    def __init__(self) -> None:
+    def __init__(self, harness: AgentHarness | None = None) -> None:
         self._agents: dict[AgentRole, BaseAgent] = {}
-        self._capability_map: dict[str, AgentRole] = {}  # action → agent
+        self._capability_map: dict[str, AgentRole] = {}  # action -> agent
         self._history: list[dict] = []
+        self._harness = harness or AgentHarness()
+        # Shared state for self-driving agents (choreography pattern)
+        self.shared_state: dict[str, Any] = {}
 
     def register(self, agent: BaseAgent) -> None:
         """Register an agent on the bus."""
@@ -59,7 +63,7 @@ class AgentBus:
             )
 
         agent = self._agents[target_role]
-        result = agent.process(task)
+        result = self._harness.run(agent, task)
 
         self._history.append({
             "task_id": task.id,
@@ -113,4 +117,15 @@ class AgentBus:
             "agents": self.registered_roles,
             "dispatches": len(self._history),
             "recent": self._history[-10:] if self._history else [],
+            "harness": self._harness.summary(),
         }
+
+    # ── Shared state for choreography ───────────────────────────────
+
+    def update_shared_state(self, agent_role: AgentRole, state_dict: dict) -> None:
+        """Store agent state in the shared dict for peer visibility."""
+        self.shared_state[agent_role.value] = state_dict
+
+    def get_shared_state(self, agent_role: AgentRole) -> dict:
+        """Read another agent's shared state (or empty dict if absent)."""
+        return self.shared_state.get(agent_role.value, {})
