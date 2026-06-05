@@ -84,6 +84,9 @@ class ResearchCliTest(unittest.TestCase):
             self.assertEqual(payload["research_brief"]["recommended_objectives"][0], "lead")
             self.assertIn("soi da", payload["research_brief"]["campaign_focus"])
             self.assertIn("Chi phí soi da là bao nhiêu?", payload["research_brief"]["frequent_questions"])
+            self.assertGreater(payload["research_brief"]["confidence_score"], 0)
+            self.assertTrue(payload["research_brief"]["evidence"])
+            self.assertIn("quality_warnings", payload["research_brief"])
             self.assertTrue(any("soi da" in note.lower() for note in payload["plan"]["strategy_notes"]))
 
 

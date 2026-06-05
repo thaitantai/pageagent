@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from fanpage_agent.models import CommentInboxEntry, ResearchBrief, TrendItem
+from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, TrendItem
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.web_search import WebSearchClient
@@ -155,6 +155,17 @@ class ResearchService:
             except Exception as exc:
                 logger.warning("TrendScraper/web search thất bại: %s", exc)
 
+        evidence = self._build_evidence(
+            external_trends=external_trends,
+            top_performing_topics=top_performing_topics,
+            frequent_questions=frequent_questions,
+            campaign_focus=campaign_focus,
+        )
+        confidence_score = self._confidence_score(evidence)
+        quality_warnings = self._quality_warnings(evidence, external_trends)
+        if quality_warnings:
+            recommendations.append("Cần bổ sung nguồn trước khi Writer dùng các claim quan trọng.")
+
         return ResearchBrief(
             top_performing_topics=top_performing_topics,
             overused_topics=overused_topics,
@@ -167,6 +178,9 @@ class ResearchService:
             external_trends=external_trends,
             trend_keywords=trend_keywords,
             trend_clusters=trend_clusters,
+            evidence=evidence,
+            confidence_score=confidence_score,
+            quality_warnings=quality_warnings,
         )
 
     def _build_search_queries(
@@ -214,6 +228,64 @@ class ResearchService:
 
         # Giới hạn tối đa 8 queries mỗi lần build brief
         return deduped[:8]
+
+    def _build_evidence(
+        self,
+        external_trends: list[TrendItem],
+        top_performing_topics: list[str],
+        frequent_questions: list[str],
+        campaign_focus: list[str],
+    ) -> list[ResearchEvidence]:
+        evidence: list[ResearchEvidence] = []
+        for item in external_trends[:10]:
+            confidence = 0.75 if item.url else 0.55
+            evidence.append(ResearchEvidence(
+                claim=item.title,
+                source=item.source or "external_trend",
+                url=item.url,
+                evidence_type="external_source",
+                confidence=confidence,
+            ))
+        for topic in top_performing_topics[:5]:
+            evidence.append(ResearchEvidence(
+                claim=f"Topic '{topic}' đang có tín hiệu tốt từ dữ liệu hiệu suất nội bộ.",
+                source="post_metrics",
+                evidence_type="internal_performance",
+                confidence=0.7,
+            ))
+        for question in frequent_questions[:5]:
+            evidence.append(ResearchEvidence(
+                claim=f"Khách hàng đang hỏi: {question}",
+                source="comment_inbox",
+                evidence_type="customer_voice",
+                confidence=0.65,
+            ))
+        for focus in campaign_focus[:3]:
+            evidence.append(ResearchEvidence(
+                claim=f"Campaign focus hiện tại: {focus}",
+                source="campaign_notes",
+                evidence_type="operator_input",
+                confidence=0.6,
+            ))
+        return evidence
+
+    @staticmethod
+    def _confidence_score(evidence: list[ResearchEvidence]) -> float:
+        if not evidence:
+            return 0.0
+        return round(sum(item.confidence for item in evidence) / len(evidence), 3)
+
+    @staticmethod
+    def _quality_warnings(evidence: list[ResearchEvidence], external_trends: list[TrendItem]) -> list[str]:
+        warnings: list[str] = []
+        if not external_trends:
+            warnings.append("Không có external_trends; Research chỉ dựa vào dữ liệu nội bộ/operator.")
+        source_count = len({item.source for item in evidence if item.source})
+        if source_count < 2:
+            warnings.append("Evidence chưa đủ đa nguồn; cần thêm ít nhất 2 nguồn độc lập.")
+        if not any(item.url for item in evidence):
+            warnings.append("Evidence chưa có URL nguồn để Writer trích dẫn hoặc kiểm chứng.")
+        return warnings
 
     @staticmethod
     def _read_comments(path: str | Path | None) -> list[CommentInboxEntry]:

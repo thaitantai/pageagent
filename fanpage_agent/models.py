@@ -148,6 +148,14 @@ class TrendItem(BaseModel):
     relevance: str = ""
 
 
+class ResearchEvidence(BaseModel):
+    claim: str
+    source: str
+    url: str = ""
+    evidence_type: str = "source"
+    confidence: float = 0.0
+
+
 class ResearchBrief(BaseModel):
     top_performing_topics: List[str] = Field(default_factory=list)
     overused_topics: List[str] = Field(default_factory=list)
@@ -160,6 +168,9 @@ class ResearchBrief(BaseModel):
     external_trends: List[TrendItem] = Field(default_factory=list)
     trend_keywords: List[str] = Field(default_factory=list, description="Top keywords từ TrendAnalyzer")
     trend_clusters: dict[str, list[str]] = Field(default_factory=dict, description="Cluster tên + các title từ TrendAnalyzer")
+    evidence: List[ResearchEvidence] = Field(default_factory=list)
+    confidence_score: float = 0.0
+    quality_warnings: List[str] = Field(default_factory=list)
 
 
 class AnalyticsSummary(BaseModel):
