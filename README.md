@@ -279,10 +279,10 @@ docker logs fanpage-agent-v2 --tail 20
 docker logs -f fanpage-agent-v2
 
 # Run single tick (CLI)
-python3 -m fanpage_agent_v2.main tick
+python3 -m fanpage_agent.v2.main tick
 
 # Run daemon (foreground)
-python3 -m fanpage_agent_v2.main daemon
+python3 -m fanpage_agent.v2.main daemon
 
 # Check container health
 docker ps --filter name=fanpage-agent-v2 --format "{{.Status}}"

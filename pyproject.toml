@@ -19,7 +19,7 @@ fanpage-agent = "fanpage_cli:main"
 fanpage-manager = "fanpage_agent.manager_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["fanpage_agent*", "fanpage_cli*", "fanpage_agent_v2*"]
+include = ["fanpage_agent*", "fanpage_cli*"]
 
 [tool.setuptools]
 py-modules = ["agent", "config", "tools", "scheduler", "cli"]

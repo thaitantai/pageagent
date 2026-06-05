@@ -32,5 +32,5 @@ COPY . .
 RUN pip install --no-cache-dir -e .
 
 # V2 daemon entry point
-ENTRYPOINT ["python", "-m", "fanpage_agent_v2.main"]
+ENTRYPOINT ["python", "-m", "fanpage_agent.v2.main"]
 CMD ["daemon"]
