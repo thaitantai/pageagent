@@ -176,6 +176,62 @@ class ResearchCliTest(unittest.TestCase):
             self.assertTrue(payload["brief"]["topic_scores"])
             self.assertGreater(payload["brief"]["confidence_score"], 0)
 
+    def test_page_status_lists_pages_and_recent_packets(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "research_packets"
+            output_dir.mkdir()
+            (output_dir / "2026-06-05-test-rpkt-1.json").write_text(
+                json.dumps({
+                    "packet_id": "rpkt-1",
+                    "job_id": "job-1",
+                    "created_at": "2026-06-05T00:00:00+00:00",
+                    "page_id": "main",
+                    "brief": {
+                        "confidence_score": 0.8,
+                        "topic_scores": [{"topic": "soi da", "total_score": 7}],
+                        "evidence": [{"claim": "x"}],
+                    },
+                }, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "page-status",
+                    "--output-dir",
+                    str(output_dir),
+                    "--page-id",
+                    "main",
+                ],
+                cwd=root,
+                env=isolated_subprocess_env(
+                    PAGES=json.dumps([
+                        {
+                            "page_id": "main",
+                            "page_token": "tok_main",
+                            "topic_focus": "cong dong soi da",
+                            "community_value": "Giai dap thac mac soi da bang ngon ngu de hieu",
+                        }
+                    ], ensure_ascii=False)
+                ),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            payload = json.loads(completed.stdout)
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["page_filter"], "main")
+            self.assertEqual(payload["pages"][0]["page_id"], "main")
+            self.assertEqual(payload["research_packets"][0]["packet_id"], "rpkt-1")
+            self.assertEqual(payload["research_packets"][0]["top_topic"], "soi da")
+            self.assertEqual(payload["research_packets"][0]["evidence_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

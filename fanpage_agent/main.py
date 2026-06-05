@@ -199,6 +199,7 @@ def cli() -> None:
     runtime_actions = {
         "tick", "status", "daemon", "backup", "restore", "list-backups",
         "check-db", "harness-status", "roadmap-status", "research-standalone",
+        "page-status",
     }
     if len(sys.argv) > 1 and sys.argv[1] not in runtime_actions:
         raise SystemExit(legacy_cli_main())
@@ -279,6 +280,13 @@ def cli() -> None:
             job_id=args.job_id,
             page_id=args.page_id,
             fetch_external_trends=not args.no_external_trends,
+        )
+
+    elif args.action == "page-status":
+        _run_page_status(
+            output_dir=args.output_dir,
+            page_id=args.page_id,
+            limit=args.limit,
         )
 
     elif args.action == "daemon":
@@ -435,6 +443,45 @@ def _run_research_standalone(
     payload["output_file"] = str(output_path)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
+
+
+def _run_page_status(output_dir: str, page_id: str | None = None, limit: int = 20) -> None:
+    from config import Settings
+    from fanpage_agent.adapters.page_registry import PageRegistry
+
+    registry = PageRegistry(Settings.from_env())
+    pages = registry.list_pages()
+    packet_dir = Path(output_dir)
+    packets: list[dict[str, Any]] = []
+    for packet_file in sorted(packet_dir.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True):
+        try:
+            payload = json.loads(packet_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        packet_page_id = str(payload.get("page_id", ""))
+        if page_id and packet_page_id != page_id:
+            continue
+        brief = payload.get("brief", {}) if isinstance(payload.get("brief"), dict) else {}
+        packets.append({
+            "packet_id": payload.get("packet_id", ""),
+            "job_id": payload.get("job_id", ""),
+            "created_at": payload.get("created_at", ""),
+            "page_id": packet_page_id,
+            "confidence_score": brief.get("confidence_score", 0),
+            "top_topic": (brief.get("topic_scores") or [{}])[0].get("topic", ""),
+            "evidence_count": len(brief.get("evidence") or []),
+            "file": str(packet_file),
+        })
+        if len(packets) >= limit:
+            break
+
+    print(json.dumps({
+        "status": "ok",
+        "page_filter": page_id or "all",
+        "pages": pages,
+        "research_packets_dir": str(packet_dir),
+        "research_packets": packets,
+    }, ensure_ascii=False, indent=2))
 
 
 def _run_roadmap_status() -> None:
