@@ -5,6 +5,11 @@
 
 # Generated artifacts and local scratch data
 artifacts/
+backups/
+data/
+*.db
+*.db-shm
+*.db-wal
 .codegraph/
 
 # Build artifacts

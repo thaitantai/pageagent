@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from fanpage_agent_v2.memory.performance import (
+from fanpage_agent.v2.memory.performance import (
     BackupError,
     IntegrityError,
     PerformanceMemory,
 )
-from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
 
 
 # ── fixtures ────────────────────────────────────────────────────

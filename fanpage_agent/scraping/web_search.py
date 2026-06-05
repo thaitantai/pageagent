@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fanpage_agent_v2.utils.throttle import TokenBucket
-from fanpage_agent_v2.audit import audit
+from fanpage_agent.v2.utils.throttle import TokenBucket
+from fanpage_agent.v2.audit import audit
 
 logger = logging.getLogger(__name__)
 

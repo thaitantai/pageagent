@@ -6,7 +6,7 @@ import time
 import unittest
 from unittest.mock import Mock, call, mock_open, patch
 
-from fanpage_agent_v2.utils.throttle import TokenBucket
+from fanpage_agent.v2.utils.throttle import TokenBucket
 
 
 class TokenBucketTest(unittest.TestCase):
@@ -53,7 +53,7 @@ class RetryTest(unittest.TestCase):
     """429 retry decorator."""
 
     def test_retry_on_429_succeeds_eventually(self) -> None:
-        from fanpage_agent_v2.utils.throttle import retry_on_429
+        from fanpage_agent.v2.utils.throttle import retry_on_429
 
         call_count = 0
 
@@ -70,7 +70,7 @@ class RetryTest(unittest.TestCase):
         self.assertEqual(call_count, 3)
 
     def test_retry_on_non_429_raises_immediately(self) -> None:
-        from fanpage_agent_v2.utils.throttle import retry_on_429
+        from fanpage_agent.v2.utils.throttle import retry_on_429
 
         @retry_on_429(max_retries=3, base_delay=0.01)
         def broken() -> str:
@@ -80,7 +80,7 @@ class RetryTest(unittest.TestCase):
             broken()
 
     def test_all_retries_exhausted(self) -> None:
-        from fanpage_agent_v2.utils.throttle import retry_on_429
+        from fanpage_agent.v2.utils.throttle import retry_on_429
 
         @retry_on_429(max_retries=2, base_delay=0.01)
         def always_429() -> str:
@@ -91,7 +91,7 @@ class RetryTest(unittest.TestCase):
         self.assertIn("retries", str(ctx.exception))
 
     def test_detects_rate_limit_in_message(self) -> None:
-        from fanpage_agent_v2.utils.throttle import retry_on_429
+        from fanpage_agent.v2.utils.throttle import retry_on_429
 
         call_count = 0
 
@@ -181,7 +181,7 @@ class WebSearchThrottleTest(unittest.TestCase):
         """Verify _limiter.acquire is called before each search."""
         mock_sdk.return_value = []
         # Override limiter with tiny capacity to observe consumption
-        from fanpage_agent_v2.utils.throttle import TokenBucket
+        from fanpage_agent.v2.utils.throttle import TokenBucket
 
         self.client._limiter = TokenBucket(capacity=1, window_sec=3600.0)
         self.client.search("test query", max_results=3)
@@ -193,7 +193,7 @@ class WebSearchThrottleTest(unittest.TestCase):
     def test_search_consumes_one_token(self, mock_sdk: Mock) -> None:
         """Multiple searches consume multiple tokens."""
         mock_sdk.return_value = []
-        from fanpage_agent_v2.utils.throttle import TokenBucket
+        from fanpage_agent.v2.utils.throttle import TokenBucket
 
         self.client._limiter = TokenBucket(capacity=5, window_sec=3600.0)
         self.client.search("q1")

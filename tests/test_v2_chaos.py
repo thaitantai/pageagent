@@ -16,9 +16,9 @@ from unittest.mock import Mock, mock_open, patch
 
 from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.scraping.web_search import SearchResult, WebSearchClient
-from fanpage_agent_v2.audit import AuditManager
-from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
-from fanpage_agent_v2.memory.performance import (
+from fanpage_agent.v2.audit import AuditManager
+from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
+from fanpage_agent.v2.memory.performance import (
     BackupError,
     PerformanceMemory,
     IntegrityError,

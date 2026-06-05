@@ -3,15 +3,15 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from fanpage_agent_v2.core.types import (
+from fanpage_agent.v2.core.types import (
     AgentRole, AgentTask, ActionPriority, ContentPackage,
 )
-from fanpage_agent_v2.agents.strategist import StrategistAgent
-from fanpage_agent_v2.agents.writer import WriterAgent
-from fanpage_agent_v2.agents.designer import DesignerAgent
-from fanpage_agent_v2.agents.community import CommunityAgent
-from fanpage_agent_v2.agents.analyst import AnalystAgent
-from fanpage_agent_v2.agents.researcher import ResearchAgent
+from fanpage_agent.v2.agents.strategist import StrategistAgent
+from fanpage_agent.v2.agents.writer import WriterAgent
+from fanpage_agent.v2.agents.designer import DesignerAgent
+from fanpage_agent.v2.agents.community import CommunityAgent
+from fanpage_agent.v2.agents.analyst import AnalystAgent
+from fanpage_agent.v2.agents.researcher import ResearchAgent
 
 
 # ── Strategist ──────────────────────────────────────────────────
@@ -425,7 +425,7 @@ class TestResearchAgent:
 
     def test_plan_weekly_can_accept_research_brief(self, agent):
         """Strategist should accept research_brief in params."""
-        from fanpage_agent_v2.agents.strategist import StrategistAgent
+        from fanpage_agent.v2.agents.strategist import StrategistAgent
         s_agent = StrategistAgent(config={})
         brief = {
             "findings": [
@@ -466,7 +466,7 @@ class TestResearchAgent:
     def test_cache_auto_cleanup(self, agent):
         """Cache should purge stale entries when > 100 entries."""
         now = __import__("time").time()
-        from fanpage_agent_v2.agents.researcher import CACHE_TTL
+        from fanpage_agent.v2.agents.researcher import CACHE_TTL
         # Fill 101 entries: 50 fresh, 51 stale (> TTL old)
         for i in range(101):
             if i < 50:
@@ -553,19 +553,19 @@ class TestResearchAgent:
 class TestPerformanceMemory:
     @pytest.fixture
     def memory(self, tmp_path):
-        from fanpage_agent_v2.memory.performance import PerformanceMemory
+        from fanpage_agent.v2.memory.performance import PerformanceMemory
         return PerformanceMemory(db_path=tmp_path / "test_memory.db")
 
     def test_init_creates_tables(self, memory):
         """DB tables created on init."""
-        from fanpage_agent_v2.memory.performance import PerformanceMemory
+        from fanpage_agent.v2.memory.performance import PerformanceMemory
         import sqlite3
         # Just verify we can query
         rows = memory.get_top_patterns()
         assert rows == []
 
     def test_record_and_query_pillar(self, memory, tmp_path):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
         pkg = ContentPackage(package_id="pkg1", brand_id="test", scheduled_date="2026-06-10")
         pkg.variants = [
             ContentVariant(variant_id="v1", topic="Vitamin C", pillar="ingredient_deepdive",
@@ -581,7 +581,7 @@ class TestPerformanceMemory:
         assert pillar_pats[0].value == "ingredient_deepdive"
 
     def test_record_updates_metrics(self, memory, tmp_path):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
         pkg = ContentPackage(package_id="pkg2", brand_id="test", scheduled_date="2026-06-10")
         pkg.variants = [ContentVariant(variant_id="v1", topic="SPF", pillar="skincare_routine",
                                       caption="Test", hook="Hook", cta="CTA", format="carousel")]
@@ -594,7 +594,7 @@ class TestPerformanceMemory:
         assert matching[0]["reach"] == 1200
 
     def test_pillar_performance(self, memory, tmp_path):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
         for i, pillar in enumerate(["skincare_routine", "ingredient_deepdive", "myth_busting"]):
             pkg = ContentPackage(package_id=f"p{i}", brand_id="test", scheduled_date="2026-06-10")
             pkg.variants = [ContentVariant(variant_id=f"v{i}", topic=f"T{i}", pillar=pillar,
@@ -608,7 +608,7 @@ class TestPerformanceMemory:
         assert perf[0]["pillar"] == "myth_busting"
 
     def test_recommendations(self, memory, tmp_path):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
         # Need sample_count >= 4 so confidence > 0.3 (confidence = min(1.0, count/10))
         for i in range(4):
             pkg = ContentPackage(package_id=f"pkg_rec_{i}", brand_id="test", scheduled_date="2026-06-10")
@@ -620,7 +620,7 @@ class TestPerformanceMemory:
         assert len(recs) > 0
 
     def test_format_summary(self, memory, tmp_path):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
         pkg = ContentPackage(package_id="pkg_sum", brand_id="test", scheduled_date="2026-06-10")
         pkg.variants = [ContentVariant(variant_id="v_sum", topic="Summary", pillar="test",
                                       caption="T", hook="H", cta="C", format="text_image")]

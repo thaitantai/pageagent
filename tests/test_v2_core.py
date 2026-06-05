@@ -1,12 +1,12 @@
 """Tests for V2 core framework — types, agent base, bus."""
 
 import pytest
-from fanpage_agent_v2.core.types import (
+from fanpage_agent.v2.core.types import (
     AgentRole, ActionPriority, AgentTask, AgentResult, PipelineState, ContentPackage, PerformancePattern,
 )
-from fanpage_agent_v2.core.agent import BaseAgent
-from fanpage_agent_v2.core.bus import AgentBus
-from fanpage_agent_v2.core.harness import AgentHarness, HarnessPolicy
+from fanpage_agent.v2.core.agent import BaseAgent
+from fanpage_agent.v2.core.bus import AgentBus
+from fanpage_agent.v2.core.harness import AgentHarness, HarnessPolicy
 
 
 class DummyAgent(BaseAgent):
@@ -128,7 +128,7 @@ class TestContentPackage:
         assert p.best_variant() is None
 
     def test_best_variant_by_score(self):
-        from fanpage_agent_v2.core.types import ContentVariant
+        from fanpage_agent.v2.core.types import ContentVariant
         p = ContentPackage(package_id="pkg2", brand_id="test", scheduled_date="2026-06-10")
         p.variants = [
             ContentVariant(variant_id="a", topic="t1", pillar="p1",

@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 # ── Minimal import — no full agent bootstrap ──
-from fanpage_agent_v2.adapters.fb_adapter import FacebookAdapter
-from fanpage_agent_v2.memory.performance import PerformanceMemory
+from fanpage_agent.v2.adapters.fb_adapter import FacebookAdapter
+from fanpage_agent.v2.memory.performance import PerformanceMemory
 
 
 def main() -> str:

@@ -8,8 +8,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from fanpage_agent.config import Settings
-from fanpage_agent_v2.utils.throttle import TokenBucket
-from fanpage_agent_v2.audit import audit, AuditManager
+from fanpage_agent.v2.utils.throttle import TokenBucket
+from fanpage_agent.v2.audit import audit, AuditManager
 
 logger = logging.getLogger(__name__)
 

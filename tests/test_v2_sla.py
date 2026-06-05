@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from fanpage_agent_v2.ops.sla import SlaDashboard, SlaSnapshot, build_sla_text
+from fanpage_agent.v2.ops.sla import SlaDashboard, SlaSnapshot, build_sla_text
 
 
 class SlaDashboardTest(unittest.TestCase):
@@ -138,7 +138,7 @@ class SlaDashboardTest(unittest.TestCase):
     def test_audit_list_with_many_entries(self) -> None:
         """SLA can handle dash query with realistic entry count."""
         # Write some audit entries to the real audit DB
-        from fanpage_agent_v2.audit import AuditManager
+        from fanpage_agent.v2.audit import AuditManager
 
         am = AuditManager(db_dir=str(self._data_dir))
         for i in range(20):

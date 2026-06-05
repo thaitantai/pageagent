@@ -11,9 +11,9 @@ import time
 import unittest
 from pathlib import Path
 
-from fanpage_agent_v2.audit import AuditManager, audit, audit_sync
-from fanpage_agent_v2.audit.auditor import AuditEntry
-from fanpage_agent_v2.main import _run_harness_status
+from fanpage_agent.v2.audit import AuditManager, audit, audit_sync
+from fanpage_agent.v2.audit.auditor import AuditEntry
+from fanpage_agent.v2.main import _run_harness_status
 
 
 class AuditManagerTest(unittest.TestCase):
@@ -249,7 +249,7 @@ class AuditHelpersTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             import os
             old = os.environ.get("AUDIT_DB_DIR", "")
-            from fanpage_agent_v2.audit.auditor import _DEFAULT_DATA_DIR
+            from fanpage_agent.v2.audit.auditor import _DEFAULT_DATA_DIR
 
             # We can't override easily; just test with explicit manager
             # This test verifies the function signature works

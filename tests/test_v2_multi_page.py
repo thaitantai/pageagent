@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 from pathlib import Path
 
-from fanpage_agent_v2.core.types import (
+from fanpage_agent.v2.core.types import (
     AgentRole, AgentTask, ActionPriority, ContentPackage, ContentVariant,
 )
 
@@ -34,7 +34,7 @@ class TestPageConfig:
 class TestPageRegistry:
     @pytest.fixture
     def registry(self, tmp_path):
-        from fanpage_agent_v2.adapters.page_registry import PageRegistry
+        from fanpage_agent.v2.adapters.page_registry import PageRegistry
         from config import Settings, PageConfig
         s = Settings(pages=[
             {"page_id": "main", "page_token": "tok_main"},
@@ -77,7 +77,7 @@ class TestPageRegistry:
 
 class TestGetRegistry:
     def test_get_registry_from_settings(self):
-        from fanpage_agent_v2.adapters.page_registry import get_registry
+        from fanpage_agent.v2.adapters.page_registry import get_registry
         from config import Settings
         s = Settings(pages=[
             {"page_id": "alpha", "page_token": "tok_a", "is_default": True},
@@ -87,14 +87,14 @@ class TestGetRegistry:
 
     def test_get_registry_default(self):
         """get_registry() with no args should load from global settings."""
-        from fanpage_agent_v2.adapters.page_registry import get_registry
+        from fanpage_agent.v2.adapters.page_registry import get_registry
         reg = get_registry()  # uses get_settings()
         assert reg.default_page_id is not None or reg.page_count >= 1
 
     def test_registry_handles_env_settings(self):
         """Verify registry can load from env-provided pages."""
-        from fanpage_agent_v2.adapters.settings import get_settings
-        from fanpage_agent_v2.adapters.page_registry import PageRegistry
+        from fanpage_agent.v2.adapters.settings import get_settings
+        from fanpage_agent.v2.adapters.page_registry import PageRegistry
         settings = get_settings()
         reg = PageRegistry(settings)
         ids = reg.all_page_ids
@@ -106,7 +106,7 @@ class TestGetRegistry:
 class TestFacebookAdapterMultiPage:
     @pytest.fixture
     def adapter(self):
-        from fanpage_agent_v2.adapters.fb_adapter import FacebookAdapter
+        from fanpage_agent.v2.adapters.fb_adapter import FacebookAdapter
         return FacebookAdapter()
 
     def test_default_page_id_from_registry(self, adapter):
@@ -144,8 +144,8 @@ class TestPublisherAgentPageId:
 
     @pytest.fixture
     def agent(self, mock_fb, tmp_path):
-        from fanpage_agent_v2.agents.publisher import PublisherAgent
-        from fanpage_agent_v2.memory.performance import PerformanceMemory
+        from fanpage_agent.v2.agents.publisher import PublisherAgent
+        from fanpage_agent.v2.memory.performance import PerformanceMemory
         mem = PerformanceMemory(db_path=tmp_path / "pub_test.db")
         agent = PublisherAgent(
             config={},
@@ -207,7 +207,7 @@ class TestCommunityAgentPageId:
 
     @pytest.fixture
     def agent(self, mock_fb, tmp_path):
-        from fanpage_agent_v2.agents.community import CommunityAgent
+        from fanpage_agent.v2.agents.community import CommunityAgent
         agent = CommunityAgent(
             config={},
             data_dir=str(tmp_path),
@@ -241,7 +241,7 @@ class TestCommunityAgentPageId:
 class TestPerformanceMemoryPageId:
     @pytest.fixture
     def memory(self, tmp_path):
-        from fanpage_agent_v2.memory.performance import PerformanceMemory
+        from fanpage_agent.v2.memory.performance import PerformanceMemory
         return PerformanceMemory(db_path=tmp_path / "multi_page.db")
 
     def test_record_with_page_id(self, memory):
@@ -260,7 +260,7 @@ class TestPerformanceMemoryPageId:
         assert matching[0]["page_id"] == "page2"
 
     def test_filter_by_page_id(self, memory):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
 
         for pid, page in [("pkg_a", "page1"), ("pkg_b", "page2")]:
             pkg = ContentPackage(package_id=pid, brand_id="test", scheduled_date="2026-06-15")
@@ -281,7 +281,7 @@ class TestPerformanceMemoryPageId:
         assert p2[0]["package_id"] == "pkg_b"
 
     def test_filter_pillar_performance_by_page(self, memory):
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
 
         for pid, page, pillar in [("pa", "p1", "a"), ("pb", "p2", "a")]:
             pkg = ContentPackage(package_id=pid, brand_id="test", scheduled_date="2026-06-15")
@@ -299,7 +299,7 @@ class TestPerformanceMemoryPageId:
 
     def test_no_page_id_fallback(self, memory):
         """record_publish without page_id should get default 'main'."""
-        from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.v2.core.types import ContentPackage, ContentVariant
         pkg = ContentPackage(package_id="nopid", brand_id="test", scheduled_date="2026-06-15")
         pkg.variants = [
             ContentVariant(variant_id="v1", topic="T", pillar="test",
@@ -319,7 +319,7 @@ class TestPerformanceMemoryPageId:
 class TestMainMultiPage:
     def test_create_pipeline_with_pages(self, tmp_path):
         """create_pipeline should accept pages list and create pipeline."""
-        from fanpage_agent_v2.main import create_pipeline
+        from fanpage_agent.v2.main import create_pipeline
         orch = create_pipeline(
             data_dir=tmp_path / "test_data",
             brand_id="test",
@@ -330,7 +330,7 @@ class TestMainMultiPage:
 
     def test_create_pipeline_default_page_id(self, tmp_path):
         """First page_id should become default for agents."""
-        from fanpage_agent_v2.main import create_pipeline
+        from fanpage_agent.v2.main import create_pipeline
         orch = create_pipeline(
             data_dir=tmp_path / "test_data2",
             brand_id="test",
@@ -345,7 +345,7 @@ class TestMainMultiPage:
 
     def test_run_tick_with_pages(self, tmp_path):
         """run_tick should accept pages param."""
-        from fanpage_agent_v2.main import run_tick
+        from fanpage_agent.v2.main import run_tick
         result = run_tick(
             data_dir=tmp_path / "tick_data",
             brand_id="test",
@@ -356,7 +356,7 @@ class TestMainMultiPage:
 
     def test_daemon_cli_shows_pages(self):
         """CLI daemon action should print page IDs."""
-        from fanpage_agent_v2.main import cli
+        from fanpage_agent.v2.main import cli
         import sys
         sys.argv = ["fanpage-agent", "tick", "--data-dir", "/tmp/test_cli_pages",
                     "--brand-id", "test"]
@@ -371,7 +371,7 @@ class TestMainMultiPage:
 
 class TestOrchestratorPageIds:
     def test_orchestrator_accepts_page_ids(self):
-        from fanpage_agent_v2.agents.orchestrator import OrchestratorAgent
+        from fanpage_agent.v2.agents.orchestrator import OrchestratorAgent
         agent = OrchestratorAgent(
             config={},
             page_ids=["p1", "p2", "p3"],
@@ -379,7 +379,7 @@ class TestOrchestratorPageIds:
         assert hasattr(agent, "_page_ids") or hasattr(agent, "page_ids")
 
     def test_orchestrator_capabilities(self):
-        from fanpage_agent_v2.agents.orchestrator import OrchestratorAgent
+        from fanpage_agent.v2.agents.orchestrator import OrchestratorAgent
         agent = OrchestratorAgent(config={})
         caps = agent.capabilities
         assert "tick" in caps
@@ -395,7 +395,7 @@ class TestSlaDashboardPageId:
 
     def test_published_posts_has_page_id_column(self, tmp_path):
         """Verify DB schema includes page_id column."""
-        from fanpage_agent_v2.memory.performance import PerformanceMemory
+        from fanpage_agent.v2.memory.performance import PerformanceMemory
         mem = PerformanceMemory(db_path=tmp_path / "schema_test.db")
 
         import sqlite3
