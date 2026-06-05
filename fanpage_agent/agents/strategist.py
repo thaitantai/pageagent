@@ -125,7 +125,11 @@ class StrategistAgent(BaseAgent):
             existing_calendar: Existing scheduled items.
             research_brief: Optional research data from ResearchAgent.
         """
+        packet = research_brief or {}
+        page_context = packet.get("page_context", {}) if isinstance(packet, dict) else {}
         research_context = self._normalise_research_context(research_brief)
+        if page_context:
+            research_context["page_context"] = page_context
 
         if self._llm:
             pillar_stats = ""
@@ -140,6 +144,11 @@ class StrategistAgent(BaseAgent):
             research_section = ""
             if research_context["priority_topics"] or research_context["findings"]:
                 research_lines = []
+                if research_context.get("page_context"):
+                    page = research_context["page_context"]
+                    research_lines.append(
+                        f"  - page_focus: {page.get('topic_focus', '')}; community_value: {page.get('community_value', '')}"
+                    )
                 for topic in research_context["priority_topics"][:8]:
                     research_lines.append(
                         f"  - topic_score={topic.get('total_score', '?')}: {topic.get('topic', '')[:100]}"
@@ -189,6 +198,7 @@ Yêu cầu output JSON:
                         "reasoning": data.get("reasoning", ""),
                         "research_priority_topics": research_context["priority_topics"],
                         "research_confidence": research_context["confidence_score"],
+                        "page_context": research_context.get("page_context", {}),
                         "generated_by": "llm",
                     },
                 )
@@ -258,12 +268,14 @@ Yêu cầu output JSON:
                 "recommended_posting_times": self._recommend_times(),
                 "research_priority_topics": priority_topics,
                 "research_confidence": research_context["confidence_score"],
+                "page_context": research_context.get("page_context", {}),
                 "generated_by": "template",
             },
         )
 
     def _normalise_research_context(self, research_brief: dict | None) -> dict[str, Any]:
-        brief = research_brief or {}
+        packet = research_brief or {}
+        brief = packet
         if "brief" in brief and isinstance(brief.get("brief"), dict):
             brief = brief["brief"]
 
@@ -287,6 +299,7 @@ Yêu cầu output JSON:
             "priority_topics": priority_topics,
             "findings": findings,
             "confidence_score": brief.get("confidence_score", 0),
+            "page_context": packet.get("page_context", {}) if isinstance(packet, dict) else {},
         }
 
     @staticmethod

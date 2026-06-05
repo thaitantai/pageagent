@@ -143,10 +143,21 @@ class ResearchCliTest(unittest.TestCase):
                     str(output_dir),
                     "--job-id",
                     "test-research",
+                    "--page-id",
+                    "main",
                     "--no-external-trends",
                 ],
                 cwd=root,
-                env=isolated_subprocess_env(),
+                env=isolated_subprocess_env(
+                    PAGES=json.dumps([
+                        {
+                            "page_id": "main",
+                            "page_token": "tok_main",
+                            "topic_focus": "cong dong soi da",
+                            "community_value": "Giai dap thac mac soi da bang ngon ngu de hieu",
+                        }
+                    ], ensure_ascii=False)
+                ),
                 capture_output=True,
                 text=True,
                 check=True,
@@ -159,6 +170,8 @@ class ResearchCliTest(unittest.TestCase):
             self.assertTrue(output_file.exists())
             self.assertEqual(payload["schema_version"], "research_packet.v1")
             self.assertEqual(payload["job_id"], "test-research")
+            self.assertEqual(payload["page_id"], "main")
+            self.assertEqual(payload["page_context"]["topic_focus"], "cong dong soi da")
             self.assertEqual(saved_payload["packet_id"], payload["packet_id"])
             self.assertTrue(payload["brief"]["topic_scores"])
             self.assertGreater(payload["brief"]["confidence_score"], 0)

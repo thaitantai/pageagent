@@ -70,6 +70,11 @@ class TestStrategistAgent:
     def test_plan_weekly_accepts_research_packet_shape(self, agent):
         packet = {
             "schema_version": "research_packet.v1",
+            "page_context": {
+                "page_id": "main",
+                "topic_focus": "phuc hoi da treatment",
+                "community_value": "Giai thich phuc hoi hang rao bao ve da",
+            },
             "brief": {
                 "confidence_score": 0.7,
                 "topic_scores": [
@@ -88,6 +93,7 @@ class TestStrategistAgent:
         assert result.success
         assert result.data["schedule"][0]["topic_template"] == "Review sản phẩm phục hồi cho da treatment"
         assert result.data["schedule"][0]["pillar"] == "product_review"
+        assert result.data["page_context"]["topic_focus"] == "phuc hoi da treatment"
 
     def test_generate_ideas(self, agent):
         task = AgentTask(id="i1", target=AgentRole.STRATEGIST, action="generate_ideas",

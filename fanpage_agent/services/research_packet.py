@@ -21,6 +21,8 @@ def build_research_packet(
     calendar_file: str | Path = "data/content_calendar.csv",
     job_id: str | None = None,
     fetch_external_trends: bool = True,
+    page_id: str | None = None,
+    page_context: dict[str, object] | None = None,
 ) -> ResearchPacket:
     store = LocalSheetStore(
         calendar_csv=calendar_file,
@@ -38,6 +40,8 @@ def build_research_packet(
         packet_id=f"rpkt-{uuid4().hex[:12]}",
         job_id=packet_job_id,
         created_at=datetime.now(timezone.utc).isoformat(),
+        page_id=page_id or str((page_context or {}).get("page_id", "")),
+        page_context=page_context or {},
         source_files={
             "history_file": str(history_file),
             "metrics_file": str(metrics_file),

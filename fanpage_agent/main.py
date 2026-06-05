@@ -235,6 +235,8 @@ def cli() -> None:
                        help="directory to write ResearchPacket JSON")
     parser.add_argument("--job-id",
                        help="optional stable job id for standalone research")
+    parser.add_argument("--page-id",
+                       help="page id whose profile should guide research/strategy")
     parser.add_argument("--no-external-trends", action="store_true",
                        help="skip external trend fetch for deterministic/offline runs")
 
@@ -275,6 +277,7 @@ def cli() -> None:
             calendar_file=args.calendar_file,
             output_dir=args.output_dir,
             job_id=args.job_id,
+            page_id=args.page_id,
             fetch_external_trends=not args.no_external_trends,
         )
 
@@ -408,10 +411,14 @@ def _run_research_standalone(
     calendar_file: str,
     output_dir: str,
     job_id: str | None = None,
+    page_id: str | None = None,
     fetch_external_trends: bool = True,
 ) -> None:
+    from config import Settings
+    from fanpage_agent.adapters.page_registry import PageRegistry
     from fanpage_agent.services.research_packet import build_research_packet, save_research_packet
 
+    page_context = PageRegistry(Settings.from_env()).page_context(page_id)
     packet = build_research_packet(
         history_file=history_file,
         metrics_file=metrics_file,
@@ -419,6 +426,8 @@ def _run_research_standalone(
         campaign_file=campaign_file,
         calendar_file=calendar_file,
         job_id=job_id,
+        page_id=str(page_context.get("page_id", page_id or "")),
+        page_context=page_context,
         fetch_external_trends=fetch_external_trends,
     )
     output_path = save_research_packet(packet, output_dir=output_dir)

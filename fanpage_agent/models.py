@@ -193,6 +193,8 @@ class ResearchPacket(BaseModel):
     schema_version: str = "research_packet.v1"
     created_at: str
     status: str = "ready"
+    page_id: str = ""
+    page_context: dict[str, object] = Field(default_factory=dict)
     source_files: dict[str, str] = Field(default_factory=dict)
     brief: ResearchBrief
 
