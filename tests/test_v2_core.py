@@ -22,6 +22,28 @@ class DummyAgent(BaseAgent):
         return AgentResult(task_id=task.id, success=True, data={"echo": task.params})
 
 
+class PublishingDummyAgent(BaseAgent):
+    @property
+    def role(self) -> AgentRole:
+        return AgentRole.PUBLISHER
+
+    @property
+    def capabilities(self) -> list[str]:
+        return ["publish_post"]
+
+    def handle_task(self, task: AgentTask) -> AgentResult:
+        return AgentResult(task_id=task.id, success=True, data={"published": True})
+
+
+class FakeAuditManager:
+    def __init__(self):
+        self.records = []
+
+    def record(self, **kwargs):
+        self.records.append(kwargs)
+        return len(self.records)
+
+
 class TestAgentTask:
     def test_create_task(self):
         task = AgentTask(id="t1", target=AgentRole.WRITER, action="write")
@@ -261,3 +283,21 @@ class TestAgentHarness:
         )
         result = harness.run(agent, task)
         assert result.success
+
+    def test_harness_requires_approval_for_default_publish_action(self):
+        harness = AgentHarness()
+        agent = PublishingDummyAgent()
+        task = AgentTask(id="h5", target=AgentRole.PUBLISHER, action="publish_post")
+        result = harness.run(agent, task)
+        assert not result.success
+        assert "requires explicit approval" in (result.error or "")
+
+    def test_harness_persists_events_to_audit_manager(self):
+        audit_manager = FakeAuditManager()
+        harness = AgentHarness(audit_manager=audit_manager)
+        agent = DummyAgent()
+        task = AgentTask(id="h6", target=AgentRole.STRATEGIST, action="test_action")
+        result = harness.run(agent, task)
+        assert result.success
+        assert audit_manager.records[0]["event_type"] == "harness.success"
+        assert audit_manager.records[0]["source"] == "AgentHarness"

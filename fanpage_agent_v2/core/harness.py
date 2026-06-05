@@ -20,7 +20,14 @@ class HarnessPolicy:
 
     allowed_actions: dict[AgentRole, set[str]] = field(default_factory=dict)
     blocked_actions: set[str] = field(default_factory=set)
-    approval_required_actions: set[str] = field(default_factory=lambda: {"publish_now", "force_publish"})
+    approval_required_actions: set[str] = field(default_factory=lambda: {
+        "publish_now",
+        "force_publish",
+        "publish_post",
+        "publish_package",
+        "publish_due",
+        "delete_post",
+    })
     max_payload_chars: int = 120_000
 
     def is_action_allowed(
@@ -84,8 +91,9 @@ class RunnableAgent(Protocol):
 class AgentHarness:
     """Guarded execution wrapper used by AgentBus."""
 
-    def __init__(self, policy: HarnessPolicy | None = None) -> None:
+    def __init__(self, policy: HarnessPolicy | None = None, audit_manager: Any | None = None) -> None:
         self.policy = policy or HarnessPolicy()
+        self._audit_manager = audit_manager
         self._events: list[HarnessEvent] = []
 
     def run(self, agent: RunnableAgent, task: AgentTask) -> AgentResult:
@@ -98,7 +106,7 @@ class AgentHarness:
                 status="blocked",
                 reason=reason,
             )
-            self._events.append(event)
+            self._record_event(event)
             return AgentResult(
                 task_id=task.id,
                 success=False,
@@ -109,7 +117,7 @@ class AgentHarness:
         result = agent.process(task)
         status = "success" if result.success else "failed"
         elapsed_ms = result.metrics.get("elapsed_ms") if result.metrics else None
-        self._events.append(HarnessEvent(
+        self._record_event(HarnessEvent(
             task_id=task.id,
             action=task.action,
             agent=agent.role.value,
@@ -119,6 +127,24 @@ class AgentHarness:
         ))
         result.metrics["harness_status"] = status
         return result
+
+    def _record_event(self, event: HarnessEvent) -> None:
+        self._events.append(event)
+        if self._audit_manager is None:
+            return
+        self._audit_manager.record(
+            event_type=f"harness.{event.status}",
+            source="AgentHarness",
+            event_data={
+                "task_id": event.task_id,
+                "action": event.action,
+                "agent": event.agent,
+                "reason": event.reason,
+            },
+            success=event.status == "success",
+            duration_ms=event.elapsed_ms,
+            error=event.reason if event.status != "success" else None,
+        )
 
     @property
     def events(self) -> list[dict[str, Any]]:
