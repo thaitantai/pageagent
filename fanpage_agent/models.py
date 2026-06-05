@@ -186,6 +186,17 @@ class ResearchBrief(BaseModel):
     topic_scores: List[ResearchTopicScore] = Field(default_factory=list)
 
 
+class ResearchPacket(BaseModel):
+    packet_id: str
+    job_id: str
+    agent: str = "research"
+    schema_version: str = "research_packet.v1"
+    created_at: str
+    status: str = "ready"
+    source_files: dict[str, str] = Field(default_factory=dict)
+    brief: ResearchBrief
+
+
 class AnalyticsSummary(BaseModel):
     total_posts: int
     total_reach: int

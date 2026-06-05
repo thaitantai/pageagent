@@ -84,9 +84,25 @@ Viec can lam:
 - Them health check CI neu co pipeline GitHub Actions.
 - Rasoat lai Git history/secret neu repo public.
 
+## Phase 6: Research Intelligence doc lap va dung chung
+
+Muc tieu: Research Agent co the chay nhu mot cong doan rieng, tao goi insight co schema on dinh de Planner, Writer va nguoi van hanh cung doc duoc.
+
+Ket qua mong muon:
+- Moi lan research sinh ra mot `ResearchPacket` co id, thoi gian, source file, confidence, evidence va topic score.
+- Co CLI doc lap de chay research ma khong can chay toan bo pipeline.
+- Output luu thanh JSON de cron, dashboard hoac agent khac doc lai.
+- Planner/Writer co the uu tien chu de dua tren score thay vi chon thu cong.
+
+Viec can lam:
+- Them schema `ResearchPacket`.
+- Them service build/save packet tu du lieu hien co.
+- Them CLI `research-standalone` co che do offline/deterministic.
+- Them test cho packet va CLI output.
+
 ## Uu tien thuc thi ngay
 
-1. Hoan tat single-runtime cleanup trong tai lieu va CLI.
-2. Lam roadmap thanh mot lenh quan sat duoc: `python3 -m fanpage_agent.main roadmap-status`.
-3. Giu harness/audit la truc an toan chinh cho publish va delete.
-4. Sau do moi toi uu noi dung va multi-page sau, tranh mo rong khi nen tang van hanh chua chac.
+1. Hoan tat ResearchPacket va CLI `research-standalone`.
+2. Giu `research-brief` legacy chay nhu cu de khong pha workflow hien tai.
+3. Dua `topic_scores`, `evidence`, `confidence_score` thanh input uu tien cho Planner/Writer.
+4. Sau do moi toi uu content scoring va multi-page sau, tranh mo rong khi Research chua co output dung chung.

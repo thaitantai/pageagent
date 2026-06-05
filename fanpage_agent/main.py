@@ -26,6 +26,8 @@ from fanpage_agent.agents.publisher import PublisherAgent
 from fanpage_agent.agents.researcher import ResearchAgent
 from fanpage_agent.legacy_cli import (
     DEFAULT_CALENDAR_FILE,
+    DEFAULT_CAMPAIGN_FILE,
+    DEFAULT_COMMENT_FILE,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
     EXPECTED_HERMES_CRON_JOBS,
@@ -196,7 +198,7 @@ def cli() -> None:
 
     runtime_actions = {
         "tick", "status", "daemon", "backup", "restore", "list-backups",
-        "check-db", "harness-status", "roadmap-status",
+        "check-db", "harness-status", "roadmap-status", "research-standalone",
     }
     if len(sys.argv) > 1 and sys.argv[1] not in runtime_actions:
         raise SystemExit(legacy_cli_main())
@@ -219,6 +221,22 @@ def cli() -> None:
                        help="Number of backup copies to keep (default: 7)")
     parser.add_argument("--limit", type=int, default=20,
                        help="Number of recent rows for status views")
+    parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE),
+                       help="post history CSV for research-standalone")
+    parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE),
+                       help="post metrics CSV for research-standalone")
+    parser.add_argument("--comment-file", default=str(DEFAULT_COMMENT_FILE),
+                       help="comment inbox CSV for research-standalone")
+    parser.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE),
+                       help="campaign notes JSON for research-standalone")
+    parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE),
+                       help="calendar CSV for research-standalone")
+    parser.add_argument("--output-dir", default="data/research_packets",
+                       help="directory to write ResearchPacket JSON")
+    parser.add_argument("--job-id",
+                       help="optional stable job id for standalone research")
+    parser.add_argument("--no-external-trends", action="store_true",
+                       help="skip external trend fetch for deterministic/offline runs")
 
     args = parser.parse_args()
 
@@ -247,6 +265,18 @@ def cli() -> None:
 
     elif args.action == "roadmap-status":
         _run_roadmap_status()
+
+    elif args.action == "research-standalone":
+        _run_research_standalone(
+            history_file=args.history_file,
+            metrics_file=args.metrics_file,
+            comment_file=args.comment_file,
+            campaign_file=args.campaign_file,
+            calendar_file=args.calendar_file,
+            output_dir=args.output_dir,
+            job_id=args.job_id,
+            fetch_external_trends=not args.no_external_trends,
+        )
 
     elif args.action == "daemon":
         pages = _load_pages()
@@ -368,6 +398,34 @@ def _run_harness_status(data_dir: str, limit: int = 20) -> None:
         "harness_events_total": audit.count(source="AgentHarness"),
         "recent": recent,
     }, ensure_ascii=False, indent=2))
+
+
+def _run_research_standalone(
+    history_file: str,
+    metrics_file: str,
+    comment_file: str | None,
+    campaign_file: str | None,
+    calendar_file: str,
+    output_dir: str,
+    job_id: str | None = None,
+    fetch_external_trends: bool = True,
+) -> None:
+    from fanpage_agent.services.research_packet import build_research_packet, save_research_packet
+
+    packet = build_research_packet(
+        history_file=history_file,
+        metrics_file=metrics_file,
+        comment_file=comment_file,
+        campaign_file=campaign_file,
+        calendar_file=calendar_file,
+        job_id=job_id,
+        fetch_external_trends=fetch_external_trends,
+    )
+    output_path = save_research_packet(packet, output_dir=output_dir)
+    payload = packet.model_dump(mode="json")
+    payload["output_file"] = str(output_path)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
 
 
 def _run_roadmap_status() -> None:

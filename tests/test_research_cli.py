@@ -91,6 +91,78 @@ class ResearchCliTest(unittest.TestCase):
             self.assertIn("total_score", payload["research_brief"]["topic_scores"][0])
             self.assertTrue(any("soi da" in note.lower() for note in payload["plan"]["strategy_notes"]))
 
+    def test_research_standalone_writes_research_packet(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            output_dir = tmpdir / "research_packets"
+            calendar = tmpdir / "calendar.csv"
+            history = tmpdir / "history.csv"
+            metrics = tmpdir / "metrics.csv"
+            comments = tmpdir / "comment_inbox.csv"
+            campaign = tmpdir / "campaign_notes.json"
+
+            history.write_text(
+                "published_at,topic,hook,pillar,objective,permalink,reach,engagement_rate\n"
+                "2026-06-01,Da thiếu nước nên làm gì?,Hook A,education,reach,https://example.com/1,1200,0.05\n",
+                encoding="utf-8",
+            )
+            metrics.write_text(
+                "published_at,topic,pillar,objective,reach,engagements,leads\n"
+                "2026-06-03,Khi nào cần soi da?,trust,lead,1500,90,8\n",
+                encoding="utf-8",
+            )
+            comments.write_text(
+                "created_at,source,message\n"
+                "2026-06-05,inbox,Chi phí soi da là bao nhiêu?\n",
+                encoding="utf-8",
+            )
+            campaign.write_text(
+                json.dumps({"campaign_focus": ["soi da"], "priority_objective": "lead"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "research-standalone",
+                    "--calendar-file",
+                    str(calendar),
+                    "--history-file",
+                    str(history),
+                    "--metrics-file",
+                    str(metrics),
+                    "--comment-file",
+                    str(comments),
+                    "--campaign-file",
+                    str(campaign),
+                    "--output-dir",
+                    str(output_dir),
+                    "--job-id",
+                    "test-research",
+                    "--no-external-trends",
+                ],
+                cwd=root,
+                env=isolated_subprocess_env(),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            payload = json.loads(completed.stdout)
+            output_file = Path(payload["output_file"])
+            saved_payload = json.loads(output_file.read_text(encoding="utf-8"))
+
+            self.assertTrue(output_file.exists())
+            self.assertEqual(payload["schema_version"], "research_packet.v1")
+            self.assertEqual(payload["job_id"], "test-research")
+            self.assertEqual(saved_payload["packet_id"], payload["packet_id"])
+            self.assertTrue(payload["brief"]["topic_scores"])
+            self.assertGreater(payload["brief"]["confidence_score"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
