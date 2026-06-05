@@ -65,6 +65,7 @@ class HarnessPolicy:
         "publish_package",
         "publish_post",
         "write_post",
+        "write_variants",
     })
     max_payload_chars: int = 120_000
 

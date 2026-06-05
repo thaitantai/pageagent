@@ -17,19 +17,19 @@ Muc tieu: dua Fanpage Agent tien gan he thong multi-page co nghien cuu da nguon,
 - Harness ghi `page_id` vao event/audit, giup truy vet agent dang lam cho page nao.
 - Giu approval gate cho publish actions.
 
-## Phase 4 - Evidence-Grounded Writer
+## Phase 4 - Evidence-Grounded Writer (done)
 - Noi `ResearchPacket` va page context vao Writer de caption dua tren evidence, khong viet chung chung.
 - Them citation/source hints vao draft metadata de nguoi duyet thay bai dua tren nguon nao.
 - Them test Writer dung packet evidence va community value cua page.
 
-## Phase 5 - Page Status & Operator CLI
+## Phase 5 - Page Status & Operator CLI (done)
 - Them CLI xem page context/status theo tung page cho nguoi van hanh non-tech.
 - Hien thi research packet gan nhat, score, evidence count, va trang thai san sang viet bai.
 - Them test CLI khong lo credential va output de doc.
 
-## Phase 6 - End-to-End Safety Slice
-- Them test luong comments/research -> strategy -> writer -> harness audit.
-- Dam bao publish/write public-facing bi chan neu thieu page context hoac approval.
+## Phase 6 - End-to-End Safety Slice (done)
+- Them test luong ResearchPacket -> Writer -> Harness audit/status.
+- Dam bao write public-facing bi chan neu thieu page context.
 - Cap nhat docs voi cach chay, cach kiem tra va buoc tiep theo.
 
 ## Execution Rules
