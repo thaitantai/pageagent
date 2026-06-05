@@ -46,6 +46,49 @@ class TestStrategistAgent:
         assert result.success
         assert len(result.data["schedule"]) == 5
 
+    def test_plan_weekly_prioritises_scored_research_topics(self, agent):
+        brief = {
+            "confidence_score": 0.82,
+            "topic_scores": [
+                {"topic": "Chi phí soi da và khi nào nên đặt lịch", "total_score": 0.91, "duplication_risk": 0.1},
+                {"topic": "Routine buổi tối cho da thiếu nước", "total_score": 0.77, "duplication_risk": 0.2},
+            ],
+        }
+        task = AgentTask(
+            id="p3",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={"days": 2, "research_brief": brief},
+        )
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["schedule"][0]["topic_template"] == "Chi phí soi da và khi nào nên đặt lịch"
+        assert result.data["research_priority_topics"][0]["total_score"] == 0.91
+        assert result.data["research_confidence"] == 0.82
+
+    def test_plan_weekly_accepts_research_packet_shape(self, agent):
+        packet = {
+            "schema_version": "research_packet.v1",
+            "brief": {
+                "confidence_score": 0.7,
+                "topic_scores": [
+                    {"topic": "Review sản phẩm phục hồi cho da treatment", "total_score": 0.88}
+                ],
+            },
+        }
+        task = AgentTask(
+            id="p4",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={"days": 1, "research_brief": packet},
+        )
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["schedule"][0]["topic_template"] == "Review sản phẩm phục hồi cho da treatment"
+        assert result.data["schedule"][0]["pillar"] == "product_review"
+
     def test_generate_ideas(self, agent):
         task = AgentTask(id="i1", target=AgentRole.STRATEGIST, action="generate_ideas",
                         params={"pillar": "skincare_routine", "count": 3})

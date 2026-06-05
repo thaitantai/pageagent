@@ -125,6 +125,8 @@ class StrategistAgent(BaseAgent):
             existing_calendar: Existing scheduled items.
             research_brief: Optional research data from ResearchAgent.
         """
+        research_context = self._normalise_research_context(research_brief)
+
         if self._llm:
             pillar_stats = ""
             if self._memory:
@@ -135,19 +137,19 @@ class StrategistAgent(BaseAgent):
                         for p in perf
                     )
 
-            # ── Inject research context if available ──
             research_section = ""
-            if research_brief and research_brief.get("findings"):
-                findings = research_brief["findings"]
+            if research_context["priority_topics"] or research_context["findings"]:
                 research_lines = []
-                for f in findings[:10]:  # top 10 findings
+                for topic in research_context["priority_topics"][:8]:
                     research_lines.append(
-                        f"  - [{f.get('pillar','?')}] {f.get('topic','')[:100]}"
+                        f"  - topic_score={topic.get('total_score', '?')}: {topic.get('topic', '')[:100]}"
                     )
+                for finding in research_context["findings"][:5]:
+                    research_lines.append(f"  - finding: {finding[:120]}")
                 research_section = (
-                    "\nDữ liệu nghiên cứu thực tế từ blog/web:\n"
+                    "\nDữ liệu nghiên cứu thực tế đã chấm điểm:\n"
                     + "\n".join(research_lines)
-                    + "\n\nDựa vào dữ liệu trên để đề xuất chủ đề content thực tế."
+                    + "\n\nƯu tiên các chủ đề điểm cao, có evidence, tránh topic rủi ro lặp."
                 )
 
             prompt = f"""Lên lịch nội dung {days} ngày cho fanpage skincare GenZ.
@@ -185,6 +187,8 @@ Yêu cầu output JSON:
                         "pillar_distribution": data.get("pillar_distribution", {}),
                         "recommended_posting_times": data.get("recommended_posting_times", ["09:00", "12:00", "20:00"]),
                         "reasoning": data.get("reasoning", ""),
+                        "research_priority_topics": research_context["priority_topics"],
+                        "research_confidence": research_context["confidence_score"],
                         "generated_by": "llm",
                     },
                 )
@@ -226,10 +230,15 @@ Yêu cầu output JSON:
         }
 
         pillars = list(templates.keys())
+        priority_topics = research_context["priority_topics"]
         schedule = []
         for day_offset in range(days):
-            chosen = random.choice(pillars)
-            topic = random.choice(templates[chosen])
+            if day_offset < len(priority_topics):
+                chosen = self._infer_pillar(priority_topics[day_offset].get("topic", ""))
+                topic = priority_topics[day_offset].get("topic", "")
+            else:
+                chosen = random.choice(pillars)
+                topic = random.choice(templates[chosen])
             schedule.append({
                 "day_offset": day_offset,
                 "pillar": chosen,
@@ -247,9 +256,53 @@ Yêu cầu output JSON:
                     p: sum(1 for s in schedule if s["pillar"] == p) for p in pillars
                 },
                 "recommended_posting_times": self._recommend_times(),
+                "research_priority_topics": priority_topics,
+                "research_confidence": research_context["confidence_score"],
                 "generated_by": "template",
             },
         )
+
+    def _normalise_research_context(self, research_brief: dict | None) -> dict[str, Any]:
+        brief = research_brief or {}
+        if "brief" in brief and isinstance(brief.get("brief"), dict):
+            brief = brief["brief"]
+
+        priority_topics = []
+        for item in brief.get("topic_scores", [])[:10]:
+            if isinstance(item, dict) and item.get("topic"):
+                priority_topics.append({
+                    "topic": str(item.get("topic", "")),
+                    "total_score": item.get("total_score", 0),
+                    "duplication_risk": item.get("duplication_risk", 0),
+                })
+
+        if not priority_topics:
+            priority_topics = [{"topic": t, "total_score": 0, "duplication_risk": 0} for t in brief.get("next_angles", [])[:10]]
+
+        findings = []
+        for finding in brief.get("findings", [])[:10]:
+            findings.append(str(finding))
+
+        return {
+            "priority_topics": priority_topics,
+            "findings": findings,
+            "confidence_score": brief.get("confidence_score", 0),
+        }
+
+    @staticmethod
+    def _infer_pillar(topic: str) -> str:
+        text = topic.lower()
+        if any(word in text for word in ["routine", "buổi sáng", "buổi tối", "layer"]):
+            return "skincare_routine"
+        if any(word in text for word in ["vitamin", "retinol", "niacinamide", "bha", "aha"]):
+            return "ingredient_deepdive"
+        if any(word in text for word in ["myth", "lầm tưởng", "sai lầm"]):
+            return "myth_busting"
+        if any(word in text for word in ["review", "so sánh", "top", "sản phẩm"]):
+            return "product_review"
+        if any(word in text for word in ["genz", "sinh viên", "văn phòng", "du lịch"]):
+            return "genz_lifestyle"
+        return "medical_reference"
 
     def _recommend_times(self) -> list[str]:
         """Return optimal posting times based on memory."""
