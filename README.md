@@ -176,9 +176,9 @@ python3 -m fanpage_agent.main ops-status --fail-on-stale
 
 ---
 
-## V2 Multi-Agent Pipeline
+## Multi-Agent Pipeline
 
-V2 is a multi-agent orchestrator that runs as a Docker daemon and auto-generates content for Facebook.
+Fanpage Agent is a multi-agent orchestrator that runs as a Docker daemon and auto-generates content for Facebook.
 
 ### Architecture
 
@@ -247,7 +247,7 @@ After each publish, the pipeline:
 ### Data Files
 
 ```
-data/v2/
+data/agent/
 ├── memory.db              # PerformanceMemory SQLite DB
 │   ├── published_posts    # Post records + metrics
 │   └── ...                # Patterns, recommendations
@@ -265,35 +265,35 @@ data/v2/
 docker build -t fanpage-agent:latest -f Dockerfile .
 
 # Run container (interval=600s, writer_temp=0.7, hooks_temp=0.8, writer_max_tokens=3000)
-docker rm -f fanpage-agent-v2 2>/dev/null
-docker run -d --name fanpage-agent-v2 --restart unless-stopped \
+docker rm -f fanpage-agent 2>/dev/null
+docker run -d --name fanpage-agent --restart unless-stopped \
   --env-file .env \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/artifacts:/app/artifacts \
   fanpage-agent:latest
 
 # Check logs
-docker logs fanpage-agent-v2 --tail 20
+docker logs fanpage-agent --tail 20
 
 # Watch live output
-docker logs -f fanpage-agent-v2
+docker logs -f fanpage-agent
 
 # Run single tick (CLI)
-python3 -m fanpage_agent.v2.main tick
+python3 -m fanpage_agent.main tick
 
 # Run daemon (foreground)
-python3 -m fanpage_agent.v2.main daemon
+python3 -m fanpage_agent.main daemon
 
 # Check container health
-docker ps --filter name=fanpage-agent-v2 --format "{{.Status}}"
+docker ps --filter name=fanpage-agent --format "{{.Status}}"
 ```
 
 ### Cron Jobs
 
 | Name | Schedule | Description |
 |---|---|---|
-| `fanpage-v2-status` | `0 */6 * * *` | V2 container health + memory report via no-agent script |
-| `fanpage-v2-weekly-report` | `0 2 * * 1` | Weekly analytics report (posts, reach, engagement, patterns) |
+| `fanpage-agent-status` | `0 */6 * * *` | container health + memory report via no-agent script |
+| `fanpage-agent-weekly-report` | `0 2 * * 1` | Weekly analytics report (posts, reach, engagement, patterns) |
 
 ### Current Status
 
@@ -301,9 +301,9 @@ docker ps --filter name=fanpage-agent-v2 --format "{{.Status}}"
 | ✅ Tick cycle: gather → decide → auto-generate → publish → repeat
 | ✅ Facebook API publishing with PerformanceMemory recording
 | ✅ Publisher fix: posts now recorded in memory.db
-| ✅ Settings fix: .env auto-loaded from cwd, load_dotenv=True in V2
+| ✅ Settings fix: .env auto-loaded from cwd, load_dotenv=True in agent runtime
 | ✅ CLI `tick` and `daemon` modes work
-| ✅ Hermes cron V2 status reporter configured
+| ✅ Hermes cron status reporter configured
 | ✅ Content pipe: writer output → publisher message (non-hardcoded)
 | ✅ CommunityAgent: live comment fetch + triage from Facebook API
 | ✅ Weekly analytics report cron (no-agent, every Monday)

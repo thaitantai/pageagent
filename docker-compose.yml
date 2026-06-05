@@ -1,10 +1,10 @@
 version: "3.9"
 
 services:
-  # ── V2 Agent daemon (multi-agent, performance memory) ───────
+  # ── Agent daemon (multi-agent, performance memory) ───────
   agent:
     image: fanpage-agent:latest
-    container_name: fanpage-agent-v2
+    container_name: fanpage-agent
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,7 +17,7 @@ services:
       - ./artifacts:/app/artifacts
       - ./.env:/app/.env:ro
       - ./encoded-might-498016-q3-1ff99b2c609b.json:/app/encoded-might-498016-q3-1ff99b2c609b.json:ro
-    entrypoint: ["python", "-m", "fanpage_agent.v2.main"]
+    entrypoint: ["python", "-m", "fanpage_agent.main"]
     command: ["daemon", "--interval", "600"]
     restart: unless-stopped
     profiles:

@@ -1,10 +1,10 @@
-"""Quick state check for V2 after rebuild."""
+"""Quick state check for after rebuild."""
 import json
 import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DB = ROOT / "data" / "v2" / "memory.db"
+DB = ROOT / "data" / "agent" / "memory.db"
 
 conn = sqlite3.connect(str(DB))
 conn.row_factory = sqlite3.Row
@@ -34,7 +34,7 @@ for r in conn.execute(
 print()
 print("=== STATE ===")
 try:
-    s = json.loads((ROOT / "data" / "v2" / "state.json").read_text())
+    s = json.loads((ROOT / "data" / "agent" / "state.json").read_text())
     print(f"  ticks_run: {s.get('ticks_run', 0)}")
     print(f"  total_published: {s.get('total_published', 0)}")
     print(f"  community_fetches: {s.get('community_fetches', 0)}")

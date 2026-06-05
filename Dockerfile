@@ -1,6 +1,6 @@
-# Fanpage Agent V2 — Docker image
-# Build:   docker build -t fanpage-agent-v2:latest -f Dockerfile.v2 .
-# Run:     docker compose --profile v2 up -d
+# Fanpage Agent — Docker image
+# Build:   docker build -t fanpage-agent:latest -f Dockerfile .
+# Run:     docker compose --profile agent up -d
 
 # ── Stage 1: base ──────────────────────────────────────────────
 FROM python:3.11-slim AS base
@@ -31,6 +31,6 @@ FROM deps AS final
 COPY . .
 RUN pip install --no-cache-dir -e .
 
-# V2 daemon entry point
-ENTRYPOINT ["python", "-m", "fanpage_agent.v2.main"]
+# Agent daemon entry point
+ENTRYPOINT ["python", "-m", "fanpage_agent.main"]
 CMD ["daemon"]

@@ -11,9 +11,9 @@ All notable changes to Fanpage Agent are documented in this file.
 - Improve Writer Agent with GenZ tone personas, pillar hashtags, smart scheduling, hook rotation, format rotation, and content quality scoring.
 - Add seasonal topic fallback and operations artifact freshness checks.
 
-### V2 platform
+### platform
 
-- Upgrade daemon to V2 multi-agent architecture with Orchestrator, Strategist, Writer, Designer, Community, and Analyst agents.
+- Upgrade daemon to multi-agent architecture with Orchestrator, Strategist, Writer, Designer, Community, and Analyst agents.
 - Add PerformanceMemory SQLite learning, content pipe, community fetch, weekly analytics, metrics cron, and faster daemon interval.
 - Add publisher memory fixes, auto-reply, quality gate, self-reply, reply tracking cache, and visual brief support.
 - Add Facebook Insights integration with real reach/impressions, track_performance after publish, and periodic refresh_metrics.

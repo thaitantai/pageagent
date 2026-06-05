@@ -49,7 +49,7 @@ commit_parsers = [
     { message = "^ci", group = "CI" },
     { message = "^chore\\(release\\):", skip = true },
     { message = "^chore", group = "Maintenance" },
-    { message = "^v2|^V2|^Phase|^visual-brief", group = "V2 platform" },
+    { message = "^platform|^Phase|^visual-brief", group = "platform" },
     { message = ".*", group = "Other" },
 ]
 link_parsers = []
