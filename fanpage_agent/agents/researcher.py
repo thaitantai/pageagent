@@ -16,12 +16,19 @@ import json
 import random
 import re
 import time
+import warnings
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any
 
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"The 'strip_cdata' option.*",
+    category=DeprecationWarning,
+)
 
 
 # ── Discovery sources ─────────────────────────────────────

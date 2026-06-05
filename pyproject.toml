@@ -23,3 +23,8 @@ include = ["fanpage_agent*", "fanpage_cli*"]
 
 [tool.setuptools]
 py-modules = ["agent", "config", "tools", "scheduler", "cli"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:The 'strip_cdata' option.*:DeprecationWarning",
+]

@@ -26,6 +26,7 @@ import os
 import sqlite3
 import threading
 import time
+from contextlib import closing
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Iterator
@@ -116,13 +117,14 @@ class AuditManager:
         Returns the row ID.
         """
         data_json = json.dumps(event_data, ensure_ascii=False) if event_data else None
-        with self._connect() as conn:
-            cur = conn.execute(
-                "INSERT INTO audit_log (event_type, source, event_data, success, duration_ms, error) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (event_type, source, data_json, 1 if success else 0, duration_ms, error),
-            )
-            row_id = cur.lastrowid or 0
+        with closing(self._connect()) as conn:
+            with conn:
+                cur = conn.execute(
+                    "INSERT INTO audit_log (event_type, source, event_data, success, duration_ms, error) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (event_type, source, data_json, 1 if success else 0, duration_ms, error),
+                )
+                row_id = cur.lastrowid or 0
         return row_id
 
     def list(
@@ -156,8 +158,9 @@ class AuditManager:
         sql += f"FROM audit_log WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        with self._connect() as conn:
-            rows = conn.execute(sql, params).fetchall()
+        with closing(self._connect()) as conn:
+            with conn:
+                rows = conn.execute(sql, params).fetchall()
 
         return [self._row_to_entry(r) for r in rows]
 
@@ -184,11 +187,12 @@ class AuditManager:
             clauses.append("timestamp >= ?")
             params.append(since)
         where = " AND ".join(clauses) if clauses else "1"
-        with self._connect() as conn:
-            row = conn.execute(
-                f"SELECT COUNT(*) FROM audit_log WHERE {where}", params
-            ).fetchone()
-            return row[0] if row else 0
+        with closing(self._connect()) as conn:
+            with conn:
+                row = conn.execute(
+                    f"SELECT COUNT(*) FROM audit_log WHERE {where}", params
+                ).fetchone()
+                return row[0] if row else 0
 
     def summary(self, since: str = "-24 hours") -> dict[str, int]:
         """Get event_type → count for a time window."""
@@ -199,8 +203,9 @@ class AuditManager:
             GROUP BY event_type
             ORDER BY cnt DESC
         """
-        with self._connect() as conn:
-            rows = conn.execute(sql, (since,)).fetchall()
+        with closing(self._connect()) as conn:
+            with conn:
+                rows = conn.execute(sql, (since,)).fetchall()
         return {r[0]: r[1] for r in rows}
 
     def vacuum(self) -> int:
@@ -208,7 +213,7 @@ class AuditManager:
 
         Returns number of rows removed.
         """
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             # Count before
             before_row = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()
             before = before_row[0] if before_row else 0
@@ -227,8 +232,9 @@ class AuditManager:
     # ── Internals ─────────────────────────────────────────────────────
 
     def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.executescript(_CREATE_TABLE)
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.executescript(_CREATE_TABLE)
 
     def _connect(self) -> sqlite3.Connection:
         """Get a fresh connection (thread-safe, no shared state)."""
