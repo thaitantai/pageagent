@@ -69,6 +69,10 @@ class ResearchServiceTest(unittest.TestCase):
             self.assertTrue(any(item.source == "post_metrics" for item in brief.evidence))
             self.assertTrue(any(item.source == "comment_inbox" for item in brief.evidence))
             self.assertTrue(brief.quality_warnings)
+            self.assertTrue(brief.topic_scores)
+            self.assertGreaterEqual(brief.topic_scores[0].total_score, brief.topic_scores[-1].total_score)
+            self.assertTrue(any(item.topic == "soi da" for item in brief.topic_scores))
+            self.assertTrue(any(item.duplication_risk > 0.8 for item in brief.topic_scores))
 
     def test_build_brief_enriches_with_trend_analyzer(self) -> None:
         """ResearchBrief chứa trend_keywords và trend_clusters khi có TrendAnalyzer."""

@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, TrendItem
+from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, ResearchTopicScore, TrendItem
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.web_search import WebSearchClient
@@ -163,6 +163,15 @@ class ResearchService:
         )
         confidence_score = self._confidence_score(evidence)
         quality_warnings = self._quality_warnings(evidence, external_trends)
+        topic_scores = self._score_topics(
+            candidates=self._dedupe(next_angles + top_performing_topics),
+            campaign_focus=campaign_focus,
+            overused_topics=overused_topics,
+            frequent_questions=frequent_questions,
+            evidence=evidence,
+        )
+        if topic_scores:
+            recommendations.append(f"Ưu tiên topic có điểm cao nhất: {topic_scores[0].topic}.")
         if quality_warnings:
             recommendations.append("Cần bổ sung nguồn trước khi Writer dùng các claim quan trọng.")
 
@@ -181,6 +190,7 @@ class ResearchService:
             evidence=evidence,
             confidence_score=confidence_score,
             quality_warnings=quality_warnings,
+            topic_scores=topic_scores,
         )
 
     def _build_search_queries(
@@ -268,6 +278,97 @@ class ResearchService:
                 confidence=0.6,
             ))
         return evidence
+
+    def _score_topics(
+        self,
+        candidates: list[str],
+        campaign_focus: list[str],
+        overused_topics: list[str],
+        frequent_questions: list[str],
+        evidence: list[ResearchEvidence],
+    ) -> list[ResearchTopicScore]:
+        scores: list[ResearchTopicScore] = []
+        for topic in candidates[:12]:
+            brand_relevance = self._keyword_overlap_score(topic, campaign_focus)
+            question_overlap = self._keyword_overlap_score(topic, frequent_questions)
+            source_confidence = self._topic_source_confidence(topic, evidence)
+            duplication_risk = 0.85 if topic in overused_topics else 0.15
+            novelty = 1.0 - duplication_risk
+            content_potential = min(1.0, 0.35 + question_overlap * 0.35 + source_confidence * 0.3)
+            fanpage_fit = min(1.0, 0.45 + brand_relevance * 0.35 + question_overlap * 0.2)
+            total = (
+                brand_relevance * 0.25
+                + novelty * 0.20
+                + content_potential * 0.20
+                + source_confidence * 0.15
+                + fanpage_fit * 0.15
+                + (1.0 - duplication_risk) * 0.05
+            )
+            rationale = self._topic_score_rationale(
+                topic=topic,
+                brand_relevance=brand_relevance,
+                novelty=novelty,
+                source_confidence=source_confidence,
+                duplication_risk=duplication_risk,
+            )
+            scores.append(ResearchTopicScore(
+                topic=topic,
+                total_score=round(total, 3),
+                brand_relevance=round(brand_relevance, 3),
+                novelty=round(novelty, 3),
+                content_potential=round(content_potential, 3),
+                source_confidence=round(source_confidence, 3),
+                fanpage_fit=round(fanpage_fit, 3),
+                duplication_risk=round(duplication_risk, 3),
+                rationale=rationale,
+            ))
+        return sorted(scores, key=lambda item: item.total_score, reverse=True)
+
+    @staticmethod
+    def _keyword_overlap_score(topic: str, references: list[str]) -> float:
+        topic_words = {word for word in topic.lower().split() if len(word) >= 3}
+        if not topic_words or not references:
+            return 0.0
+        best = 0.0
+        for reference in references:
+            ref_words = {word for word in reference.lower().split() if len(word) >= 3}
+            if ref_words:
+                best = max(best, len(topic_words & ref_words) / len(topic_words))
+        return min(1.0, best)
+
+    def _topic_source_confidence(self, topic: str, evidence: list[ResearchEvidence]) -> float:
+        topic_words = {word for word in topic.lower().split() if len(word) >= 3}
+        if not topic_words:
+            return 0.0
+        matches = []
+        for item in evidence:
+            claim_words = {word for word in item.claim.lower().split() if len(word) >= 3}
+            if topic_words & claim_words:
+                matches.append(item.confidence)
+        if not matches:
+            return 0.0
+        return min(1.0, sum(matches) / len(matches))
+
+    @staticmethod
+    def _topic_score_rationale(
+        topic: str,
+        brand_relevance: float,
+        novelty: float,
+        source_confidence: float,
+        duplication_risk: float,
+    ) -> str:
+        signals: list[str] = []
+        if brand_relevance >= 0.5:
+            signals.append("sát campaign/brand")
+        if novelty >= 0.7:
+            signals.append("ít trùng lặp")
+        if source_confidence >= 0.6:
+            signals.append("có evidence hỗ trợ")
+        if duplication_risk >= 0.8:
+            signals.append("rủi ro lặp topic cũ")
+        if not signals:
+            signals.append("cần thêm dữ liệu trước khi ưu tiên")
+        return f"{topic}: " + ", ".join(signals)
 
     @staticmethod
     def _confidence_score(evidence: list[ResearchEvidence]) -> float:

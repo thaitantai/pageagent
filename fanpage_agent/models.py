@@ -156,6 +156,18 @@ class ResearchEvidence(BaseModel):
     confidence: float = 0.0
 
 
+class ResearchTopicScore(BaseModel):
+    topic: str
+    total_score: float = 0.0
+    brand_relevance: float = 0.0
+    novelty: float = 0.0
+    content_potential: float = 0.0
+    source_confidence: float = 0.0
+    fanpage_fit: float = 0.0
+    duplication_risk: float = 0.0
+    rationale: str = ""
+
+
 class ResearchBrief(BaseModel):
     top_performing_topics: List[str] = Field(default_factory=list)
     overused_topics: List[str] = Field(default_factory=list)
@@ -171,6 +183,7 @@ class ResearchBrief(BaseModel):
     evidence: List[ResearchEvidence] = Field(default_factory=list)
     confidence_score: float = 0.0
     quality_warnings: List[str] = Field(default_factory=list)
+    topic_scores: List[ResearchTopicScore] = Field(default_factory=list)
 
 
 class AnalyticsSummary(BaseModel):

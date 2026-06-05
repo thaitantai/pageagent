@@ -87,6 +87,8 @@ class ResearchCliTest(unittest.TestCase):
             self.assertGreater(payload["research_brief"]["confidence_score"], 0)
             self.assertTrue(payload["research_brief"]["evidence"])
             self.assertIn("quality_warnings", payload["research_brief"])
+            self.assertTrue(payload["research_brief"]["topic_scores"])
+            self.assertIn("total_score", payload["research_brief"]["topic_scores"][0])
             self.assertTrue(any("soi da" in note.lower() for note in payload["plan"]["strategy_notes"]))
 
 
