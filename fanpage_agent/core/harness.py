@@ -13,6 +13,37 @@ from typing import Any, Protocol
 
 from fanpage_agent.core.types import AgentResult, AgentRole, AgentTask
 
+_SENSITIVE_KEYS = {
+    "access_token",
+    "api_key",
+    "app_secret",
+    "page_token",
+    "password",
+    "secret",
+    "token",
+}
+
+
+def _task_page_id(task: AgentTask) -> str | None:
+    page_id = task.context.get("page_id") or task.params.get("page_id")
+    if page_id:
+        return str(page_id)
+    for container in (task.context.get("page_context"), task.params.get("page_context")):
+        if isinstance(container, dict) and container.get("page_id"):
+            return str(container["page_id"])
+    return None
+
+
+def _redact_sensitive(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if key.lower() in _SENSITIVE_KEYS else _redact_sensitive(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_sensitive(item) for item in value]
+    return value
+
 
 @dataclass(frozen=True)
 class HarnessPolicy:
@@ -27,6 +58,13 @@ class HarnessPolicy:
         "publish_package",
         "publish_due",
         "delete_post",
+    })
+    require_page_context_actions: set[str] = field(default_factory=lambda: {
+        "draft_post",
+        "publish_due",
+        "publish_package",
+        "publish_post",
+        "write_post",
     })
     max_payload_chars: int = 120_000
 
@@ -53,6 +91,9 @@ class HarnessPolicy:
         if task.action in self.approval_required_actions and not task.context.get("approved"):
             return False, f"Action '{task.action}' requires explicit approval"
 
+        if task.action in self.require_page_context_actions and not _task_page_id(task):
+            return False, f"Action '{task.action}' requires page context"
+
         return True, None
 
 
@@ -63,6 +104,7 @@ class HarnessEvent:
     agent: str
     status: str
     reason: str | None = None
+    page_id: str | None = None
     elapsed_ms: int | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -73,6 +115,7 @@ class HarnessEvent:
             "agent": self.agent,
             "status": self.status,
             "reason": self.reason,
+            "page_id": self.page_id,
             "elapsed_ms": self.elapsed_ms,
             "created_at": self.created_at,
         }
@@ -105,6 +148,7 @@ class AgentHarness:
                 agent=agent.role.value,
                 status="blocked",
                 reason=reason,
+                page_id=_task_page_id(task),
             )
             self._record_event(event)
             return AgentResult(
@@ -123,6 +167,7 @@ class AgentHarness:
             agent=agent.role.value,
             status=status,
             reason=result.error,
+            page_id=_task_page_id(task),
             elapsed_ms=elapsed_ms,
         ))
         result.metrics["harness_status"] = status
@@ -135,12 +180,13 @@ class AgentHarness:
         self._audit_manager.record(
             event_type=f"harness.{event.status}",
             source="AgentHarness",
-            event_data={
+            event_data=_redact_sensitive({
                 "task_id": event.task_id,
                 "action": event.action,
                 "agent": event.agent,
                 "reason": event.reason,
-            },
+                "page_id": event.page_id,
+            }),
             success=event.status == "success",
             duration_ms=event.elapsed_ms,
             error=event.reason if event.status != "success" else None,

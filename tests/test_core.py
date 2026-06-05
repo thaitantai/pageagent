@@ -292,6 +292,33 @@ class TestAgentHarness:
         assert not result.success
         assert "requires explicit approval" in (result.error or "")
 
+    def test_harness_requires_page_context_for_publish_action(self):
+        harness = AgentHarness()
+        agent = PublishingDummyAgent()
+        task = AgentTask(
+            id="h5b",
+            target=AgentRole.PUBLISHER,
+            action="publish_post",
+            context={"approved": True},
+        )
+        result = harness.run(agent, task)
+        assert not result.success
+        assert "requires page context" in (result.error or "")
+
+    def test_harness_records_page_context_for_publish_action(self):
+        harness = AgentHarness()
+        agent = PublishingDummyAgent()
+        task = AgentTask(
+            id="h5c",
+            target=AgentRole.PUBLISHER,
+            action="publish_post",
+            params={"page_context": {"page_id": "main"}},
+            context={"approved": True},
+        )
+        result = harness.run(agent, task)
+        assert result.success
+        assert harness.events[-1]["page_id"] == "main"
+
     def test_harness_persists_events_to_audit_manager(self):
         audit_manager = FakeAuditManager()
         harness = AgentHarness(audit_manager=audit_manager)
