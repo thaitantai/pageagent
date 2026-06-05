@@ -186,8 +186,11 @@ def cli() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Fanpage Agent V2")
-    parser.add_argument("action", choices=["tick", "status", "daemon", "backup", "restore", "list-backups", "check-db"],
-                       help="Action to perform")
+    parser.add_argument(
+        "action",
+        choices=["tick", "status", "daemon", "backup", "restore", "list-backups", "check-db", "harness-status"],
+        help="Action to perform",
+    )
     parser.add_argument("--data-dir", default="data/v2",
                        help="V2 data directory")
     parser.add_argument("--brand-id", default="skincare_genz",
@@ -198,6 +201,8 @@ def cli() -> None:
                        help="Backup index for restore (1=most recent)")
     parser.add_argument("--keep", type=int, default=7,
                        help="Number of backup copies to keep (default: 7)")
+    parser.add_argument("--limit", type=int, default=20,
+                       help="Number of recent rows for status views")
 
     args = parser.parse_args()
 
@@ -220,6 +225,9 @@ def cli() -> None:
 
     elif args.action == "check-db":
         _run_check_db(data_dir=args.data_dir)
+
+    elif args.action == "harness-status":
+        _run_harness_status(data_dir=args.data_dir, limit=args.limit)
 
     elif args.action == "daemon":
         pages = _load_pages()
@@ -316,6 +324,30 @@ def _run_check_db(data_dir: str) -> None:
         "integrity": "passed",
         "db_path": str(memory.db_path),
         "total_posts": memory._total_posts(),
+    }, ensure_ascii=False, indent=2))
+
+
+def _run_harness_status(data_dir: str, limit: int = 20) -> None:
+    audit = AuditManager(db_dir=str(Path(data_dir)))
+    entries = audit.list(source="AgentHarness", limit=limit)
+    recent = [
+        {
+            "id": entry.id,
+            "timestamp": entry.timestamp,
+            "event_type": entry.event_type,
+            "success": entry.success,
+            "duration_ms": entry.duration_ms,
+            "error": entry.error,
+            "event_data": entry.event_data,
+        }
+        for entry in entries
+    ]
+    print(json.dumps({
+        "status": "ok",
+        "audit_db": str(Path(data_dir) / "audit.db"),
+        "summary_24h": audit.summary(),
+        "harness_events_total": audit.count(source="AgentHarness"),
+        "recent": recent,
     }, ensure_ascii=False, indent=2))
 
 

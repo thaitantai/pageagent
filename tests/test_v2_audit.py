@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import tempfile
@@ -11,6 +13,7 @@ from pathlib import Path
 
 from fanpage_agent_v2.audit import AuditManager, audit, audit_sync
 from fanpage_agent_v2.audit.auditor import AuditEntry
+from fanpage_agent_v2.main import _run_harness_status
 
 
 class AuditManagerTest(unittest.TestCase):
@@ -325,6 +328,29 @@ class AuditEventTypeTest(unittest.TestCase):
         )
         self.assertEqual(entry.id, 1)
         self.assertEqual(entry.event_data, {"k": "v"})
+
+
+class HarnessStatusCliTest(unittest.TestCase):
+    def test_harness_status_reads_agent_harness_events(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="harness_status_") as data_dir:
+            mgr = AuditManager(db_dir=data_dir)
+            mgr.record(
+                event_type="harness.blocked",
+                source="AgentHarness",
+                event_data={"task_id": "t1", "action": "publish_post", "agent": "publisher"},
+                success=False,
+                error="requires explicit approval",
+            )
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                _run_harness_status(data_dir=data_dir, limit=5)
+
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["harness_events_total"], 1)
+            self.assertEqual(payload["recent"][0]["event_type"], "harness.blocked")
+            self.assertEqual(payload["recent"][0]["event_data"]["action"], "publish_post")
 
 
 if __name__ == "__main__":
