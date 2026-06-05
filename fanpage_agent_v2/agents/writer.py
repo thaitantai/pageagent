@@ -12,6 +12,7 @@ from typing import Any
 from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
 from fanpage_agent_v2.core.agent import BaseAgent
 from fanpage_agent_v2.core.types import (
+    ActionPriority,
     AgentRole,
     AgentResult,
     AgentTask,
@@ -130,13 +131,23 @@ class WriterAgent(BaseAgent):
         params = task.params
 
         if action == "write_variants":
-            return self._write_variants(
+            result = self._write_variants(
                 topic=params.get("topic", ""),
                 pillar=params.get("pillar", ""),
                 count=params.get("variants", self._default_variants),
                 scheduled_date=params.get("scheduled_date"),
                 scheduled_time=params.get("scheduled_time"),
             )
+            if result.success:
+                pkg = result.data
+                self._mark_shared_done(
+                    processed_strategy_version=self._pipeline_version("strategist"),
+                    package_id=getattr(pkg, "package_id", None),
+                    pillar=getattr(pkg, "pillar", params.get("pillar", "")),
+                    variant_count=len(getattr(pkg, "variants", [])),
+                    scheduled_date=getattr(pkg, "scheduled_date", None),
+                )
+            return result
         elif action == "generate_hooks":
             return self._generate_hooks(
                 topic=params.get("topic", ""),
@@ -148,6 +159,35 @@ class WriterAgent(BaseAgent):
                 feedback=params.get("feedback", ""),
             )
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
+
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose writing: respond to new strategy, or periodic timer.
+
+        Choreography: if Strategist has produced a new schedule, Writer
+        generates content variants for the first pending topic.
+        Periodic fallback for regular content generation.
+        """
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+
+        # Check for new strategy data (choreography chain)
+        if self._has_upstream_data("strategist", "processed_strategy_version"):
+            strategy_data = self._get_shared("strategist", {})
+            schedule = strategy_data.get("schedule", [])
+            if schedule:
+                # Pick first scheduled item
+                item = schedule[0]
+                proposals.append(("write_variants", {
+                    "topic": item.get("topic_template", "Chăm sóc da GenZ"),
+                    "pillar": item.get("pillar", "skincare_routine"),
+                    "variants": 2,
+                }, ActionPriority.MEDIUM))
+            else:
+                proposals.append(("write_variants", {"variants": 2}, ActionPriority.MEDIUM))
+        elif self._should_act("write_variants", 21600):
+            # Periodic fallback: write without new strategy
+            proposals.append(("write_variants", {"variants": 2}, ActionPriority.MEDIUM))
+
+        return proposals
 
     def _write_variants(
         self,

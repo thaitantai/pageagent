@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-04T06:25:01.684186+00:00",
-  "tick": 1,
+  "timestamp": "2026-06-05T11:26:26.453053+00:00",
+  "tick": 52,
   "state": {
     "calendar": {
       "pending_approval": 0,
@@ -14,7 +14,7 @@
       "new_comments_24h": 0
     },
     "performance": {
-      "weekly_posts": 23,
+      "weekly_posts": 156,
       "avg_reach": 0,
       "avg_engagement": 0.0,
       "top_pillar": "auto_generated"
@@ -22,7 +22,7 @@
     "system": {
       "last_tick": "ok",
       "errors_24h": 0,
-      "uptime_hours": 3.669659296671549e-07
+      "uptime_hours": 8.924333087868161
     }
   }
 }

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fanpage_agent_v2.core.agent import BaseAgent
-from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask
+from fanpage_agent_v2.core.types import ActionPriority, AgentRole, AgentResult, AgentTask
 
 
 class AnalystAgent(BaseAgent):
@@ -46,20 +46,29 @@ class AnalystAgent(BaseAgent):
         params = task.params
 
         if action == "weekly_report":
-            return self._weekly_report()
+            return self._weekly_report(page_id=params.get("page_id"))
         elif action == "pattern_analysis":
             return self._pattern_analysis(
                 pattern_types=params.get("pattern_types", []),
             )
         elif action == "pillar_health":
-            return self._pillar_health()
+            return self._pillar_health(page_id=params.get("page_id"))
         elif action == "ab_test_results":
             return self._ab_test_results()
         elif action == "content_recommendations":
             return self._content_recommendations(params.get("pillar", None))
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
-    def _weekly_report(self) -> AgentResult:
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose analytics tasks based on recency."""
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+        if self._should_act("weekly_report", 86400):
+            proposals.append(("weekly_report", {}, ActionPriority.LOW))
+        if self._should_act("pattern_analysis", 43200):
+            proposals.append(("pattern_analysis", {"pattern_types": []}, ActionPriority.LOW))
+        return proposals
+
+    def _weekly_report(self, page_id: str | None = None) -> AgentResult:
         """Generate weekly performance report."""
         if not self._memory:
             return AgentResult(
@@ -68,8 +77,8 @@ class AnalystAgent(BaseAgent):
                 data={"summary": "Chưa có dữ liệu performance.", "pillars": []},
             )
 
-        pillars = self._memory.pillar_performance()
-        recent = self._memory.get_recent_posts(limit=5)
+        pillars = self._memory.pillar_performance(page_id=page_id)
+        recent = self._memory.get_recent_posts(limit=5, page_id=page_id)
         top = self._memory.get_top_patterns(limit=5)
         recs = self._memory.get_recommendations(limit=3)
         total = sum(p.get("post_count", 0) for p in pillars)
@@ -116,12 +125,12 @@ class AnalystAgent(BaseAgent):
             data={"patterns": results},
         )
 
-    def _pillar_health(self) -> AgentResult:
+    def _pillar_health(self, page_id: str | None = None) -> AgentResult:
         """Score each pillar's health based on performance."""
         if not self._memory:
             return AgentResult(task_id="pillar-health", success=True, data={"pillars": [], "overall": "no_data"})
 
-        pillars = self._memory.pillar_performance()
+        pillars = self._memory.pillar_performance(page_id=page_id)
         for p in pillars:
             er = p.get("avg_engagement_rate", 0)
             if er >= 5:

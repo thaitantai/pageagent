@@ -15,7 +15,7 @@ from typing import Any
 
 from fanpage_agent_v2.adapters.llm_adapter import LLMAdapter
 from fanpage_agent_v2.core.agent import BaseAgent
-from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask
+from fanpage_agent_v2.core.types import ActionPriority, AgentRole, AgentResult, AgentTask
 
 # ── Quality thresholds ──────────────────────────────────────────────
 _MIN_REPLY_LENGTH = 10
@@ -55,10 +55,12 @@ class CommunityAgent(BaseAgent):
         llm: LLMAdapter | None = None,
         fb_adapter: Any = None,  # FacebookAdapter | None
         data_dir: str | Path | None = None,
+        default_page_id: str | None = None,
     ) -> None:
         super().__init__(config)
         self._llm = llm
         self._fb = fb_adapter
+        self._default_page_id = default_page_id
         self._last_fetched: list[dict] = []
 
         # Reply tracking — avoids double-reply, supports scheduling
@@ -105,13 +107,18 @@ class CommunityAgent(BaseAgent):
             "sentiment_summary", "auto_reply", "self_reply_post",
         ]
 
+    def _resolve_page_id(self, params: dict) -> str | None:
+        return params.get("page_id") or self._default_page_id
+
     def handle_task(self, task: AgentTask) -> AgentResult:
         action = task.action
         params = task.params
+        page_id = self._resolve_page_id(params)
 
         if action == "fetch_and_triage":
             return self._fetch_and_triage(
                 limit=params.get("limit", 50),
+                page_id=page_id,
             )
         elif action == "triage_comments":
             return self._triage_comments(
@@ -132,18 +139,49 @@ class CommunityAgent(BaseAgent):
                 comments=params.get("comments", []),
                 limit=params.get("limit", 5),
                 max_replies=params.get("max_replies", 3),
+                page_id=page_id,
             )
         elif action == "self_reply_post":
-            return self._self_reply_post(
+            result = self._self_reply_post(
                 fb_post_id=params.get("fb_post_id", ""),
                 post_topic=params.get("topic", ""),
+                page_id=page_id,
             )
+            if result.success:
+                self._mark_shared_done(
+                    processed_publisher_version=self._pipeline_version("publisher"),
+                    self_replied=True,
+                    fb_post_id=result.data.get("post_id", ""),
+                    preview=result.data.get("comment_preview", ""),
+                )
+            return result
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
+
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose community tasks: self-reply after new publish, or periodic triage."""
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+
+        # Check for new publisher data (choreography chain)
+        if self._has_upstream_data("publisher", "processed_publisher_version"):
+            publisher_data = self._get_shared("publisher", {})
+            proposals.append(("self_reply_post", {
+                "fb_post_id": publisher_data.get("fb_post_id", ""),
+                "topic": "",
+            }, ActionPriority.MEDIUM))
+
+        if self._should_act("fetch_and_triage", 21600):
+            proposals.append(("fetch_and_triage", {"limit": 50}, ActionPriority.HIGH))
+        if self._should_act("auto_reply", 10800):
+            proposals.append(("auto_reply", {"limit": 5, "max_replies": 3}, ActionPriority.MEDIUM))
+        if self._should_act("sentiment_summary", 86400):
+            proposals.append(("sentiment_summary", {}, ActionPriority.LOW))
+        return proposals
 
     # ── Self-reply on own post (early engagement boost) ──────────
 
     def _self_reply_post(
-        self, fb_post_id: str, post_topic: str = ""
+        self, fb_post_id: str, post_topic: str = "",
+        page_id: str | None = None,
     ) -> AgentResult:
         """Post a natural comment on the page's own new post to boost early engagement.
 
@@ -171,7 +209,7 @@ class CommunityAgent(BaseAgent):
             comment = f"Mình vừa chia sẻ về {short_topic}, hy vọng có ích cho mọi người! Cảm ơn đã ghé đọc nha 💕"
 
         try:
-            self._fb.comment_on_post(fb_post_id=fb_post_id, message=comment)
+            self._fb.comment_on_post(fb_post_id=fb_post_id, message=comment, page_id=page_id)
             return AgentResult(
                 task_id="self-reply",
                 success=True,
@@ -190,7 +228,7 @@ class CommunityAgent(BaseAgent):
 
     # ── Fetch + Triage ────────────────────────────────────────────
 
-    def _fetch_and_triage(self, limit: int = 50) -> AgentResult:
+    def _fetch_and_triage(self, limit: int = 50, page_id: str | None = None) -> AgentResult:
         # ... unchanged from original ...
         if self._fb is None:
             return AgentResult(
@@ -208,13 +246,13 @@ class CommunityAgent(BaseAgent):
         all_comments: list[dict] = []
         fetch_errors = 0
         try:
-            posts = self._fb.get_recent_posts(limit=5)
+            posts = self._fb.get_recent_posts(limit=5, page_id=page_id)
             for post in posts:
                 post_id = post.get("id", "")
                 if not post_id:
                     continue
                 try:
-                    comments = self._fb.get_comments(post_id, limit=limit)
+                    comments = self._fb.get_comments(post_id, limit=limit, page_id=page_id)
                     for c in comments:
                         c["post_id"] = post_id
                     all_comments.extend(comments)
@@ -426,7 +464,8 @@ Output JSON:
 
     # ── Auto-reply (with scheduling + quality gate) ──────────────
 
-    def _auto_reply(self, comments: list[dict], limit: int = 5, max_replies: int = 3) -> AgentResult:
+    def _auto_reply(self, comments: list[dict], limit: int = 5, max_replies: int = 3,
+                     page_id: str | None = None) -> AgentResult:
         """Auto-reply to comments that qualify (praise, simple questions).
 
         Respects ``max_replies`` cap per tick. Uses replied-IDs cache to
@@ -483,7 +522,7 @@ Output JSON:
 
             # Post reply to Facebook
             try:
-                self._fb.reply_to_comment(comment_id=cid, message=reply_text)
+                self._fb.reply_to_comment(comment_id=cid, message=reply_text, page_id=page_id)
                 replied += 1
                 self._mark_replied(cid)
                 replies.append({
@@ -549,6 +588,8 @@ Output JSON:
 
         if any(w in text_lower for w in spam_words):
             return "spam"
+        if "?" in text_lower or text_lower.startswith(("tại sao", "vì sao")):
+            return "question"
         if any(w in text_lower for w in complaint_words):
             return "complaint"
         if any(w in text_lower for w in praise_words):

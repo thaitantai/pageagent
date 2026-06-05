@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from fanpage_agent.config import Settings
+from fanpage_agent_v2.utils.throttle import TokenBucket
+from fanpage_agent_v2.audit import audit, AuditManager
+
+logger = logging.getLogger(__name__)
 
 
 class FacebookClient:
@@ -27,6 +33,7 @@ class FacebookClient:
             raise RuntimeError("FB_PAGE_TOKEN is required for Facebook API calls")
         self.page_id = settings.fb_page_id
         self.api_version = settings.fb_api_version
+        self._limiter = TokenBucket(capacity=180, window_sec=3600.0)  # 180 req/h
 
     # ------------------------------------------------------------------
     # Public API
@@ -55,22 +62,63 @@ class FacebookClient:
         Returns the Graph API response containing ``id`` (photo ID) and
         ``post_id`` (feed post ID if published as a feed story).
         """
+        import random
+
         import requests as _req
 
-        url = (
-            f"{self.GRAPH_BASE}/{self.api_version}/{self.page_id}/photos"
-            f"?access_token={self.settings.fb_page_token}"
-        )
-        with open(image_path, "rb") as fh:
-            resp = _req.post(url, files={"source": fh}, data={"message": message}, timeout=120)
-        resp.raise_for_status()
-        result = resp.json()
-        if "error" in result:
-            err = result["error"]
-            raise RuntimeError(
-                f"Facebook photo upload error {err.get('code', 0)}: {err.get('message', '')[:500]}"
-            )
-        return result
+        self._limiter.acquire(tokens=1.0)
+
+        with audit(
+            event_type="fb.photo_upload",
+            source="FacebookClient.post_photo",
+            image_path=image_path[:200],
+        ) as actx:
+            for attempt in range(3 + 1):  # _retries=3
+                url = (
+                    f"{self.GRAPH_BASE}/{self.api_version}/{self.page_id}/photos"
+                    f"?access_token={self.settings.fb_page_token}"
+                )
+                try:
+                    with open(image_path, "rb") as fh:
+                        resp = _req.post(
+                            url, files={"source": fh}, data={"message": message}, timeout=120
+                        )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    if "error" in result:
+                        err = result["error"]
+                        raise RuntimeError(
+                            f"Facebook photo upload error {err.get('code', 0)}: {err.get('message', '')[:500]}"
+                        )
+                    actx["data"]["photo_id"] = result.get("id", "")
+                    return result
+                except (_req.exceptions.HTTPError, RuntimeError) as exc:
+                    msg = str(exc)
+                    is_429 = (
+                        "429" in msg
+                        or "rate limit" in msg.lower()
+                        or "too many requests" in msg.lower()
+                    )
+                    if is_429 and attempt < 3:
+                        delay = min(2.0 * (2**attempt), 60.0)
+                        delay *= 1.0 + random.random() * 0.5
+                        logger.warning(
+                            "429 on photo upload, retry %d/3 in %.1fs: %s",
+                            attempt + 1,
+                            delay,
+                            msg[:120],
+                        )
+                        time.sleep(delay)
+                        self._limiter.acquire(tokens=1.0)
+                        continue
+                    if attempt >= 3:
+                        actx["data"]["status"] = "exhausted"
+                        actx["data"]["error"] = msg[:200]
+                        continue
+                    actx["data"]["status"] = "error"
+                    actx["data"]["error"] = msg[:200]
+                    raise
+            raise RuntimeError("Photo upload failed after 3 retries")
 
     def update_post(self, post_id: str, message: str) -> dict:
         """Update the message of an existing post (limited by Graph API)."""
@@ -95,12 +143,19 @@ class FacebookClient:
 
         Returns the Graph API response containing 'id'.
         """
-        data = {"message": message, "access_token": self.settings.fb_page_token}
-        return self._request(
-            "POST",
-            f"/{self.api_version}/{comment_id}/comments",
-            data=data,
-        )
+        with audit(
+            event_type="fb.comment_reply",
+            source="FacebookClient.reply_to_comment",
+            comment_id=comment_id,
+        ) as actx:
+            data = {"message": message, "access_token": self.settings.fb_page_token}
+            result = self._request(
+                "POST",
+                f"/{self.api_version}/{comment_id}/comments",
+                data=data,
+            )
+            actx["data"]["reply_id"] = result.get("id", "")
+            return result
 
     def get_post_insights(self, post_id: str) -> dict:
         """Fetch reach + engagement insights for a single post.
@@ -231,8 +286,60 @@ class FacebookClient:
         path: str,
         data: dict | None = None,
         params: dict | None = None,
+        _retries: int = 3,
     ) -> dict:
-        """Core HTTP helper — urllib-based, no external deps."""
+        """Core HTTP helper — urllib-based, no external deps.
+
+        Acquires a rate-limit token before each request.
+        Retries on HTTP 429 (Too Many Requests) with exponential backoff.
+        """
+        import random
+
+        self._limiter.acquire(tokens=1.0)
+
+        with audit(
+            event_type=f"fb.{method.lower()}",
+            source="FacebookClient._request",
+            path=path[:120],
+        ) as actx:
+            for attempt in range(_retries + 1):
+                try:
+                    result = self._do_request(method, path, data, params)
+                    actx["data"]["status"] = "ok"
+                    return result
+                except RuntimeError as exc:
+                    msg = str(exc)
+                    is_429 = (
+                        "HTTP error 429" in msg
+                        or "rate limit" in msg.lower()
+                        or "too many requests" in msg.lower()
+                    )
+                    if is_429 and attempt < _retries:
+                        delay = min(2.0 * (2**attempt), 60.0)
+                        delay *= 1.0 + random.random() * 0.5
+                        logger.warning(
+                            "429 detected, retry %d/%d in %.1fs: %s",
+                            attempt + 1, _retries, delay, msg[:120],
+                        )
+                        time.sleep(delay)
+                        continue
+                    if attempt >= _retries:
+                        actx["data"]["status"] = "exhausted"
+                        actx["data"]["error"] = msg[:200]
+                        continue
+                    actx["data"]["status"] = "error"
+                    actx["data"]["error"] = msg[:200]
+                    raise
+            raise RuntimeError(f"Request failed after {_retries} retries")
+
+    def _do_request(
+        self,
+        method: str,
+        path: str,
+        data: dict | None = None,
+        params: dict | None = None,
+    ) -> dict:
+        """Low-level HTTP call (no rate-limit, no retry)."""
         url = f"{self.GRAPH_BASE}{path}"
 
         # Merge access_token into params for every request

@@ -9,7 +9,7 @@ import uuid
 from typing import Any
 
 from fanpage_agent_v2.core.agent import BaseAgent
-from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask
+from fanpage_agent_v2.core.types import ActionPriority, AgentRole, AgentResult, AgentTask
 
 
 class DesignerAgent(BaseAgent):
@@ -38,17 +38,40 @@ class DesignerAgent(BaseAgent):
         params = task.params
 
         if action == "generate_brief":
-            return self._generate_brief(
+            result = self._generate_brief(
                 topic=params.get("topic", ""),
                 hook=params.get("hook", ""),
                 format=params.get("format", "text_image"),
             )
+            if result.success:
+                self._mark_shared_done(
+                    processed_writer_version=self._pipeline_version("writer"),
+                    visual_brief=result.data.get("visual_brief", ""),
+                    format=result.data.get("format", "text_image"),
+                )
+            return result
         elif action == "generate_image":
             return self._generate_image(
                 brief=params.get("brief", ""),
                 style=params.get("style", "clean_skincare"),
             )
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
+
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose visual design: respond to new writer content, or periodic timer."""
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+
+        # Check for new writer content (choreography chain)
+        if self._has_upstream_data("writer", "processed_writer_version"):
+            writer_data = self._get_shared("writer", {})
+            proposals.append(("generate_brief", {
+                "topic": writer_data.get("pillar", "skincare"),
+                "format": "text_image",
+            }, ActionPriority.LOW))
+        elif self._should_act("generate_brief", 7200):
+            proposals.append(("generate_brief", {"format": "text_image"}, ActionPriority.LOW))
+
+        return proposals
 
     def _generate_brief(self, topic: str, hook: str, format: str) -> AgentResult:
         """Create a visual brief — text description of desired image."""

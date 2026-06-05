@@ -69,8 +69,16 @@ class StrategistAgent(BaseAgent):
         params = task.params
 
         if action == "plan_weekly":
-            return self._plan_weekly(params.get("days", 7), params.get("existing_calendar", []),
+            result = self._plan_weekly(params.get("days", 7), params.get("existing_calendar", []),
                                        params.get("research_brief", None))
+            if result.success:
+                self._mark_shared_done(
+                    processed_research_version=self._pipeline_version("researcher"),
+                    schedule=result.data.get("schedule", []),
+                    pillar_distribution=result.data.get("pillar_distribution", {}),
+                    reasoning=result.data.get("reasoning", ""),
+                )
+            return result
         elif action == "gap_analysis":
             return self._gap_analysis(params.get("calendar", []))
         elif action == "pillar_recommend":
@@ -80,6 +88,33 @@ class StrategistAgent(BaseAgent):
         elif action == "analyse_trends":
             return self._analyse_trends(params.get("pillars", []))
         return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
+
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose strategy: respond to new research, or periodic planning.
+
+        Choreography: if Researcher has produced new data, strategist proposes
+        plan_weekly with that research. Falls back to periodic timer for
+        gap analysis.
+        """
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+
+        # Check for new research data (choreography chain)
+        if self._has_upstream_data("researcher", "processed_research_version"):
+            research_brief = self._get_shared("researcher", {}).get("brief", {})
+            proposals.append(("plan_weekly", {
+                "days": 3,
+                "research_brief": research_brief,
+            }, ActionPriority.HIGH))
+
+        # Periodic fallback: plan even without new research
+        if not proposals and self._should_act("plan_weekly", 14400):
+            proposals.append(("plan_weekly", {"days": 3}, ActionPriority.HIGH))
+
+        # Periodic gap analysis
+        if self._should_act("gap_analysis", 28800):
+            proposals.append(("gap_analysis", {"calendar": []}, ActionPriority.LOW))
+
+        return proposals
 
     def _plan_weekly(self, days: int, existing_calendar: list[dict],
                      research_brief: dict | None = None) -> AgentResult:

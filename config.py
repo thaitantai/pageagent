@@ -11,7 +11,22 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+# ── multi-page support ──────────────────────────────────────────
+
+
+@dataclass
+class PageConfig:
+    """Configuration for a single Facebook page in a multi-page setup."""
+
+    page_id: str
+    page_token: str
+    name: str = ""
+    brand_id: str = ""
+    api_version: str = "v21.0"
+    is_default: bool = False
 
 
 # ── helper ──────────────────────────────────────────────────────
@@ -66,6 +81,9 @@ class Settings(BaseModel):
     img_model: str = "dall-e-3"
     artifacts_dir: Path = Path("artifacts")
 
+    # Multi-page support: list of PageConfig dicts
+    pages: list[dict] = Field(default_factory=list, exclude=True)
+
     @classmethod
     def from_env(
         cls,
@@ -78,8 +96,13 @@ class Settings(BaseModel):
         Priority: explicit ``env`` dict > .env file > os.environ.
         """
         sources: dict[str, str] = {}
+        env_source = env if env is not None else os.environ
+        dotenv_disabled = env_source.get("FANPAGE_AGENT_DISABLE_DOTENV", "").lower() in (
+            "1", "true", "yes"
+        )
+
         # 1. .env file (optional, only if root_dir is provided)
-        if load_dotenv is False:
+        if load_dotenv is False or dotenv_disabled:
             pass  # skip dotenv when explicitly disabled
         elif root_dir is not None:
             dotenv = _load_root_dotenv(root_dir)
@@ -92,12 +115,12 @@ class Settings(BaseModel):
                 if dotenv_path.exists():
                     sources.update(_load_root_dotenv(ancestor))
                     break
-        # 2. explicit env overrides .env
-        if env is not None:
-            sources.update(env)
-        # 3. real env overrides everything
+        # 2. real env overrides .env
         for key in os.environ:
             sources[key] = os.environ[key]
+        # 3. explicit env overrides everything for tests/CLI callers
+        if env is not None:
+            sources.update(env)
 
         kwargs: dict = {}
         for field_name in cls.model_fields:
@@ -112,6 +135,15 @@ class Settings(BaseModel):
                 kwargs[field_name] = Path(raw)
             elif field_info.annotation is bool or field_info.annotation == bool:
                 kwargs[field_name] = raw.lower() in ("true", "1", "yes")
+            elif field_name == "pages":
+                # JSON env var: FB_PAGES='[{"page_id":"...","page_token":"...","name":"..."}]'
+                import json as _json
+                try:
+                    parsed = _json.loads(raw)
+                    if isinstance(parsed, list):
+                        kwargs["pages"] = parsed
+                except (_json.JSONDecodeError, TypeError):
+                    pass
             else:
                 kwargs[field_name] = raw
 
@@ -128,6 +160,42 @@ class Settings(BaseModel):
     def model_post_init(self, _context) -> None:
         if self.llm_model_candidates is None:
             self.llm_model_candidates = []
+
+    def get_page_config(self, page_id: str | None = None) -> PageConfig:
+        """Return PageConfig for a given page_id.
+
+        If page_id is None or empty, returns the default page (from fb_page_id/fb_page_token).
+
+        Returns a PageConfig with the matching page_id, or the default if not found.
+        """
+        # Find in pages list
+        for pdata in self.pages:
+            if isinstance(pdata, dict) and pdata.get("page_id") == page_id:
+                return PageConfig(
+                    page_id=pdata["page_id"],
+                    page_token=pdata["page_token"],
+                    name=pdata.get("name", ""),
+                    brand_id=pdata.get("brand_id", pdata.get("page_id", "")),
+                    api_version=pdata.get("api_version", self.fb_api_version),
+                )
+        # Fallback to default
+        return PageConfig(
+            page_id=self.fb_page_id,
+            page_token=self.fb_page_token,
+            name="default",
+            brand_id=self.fb_page_id,
+            api_version=self.fb_api_version,
+            is_default=True,
+        )
+
+    @property
+    def page_ids(self) -> list[str]:
+        """Return all configured page IDs (including the default)."""
+        ids = {self.fb_page_id}
+        for pdata in self.pages:
+            if isinstance(pdata, dict) and pdata.get("page_id"):
+                ids.add(pdata["page_id"])
+        return list(ids)
 
 
 # ── agent-specific config ───────────────────────────────────────

@@ -3,10 +3,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from fanpage_agent_v2.utils.throttle import TokenBucket
+from fanpage_agent_v2.audit import audit
+
 logger = logging.getLogger(__name__)
 
 # DuckDuckGo max results per request
 DDG_MAX_RESULTS = 20
+
+# Rate limit: max 15 searches / 60 s (DDG is aggressive on 429)
+DDG_LIMIT_CAPACITY = 15
+DDG_LIMIT_WINDOW = 60.0
 
 
 class SearchResult:
@@ -28,27 +35,46 @@ class WebSearchClient:
 
     Sử dụng thư viện ``ddgs`` (DuckDuckGo Search SDK).
     Fallback: nếu SDK lỗi, dùng httpx/urllib để scrape HTML trực tiếp.
+
+    Rate-limited to {DDG_LIMIT_CAPACITY} requests / {DDG_LIMIT_WINDOW}s.
     """
 
     def __init__(self, region: str = "vn-vn", safesearch: str = "moderate", timeout: int = 15):
         self.region = region
         self.safesearch = safesearch
         self.timeout = timeout
+        self._limiter = TokenBucket(capacity=DDG_LIMIT_CAPACITY, window_sec=DDG_LIMIT_WINDOW)
 
     def search(self, query: str, max_results: int = 10) -> list[SearchResult]:
         """Search DuckDuckGo, return list of SearchResult."""
         if max_results > DDG_MAX_RESULTS:
             max_results = DDG_MAX_RESULTS
 
-        try:
-            return self._search_ddg_sdk(query, max_results)
-        except Exception as exc:
-            logger.warning("WebSearch: DDG SDK failed (%s), trying fallback...", exc)
+        # Acquire rate-limit token before each request
+        self._limiter.acquire(tokens=1.0)
+
+        with audit(
+            event_type="web.search",
+            source="WebSearchClient",
+            query=query[:200],
+        ) as actx:
             try:
-                return self._search_ddg_html(query, max_results)
-            except Exception as exc2:
-                logger.warning("WebSearch: fallback also failed: %s", exc2)
-                return []
+                results = self._search_ddg_sdk(query, max_results)
+                actx["data"]["count"] = len(results)
+                actx["data"]["method"] = "sdk"
+                return results
+            except Exception as exc:
+                logger.warning("WebSearch: DDG SDK failed (%s), trying fallback...", exc)
+                try:
+                    results = self._search_ddg_html(query, max_results)
+                    actx["data"]["count"] = len(results)
+                    actx["data"]["method"] = "html_fallback"
+                    return results
+                except Exception as exc2:
+                    logger.warning("WebSearch: fallback also failed: %s", exc2)
+                    actx["data"]["count"] = 0
+                    actx["data"]["method"] = "failed"
+                    return []
 
     def search_multiple(
         self, queries: list[str], max_per_query: int = 5, dedup: bool = True

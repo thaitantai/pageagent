@@ -317,6 +317,20 @@ docker ps --filter name=fanpage-agent-v2 --format "{{.Status}}"
 | ✅ **visual_brief** field in ContentVariant for template/image-prompt paths
 | ✅ **replied_comments.json** dedup tracking for auto-replies
 
+## Release notes
+
+Project releases use git-cliff to generate `CHANGELOG.md` from Git history.
+
+```bash
+# Preview release notes for the next version
+./scripts/changelog.sh v0.2.0
+
+# Update CHANGELOG.md before tagging/deploying
+./scripts/changelog.sh v0.2.0 --write
+```
+
+The command uses `cliff.toml` and should run as part of the deployment checklist before creating the Git tag. See `docs/deploy.md` for the full deploy checklist.
+
 ## Next implementation tasks
 
 - **P1:** A/B testing variants — writer generates 2+ variants, publisher picks best by pattern score

@@ -6,6 +6,7 @@ On each tick, the orchestrator:
 3. Delegates tasks to specialized agents
 4. Consolidates results
 5. Produces output (publish / report / learn)
+6. Cycles through configured pages round-robin
 """
 
 from __future__ import annotations
@@ -32,6 +33,10 @@ class OrchestratorAgent(BaseAgent):
 
     Orchestrator does NOT generate content itself. It decides WHAT to do
     and delegates to specialized agents via AgentBus.
+
+    Supports multi-page: cycles through ``page_ids`` round-robin on each
+    tick, injecting ``page_id`` into task params so downstream agents
+    (publisher, community) operate on the correct page.
     """
 
     def __init__(
@@ -39,6 +44,7 @@ class OrchestratorAgent(BaseAgent):
         config: dict[str, Any] | None = None,
         bus: AgentBus | None = None,
         state_path: str | Path | None = None,
+        page_ids: list[str] | None = None,
     ) -> None:
         super().__init__(config)
         self._bus = bus or AgentBus()
@@ -47,6 +53,8 @@ class OrchestratorAgent(BaseAgent):
         self._tick_count = 0
         self._started_at = time.time()
         self._last_state: PipelineState | None = None
+        self._page_ids = page_ids or ["main"]
+        self._page_index = 0
 
     @property
     def role(self) -> AgentRole:
@@ -75,60 +83,93 @@ class OrchestratorAgent(BaseAgent):
     def register_agent(self, agent: BaseAgent) -> None:
         """Register a specialized agent with the bus."""
         self._bus.register(agent)
+        agent.set_bus(self._bus)  # type: ignore  — _bus is always AgentBus at runtime
 
     def register_all(self, agents: list[BaseAgent]) -> None:
         """Register all agents at once."""
         for agent in agents:
             self._bus.register(agent)
+            agent.set_bus(self._bus)  # type: ignore
+
+    # ── Multi-page helpers ──────────────────────────────────────
+
+    @property
+    def current_page_id(self) -> str | None:
+        """Page selected for this tick (None for single-page mode)."""
+        if not self._page_ids:
+            return None
+        return self._page_ids[self._page_index]
+
+    def _cycle_page(self) -> str | None:
+        """Advance round-robin and return the next page_id."""
+        pid = self.current_page_id
+        self._page_index = (self._page_index + 1) % max(len(self._page_ids), 1)
+        return pid
 
     # ── Pipeline ────────────────────────────────────────────────
 
     def _tick(self) -> AgentResult:
-        """Main tick — the entry point called by the scheduler.
+        """Main tick — 2-phase choreography.
 
-        Flow:
-        1. Gather state from agents (calendar, community, performance)
-        2. Decide what to do
-        3. Execute decisions
-        4. Report
+        Phase 1: Gather state + broadcast heartbeat to shared_state
+        Phase 2: Self-driving agents propose actions, orchestrator dispatches
+                 (content generation pipeline still orchestrated as before)
+
+        Each tick operates on one page (round-robin).
         """
         self._tick_count += 1
         tick_id = f"tick-{uuid.uuid4().hex[:8]}"
         tick_start = time.time()
 
-        # Step 1: Gather state
+        page_id = self._cycle_page()
+
+        # ── Phase 1: Gather state + broadcast heartbeat ──────────
         pipeline_state = self._gather_state()
+        self._bus.update_shared_state(AgentRole.ORCHESTRATOR, {
+            "heartbeat": time.time(),
+            "tick_count": self._tick_count,
+            "state": pipeline_state.to_dict(),
+            "current_page_id": page_id,
+        })
 
-        # Step 2: Decide actions (community, analyst, etc.)
-        actions = self._decide_actions(pipeline_state)
-
-        # Step 2b: Auto-generate content if calendar is empty or periodic
+        # ── Phase 2a: Set pipeline trigger if content is needed ──
+        # Agents self-coordinate via shared_state (choreography chain)
         if self._should_generate_content(pipeline_state):
             self._log_content_gen()
-            gen_result = self._run_pipeline(mode="full")
-            if gen_result.success:
-                pipeline_state.published_today += 1
-            else:
-                pipeline_state.errors_24h += 1
+            self._bus.shared_state["pipeline_trigger"] = True  # type: ignore
+            self._bus.shared_state["pipeline_trigger_at"] = time.time()  # type: ignore
 
-        # Step 3: Execute
-        results = []
-        for priority, action in actions:
-            task = self._bus.create_task(
-                target=action["agent"],
-                action=action["action"],
-                params=action.get("params", {}),
-                priority=priority,
-            )
-            result = self._bus.dispatch(task)
-            results.append(result)
+        # ── Phase 2b: Self-driving agents propose actions ────────
+        results: list[AgentResult] = []
+        for agent in self._bus._agents.values():
+            if agent.role == AgentRole.ORCHESTRATOR:
+                continue
+            if not hasattr(agent, 'self_driving_tick'):
+                continue
+            try:
+                proposals = agent.self_driving_tick()
+                for action_name, params, priority in proposals:
+                    # Inject current page_id so downstream agents know which page
+                    if page_id is not None:
+                        params["page_id"] = page_id
+                    task = self._bus.create_task(
+                        target=agent.role,
+                        action=action_name,
+                        params=params,
+                        priority=priority,
+                    )
+                    result = self._bus.dispatch(task)
+                    results.append(result)
+            except Exception:
+                pass
 
         elapsed = time.time() - tick_start
 
-        # Step 4: Summarise
+        # ── Summarise ────────────────────────────────────────────
         summary_data = {
             "tick_id": tick_id,
             "tick_number": self._tick_count,
+            "page_id": page_id,
             "elapsed_ms": int(elapsed * 1000),
             "state": pipeline_state.to_dict(),
             "actions_taken": [
@@ -138,7 +179,6 @@ class OrchestratorAgent(BaseAgent):
             "state_path": str(self._state_path),
         }
 
-        # Persist state
         self._last_state = pipeline_state
         self._save_state(pipeline_state)
 
@@ -148,9 +188,11 @@ class OrchestratorAgent(BaseAgent):
             data=summary_data,
         )
 
-    def _run_pipeline(self, mode: str = "full") -> AgentResult:
+    def _run_pipeline(self, mode: str = "full", page_id: str | None = None) -> AgentResult:
         """Run a specific pipeline phase."""
         pipeline_state = self._gather_state()
+
+        page_id = page_id or self.current_page_id
 
         steps: list[str] = []
         if mode in ("full", "planning"):
@@ -174,7 +216,7 @@ class OrchestratorAgent(BaseAgent):
                     research_data = r.data.get("brief")
                 results.append(r)
             elif step == "strategy":
-                params = {"days": 1}
+                params: dict = {"days": 1}
                 if research_data:
                     params["research_brief"] = research_data
                 r = self._bus.dispatch(self._bus.create_task(
@@ -209,9 +251,11 @@ class OrchestratorAgent(BaseAgent):
             elif step == "publish":
                 # Compose message from writer's best variant
                 message, image_path = self._compose_message(writer_package)
+                pub_params: dict[str, Any] = {"message": message, "image_path": image_path}
+                if page_id is not None:
+                    pub_params["page_id"] = page_id
                 pub_result = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.PUBLISHER, "publish_due",
-                    {"message": message, "image_path": image_path},
+                    AgentRole.PUBLISHER, "publish_due", pub_params,
                 ))
                 results.append(pub_result)
 
@@ -219,9 +263,11 @@ class OrchestratorAgent(BaseAgent):
                 fb_post_id = pub_result.data.get("fb_post_id", "") if pub_result.success else ""
                 if fb_post_id:
                     topic = writer_package.best_variant().topic if writer_package and hasattr(writer_package, 'best_variant') else ""
+                    self_reply_params: dict[str, Any] = {"fb_post_id": fb_post_id, "topic": topic}
+                    if page_id is not None:
+                        self_reply_params["page_id"] = page_id
                     self_reply = self._bus.dispatch(self._bus.create_task(
-                        AgentRole.COMMUNITY, "self_reply_post",
-                        {"fb_post_id": fb_post_id, "topic": topic},
+                        AgentRole.COMMUNITY, "self_reply_post", self_reply_params,
                     ))
                     results.append(self_reply)
 
@@ -236,9 +282,11 @@ class OrchestratorAgent(BaseAgent):
                                 variant_id = v.variant_id
                         if hasattr(writer_package, "package_id"):
                             pkg_id = writer_package.package_id
+                    track_params: dict[str, Any] = {"fb_post_id": fb_post_id, "variant_id": variant_id, "package_id": pkg_id}
+                    if page_id is not None:
+                        track_params["page_id"] = page_id
                     track_result = self._bus.dispatch(self._bus.create_task(
-                        AgentRole.PUBLISHER, "track_performance",
-                        {"fb_post_id": fb_post_id, "variant_id": variant_id, "package_id": pkg_id},
+                        AgentRole.PUBLISHER, "track_performance", track_params,
                     ))
                     results.append(track_result)
 
@@ -298,6 +346,8 @@ class OrchestratorAgent(BaseAgent):
                 "dispatches": len(self._bus.history),
                 "state": state.to_dict(),
                 "v2_data_path": str(self._state_path.parent),
+                "page_ids": self._page_ids,
+                "page_index": self._page_index,
             },
         )
 
@@ -415,7 +465,6 @@ class OrchestratorAgent(BaseAgent):
         pillar = current_pillar or "education"
 
         if month in (1, 2):
-            # Tết — travel skincare, Tết eating, sleeping late
             topics = [
                 "Chăm sóc da ngày Tết: ăn bánh chưng không lo lên mụn",
                 "Da đổ dầu ngày Tết? Mẹo skincare cấp tốc cho GenZ",
@@ -424,7 +473,6 @@ class OrchestratorAgent(BaseAgent):
             ]
             pillar = "entertainment"
         elif month in (3, 4):
-            # Giao mùa — barrier, dị ứng, thời tiết thất thường
             topics = [
                 "Da 'nổi loạn' mùa giao mùa? 3 bước ổn định ngay",
                 "Giao mùa rồi, da dầu càng đổ dầu — cứu sao đây?",
@@ -433,7 +481,6 @@ class OrchestratorAgent(BaseAgent):
             ]
             pillar = "education"
         elif month in (5, 6):
-            # Hè — nắng nóng, đổ dầu, chống nắng
             topics = [
                 "Chống nắng mùa hè: đừng để da cháy nắng khi đi chơi",
                 "Da đổ dầu như 'đổ xăng' mùa hè? Cách kiểm soát",
@@ -442,7 +489,6 @@ class OrchestratorAgent(BaseAgent):
             ]
             pillar = "review"
         elif month in (7, 8):
-            # Mưa nồm — ẩm, maskne, nấm da
             topics = [
                 "Mùa mưa ẩm: da dầu càng 'khổ' — làm sao đây?",
                 "Maskne mùa mưa: bí kíp giữ da thông thoáng",
@@ -451,7 +497,6 @@ class OrchestratorAgent(BaseAgent):
             ]
             pillar = "trust"
         elif month in (9, 10):
-            # Tựu trường — dorm skincare, ngân sách sinh viên
             topics = [
                 "Tựu trường rồi: skincare tối giản trong dorm cho GenZ",
                 "Budget skincare cho sinh viên: rẻ mà vẫn hiệu quả",
@@ -460,7 +505,6 @@ class OrchestratorAgent(BaseAgent):
             ]
             pillar = "trust"
         else:  # 11-12
-            # Cuối năm — dưỡng da mùa lạnh, year-end review
             topics = [
                 "Cuối năm rồi: da dầu có cần dưỡng ẩm nhiều hơn không?",
                 "Review năm cũ: sản phẩm skincare nào đáng mua lại?",
@@ -480,6 +524,8 @@ class OrchestratorAgent(BaseAgent):
             data = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "tick": self._tick_count,
+                "page_ids": self._page_ids,
+                "page_index": self._page_index,
                 "state": state.to_dict(),
             }
             self._state_path.write_text(json.dumps(data, ensure_ascii=False, indent=2))

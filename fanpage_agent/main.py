@@ -110,6 +110,14 @@ def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--store-backend", choices=["local", "google"])
 
 
+def with_default_store_backend(args: argparse.Namespace, backend: str = "local") -> argparse.Namespace:
+    if getattr(args, "store_backend", None) is not None:
+        return args
+    store_options = vars(args).copy()
+    store_options["store_backend"] = backend
+    return argparse.Namespace(**store_options)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fanpage-agent")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -635,7 +643,7 @@ def _build_research_service(timeout: int = 15) -> ResearchService:
 
 def build_research_brief(args: argparse.Namespace):
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    store = build_store(settings=settings, args=args)
+    store = build_store(settings=settings, args=with_default_store_backend(args))
     return _build_research_service().build_brief(
         store=store,
         comment_csv=args.comment_file,
@@ -713,7 +721,7 @@ def build_daily_artifacts(settings: Settings, packet: dict, run_date: str) -> di
 
 def build_triage_store_payload(args: argparse.Namespace) -> dict:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    items = build_store(settings=settings, args=args).list_triage_items(
+    items = build_store(settings=settings, args=with_default_store_backend(args)).list_triage_items(
         status=getattr(args, "status", None),
         priority=getattr(args, "priority", None),
         assigned_to=getattr(args, "assigned_to", None),
@@ -1029,8 +1037,9 @@ def cmd_triage_community(args: argparse.Namespace) -> int:
     batch = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=args.comment_file)
     payload = batch.model_dump(mode="json")
     if args.write_store:
+        store_args = with_default_store_backend(args)
         payload["store"] = {
-            "persisted": build_store(settings=settings, args=args).upsert_triage_items(profile.brand_id, batch.items)
+            "persisted": build_store(settings=settings, args=store_args).upsert_triage_items(profile.brand_id, batch.items)
         }
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)
@@ -1059,6 +1068,7 @@ def cmd_deliver_triage_community(args: argparse.Namespace) -> int:
 
 def cmd_deliver_approved_triage_replies(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
+    args = with_default_store_backend(args)
     payload = build_triage_store_payload(args)
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "approved-triage-replies.json", payload)
@@ -1138,7 +1148,7 @@ def cmd_deliver_operator_digest(args: argparse.Namespace) -> int:
 
 def cmd_resolve_triage_item(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    row = build_store(settings=settings, args=args).resolve_triage_item(
+    row = build_store(settings=settings, args=with_default_store_backend(args)).resolve_triage_item(
         triage_id=args.triage_id,
         resolved_at=args.resolved_at,
         assigned_to=args.assigned_to,
@@ -1149,7 +1159,7 @@ def cmd_resolve_triage_item(args: argparse.Namespace) -> int:
 
 def cmd_reopen_triage_item(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    row = build_store(settings=settings, args=args).reopen_triage_item(
+    row = build_store(settings=settings, args=with_default_store_backend(args)).reopen_triage_item(
         triage_id=args.triage_id,
         reopened_at=args.reopened_at,
         assigned_to=args.assigned_to,
@@ -1160,7 +1170,7 @@ def cmd_reopen_triage_item(args: argparse.Namespace) -> int:
 
 def cmd_approve_triage_reply(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    row = build_store(settings=settings, args=args).approve_triage_reply(
+    row = build_store(settings=settings, args=with_default_store_backend(args)).approve_triage_reply(
         triage_id=args.triage_id,
         approved_by=args.approved_by,
         approved_at=args.approved_at,
@@ -1172,7 +1182,7 @@ def cmd_approve_triage_reply(args: argparse.Namespace) -> int:
 
 def cmd_reject_triage_reply(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    row = build_store(settings=settings, args=args).reject_triage_reply(
+    row = build_store(settings=settings, args=with_default_store_backend(args)).reject_triage_reply(
         triage_id=args.triage_id,
         reason=args.reason,
         rejected_at=args.rejected_at,
@@ -1184,7 +1194,7 @@ def cmd_reject_triage_reply(args: argparse.Namespace) -> int:
 
 def cmd_mark_triage_reply_sent(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    row = build_store(settings=settings, args=args).mark_triage_reply_sent(
+    row = build_store(settings=settings, args=with_default_store_backend(args)).mark_triage_reply_sent(
         triage_id=args.triage_id,
         sent_at=args.sent_at,
         reply_permalink=args.reply_permalink,

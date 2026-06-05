@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fanpage_agent_v2.core.agent import BaseAgent
-from fanpage_agent_v2.core.types import AgentRole, AgentResult, AgentTask
+from fanpage_agent_v2.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
 
 
 # ── Discovery sources ─────────────────────────────────────
@@ -207,9 +207,19 @@ class ResearchAgent(BaseAgent):
         params = task.params
 
         if action == "research_trends":
-            return self._research_trends(
+            result = self._research_trends(
                 pillars=params.get("pillars", list(self._get_all_pillars())),
             )
+            if result.success:
+                self._mark_shared_done(
+                    brief=result.data.get("brief", {}),
+                    source_count=result.data.get("source_count", 0),
+                    finding_count=result.data.get("finding_count", 0),
+                )
+                # Clear pipeline trigger so next tick doesn't re-trigger
+                if self._bus:
+                    self._bus.shared_state["pipeline_trigger"] = False
+            return result
         elif action == "crawl_source":
             return self._crawl_source(params.get("url", ""))
         elif action == "get_source_list":
@@ -217,6 +227,13 @@ class ResearchAgent(BaseAgent):
         return AgentResult(
             task_id=task.id, success=False, error=f"Unknown action: {action}"
         )
+
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose research every 2 hours, or when pipeline trigger is active."""
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+        if self._should_pipeline_act("research_trends", 7200):
+            proposals.append(("research_trends", {"pillars": []}, ActionPriority.MEDIUM))
+        return proposals
 
     # ── Public API ────────────────────────────────────────────────
 

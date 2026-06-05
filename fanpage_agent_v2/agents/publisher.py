@@ -34,6 +34,7 @@ class PublisherAgent(BaseAgent):
         config: dict[str, Any] | None = None,
         fb: FacebookAdapter | None = None,
         performance_memory=None,
+        default_page_id: str | None = None,
     ) -> None:
         super().__init__(config)
         self._fb: FacebookAdapter | None = None
@@ -43,6 +44,11 @@ class PublisherAgent(BaseAgent):
         except Exception as e:
             self._fb_error = str(e)
         self._memory = performance_memory
+        self._default_page_id = default_page_id
+
+    def _resolve_page_id(self, params: dict) -> str | None:
+        """Return page_id from params, falling back to instance default."""
+        return params.get("page_id") or self._default_page_id
 
     @property
     def role(self) -> AgentRole:
@@ -75,36 +81,84 @@ class PublisherAgent(BaseAgent):
                 )
 
         if action == "publish_post":
-            return self._publish_post(
+            page_id = self._resolve_page_id(params)
+            result = self._publish_post(
                 message=params.get("message", ""),
                 image_path=params.get("image_path"),
+                page_id=page_id,
             )
+            if result.success:
+                self._mark_shared_done(
+                    processed_designer_version=self._pipeline_version("designer"),
+                    fb_post_id=result.data.get("fb_post_id", ""),
+                    permalink=result.data.get("permalink", ""),
+                    published_at=result.data.get("published_at", ""),
+                )
+            return result
         elif action == "publish_package":
-            return self._publish_package(params.get("package"))
+            page_id = self._resolve_page_id(params)
+            result = self._publish_package(params.get("package"), page_id=page_id)
+            if result.success:
+                self._mark_shared_done(
+                    processed_designer_version=self._pipeline_version("designer"),
+                    fb_post_id=result.data.get("fb_post_id", ""),
+                    permalink=result.data.get("permalink", ""),
+                )
+            return result
         elif action == "publish_due":
-            return self._publish_post(
+            page_id = self._resolve_page_id(params)
+            result = self._publish_post(
                 message=params.get("message", "Bài viết mới từ Fanpage Agent 🎉"),
                 image_path=params.get("image_path"),
+                page_id=page_id,
             )
+            if result.success:
+                self._mark_shared_done(
+                    processed_designer_version=self._pipeline_version("designer"),
+                    fb_post_id=result.data.get("fb_post_id", ""),
+                    permalink=result.data.get("permalink", ""),
+                    published_at=result.data.get("published_at", ""),
+                )
+            return result
         elif action == "track_performance":
+            page_id = self._resolve_page_id(params)
             return self._track_performance(
                 fb_post_id=params.get("fb_post_id", ""),
                 variant_id=params.get("variant_id", ""),
                 package_id=params.get("package_id"),
+                page_id=page_id,
             )
         elif action == "delete_post":
-            return self._delete_post(params.get("fb_post_id", ""))
+            page_id = self._resolve_page_id(params)
+            return self._delete_post(params.get("fb_post_id", ""), page_id=page_id)
         elif action == "fetch_metrics":
-            return self._fetch_metrics(limit=params.get("limit", 10))
+            page_id = self._resolve_page_id(params)
+            return self._fetch_metrics(limit=params.get("limit", 10), page_id=page_id)
         elif action == "refresh_metrics":
-            return self._refresh_metrics(limit=params.get("limit", 10))
+            page_id = self._resolve_page_id(params)
+            return self._refresh_metrics(limit=params.get("limit", 10), page_id=page_id)
         return AgentResult(
             task_id=task.id, success=False, error=f"Unknown action: {action}"
         )
 
+    def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
+        """Propose: publish designer's content, or periodic metrics refresh."""
+        proposals: list[tuple[str, dict, ActionPriority]] = []
+
+        # Check for new designer content (choreography chain)
+        if self._has_upstream_data("designer", "processed_designer_version"):
+            proposals.append(("publish_due", {
+                "message": "Bài viết mới từ Fanpage Agent 🎉",
+            }, ActionPriority.HIGH))
+        elif self._should_act("refresh_metrics", 10800):
+            proposals.append(("refresh_metrics", {"limit": 10}, ActionPriority.LOW))
+
+        return proposals
+
     def _publish_post(
         self, message: str, image_path: str | None = None,
         record_memory: bool = True,
+        page_id: str | None = None,
     ) -> AgentResult:
         """Publish a single post — text or photo.
 
@@ -112,14 +166,15 @@ class PublisherAgent(BaseAgent):
             message: Post caption text.
             image_path: Optional local image file path.
             record_memory: If True, record post metadata in PerformanceMemory.
+            page_id: Target Facebook page ID (default: adapter default).
         """
         try:
             if image_path:
                 result = self._fb.publish_photo(
-                    image_path=image_path, message=message
+                    image_path=image_path, message=message, page_id=page_id
                 )
             else:
-                result = self._fb.publish_post(message=message)
+                result = self._fb.publish_post(message=message, page_id=page_id)
 
             fb_id = result.get("fb_post_id", "")
             permalink = result.get("permalink", "")
@@ -132,6 +187,7 @@ class PublisherAgent(BaseAgent):
                     fb_id=fb_id,
                     permalink=permalink,
                     image_path=image_path,
+                    page_id=page_id,
                 )
 
             return AgentResult(
@@ -142,6 +198,7 @@ class PublisherAgent(BaseAgent):
                     "permalink": permalink,
                     "published_at": datetime.now(timezone.utc).isoformat(),
                     "image": bool(image_path),
+                    "page_id": page_id or "default",
                 },
                 error=None if success else f"Empty FB response: {result}",
             )
@@ -158,10 +215,12 @@ class PublisherAgent(BaseAgent):
         fb_id: str,
         permalink: str,
         image_path: str | None = None,
+        page_id: str | None = None,
     ) -> None:
         """Record a simple (non-package) post in PerformanceMemory."""
         from fanpage_agent_v2.core.types import ContentPackage, ContentVariant
 
+        effective_brand_id = page_id or ""
         variant = ContentVariant(
             variant_id=fb_id,
             topic=message[:60] if message else "",
@@ -174,7 +233,7 @@ class PublisherAgent(BaseAgent):
         )
         package = ContentPackage(
             package_id=f"auto-{fb_id}",
-            brand_id=self._fb._page_id,
+            brand_id=effective_brand_id,
             scheduled_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             scheduled_time=datetime.now(timezone.utc).strftime("%H:%M"),
             variants=[variant],
@@ -187,7 +246,8 @@ class PublisherAgent(BaseAgent):
             permalink=permalink,
         )
 
-    def _publish_package(self, package: ContentPackage | dict | None) -> AgentResult:
+    def _publish_package(self, package: ContentPackage | dict | None,
+                         page_id: str | None = None) -> AgentResult:
         """Publish the best variant from a content package."""
         if package is None:
             return AgentResult(
@@ -223,6 +283,7 @@ class PublisherAgent(BaseAgent):
             message=message,
             image_path=variant.image_path,
             record_memory=False,  # package handles its own recording below
+            page_id=page_id,
         )
 
         if not fb_result.success:
@@ -257,7 +318,8 @@ class PublisherAgent(BaseAgent):
         )
 
     def _track_performance(
-        self, fb_post_id: str, variant_id: str, package_id: str | None = None
+        self, fb_post_id: str, variant_id: str, package_id: str | None = None,
+        page_id: str | None = None,
     ) -> AgentResult:
         """Fetch and record post performance metrics from Facebook."""
         if not fb_post_id:
@@ -266,7 +328,7 @@ class PublisherAgent(BaseAgent):
             )
 
         try:
-            insights = self._fb.get_post_insights(fb_post_id)
+            insights = self._fb.get_post_insights(fb_post_id, page_id=page_id)
             reach = insights.get("reach", 0)
             likes = insights.get("likes", 0)
             comments = insights.get("comments", 0)
@@ -305,10 +367,10 @@ class PublisherAgent(BaseAgent):
                 error=f"Failed to track {fb_post_id}: {e}",
             )
 
-    def _delete_post(self, fb_post_id: str) -> AgentResult:
+    def _delete_post(self, fb_post_id: str, page_id: str | None = None) -> AgentResult:
         """Delete a published post."""
         try:
-            self._fb.delete_post(fb_post_id)
+            self._fb.delete_post(fb_post_id, page_id=page_id)
             return AgentResult(
                 task_id=f"del-{fb_post_id[:12]}",
                 success=True,
@@ -321,7 +383,7 @@ class PublisherAgent(BaseAgent):
                 error=f"Delete failed: {e}",
             )
 
-    def _refresh_metrics(self, limit: int = 10) -> AgentResult:
+    def _refresh_metrics(self, limit: int = 10, page_id: str | None = None) -> AgentResult:
         """Fetch recent page posts and update metrics in performance memory.
 
         For each tracked post in memory, fetches real likes/comments/shares
@@ -334,7 +396,7 @@ class PublisherAgent(BaseAgent):
                 error="No performance memory available",
             )
         try:
-            posts = self._fb.get_recent_posts(limit=limit)
+            posts = self._fb.get_recent_posts(limit=limit, page_id=page_id)
             updated = 0
             errors = 0
             for post in posts:
@@ -368,10 +430,10 @@ class PublisherAgent(BaseAgent):
                 success=False,
                 error=f"Refresh metrics failed: {e}",
             )
-    def _fetch_metrics(self, limit: int = 10) -> AgentResult:
+    def _fetch_metrics(self, limit: int = 10, page_id: str | None = None) -> AgentResult:
         """Fetch recent page posts with engagement data."""
         try:
-            posts = self._fb.get_recent_posts(limit=limit)
+            posts = self._fb.get_recent_posts(limit=limit, page_id=page_id)
             return AgentResult(
                 task_id="metrics",
                 success=True,
