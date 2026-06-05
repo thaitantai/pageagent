@@ -15,10 +15,18 @@ from fanpage_agent.core.types import (
 class TestPageConfig:
     def test_create_page_config(self):
         from config import PageConfig
-        cfg = PageConfig(page_id="test", page_token="tok123", name="Test Page")
+        cfg = PageConfig(
+            page_id="test",
+            page_token="tok123",
+            name="Test Page",
+            topic_focus="Skincare khoa hoc",
+            community_value="Tra loi cau hoi cham soc da de hieu",
+        )
         assert cfg.page_id == "test"
         assert cfg.page_token == "tok123"
         assert cfg.name == "Test Page"
+        assert cfg.topic_focus == "Skincare khoa hoc"
+        assert cfg.community_value.startswith("Tra loi")
         assert cfg.api_version == "v21.0"
         assert cfg.is_default is False
 
@@ -37,8 +45,16 @@ class TestPageRegistry:
         from fanpage_agent.adapters.page_registry import PageRegistry
         from config import Settings, PageConfig
         s = Settings(pages=[
-            {"page_id": "main", "page_token": "tok_main"},
-            {"page_id": "page2", "page_token": "tok_page2"},
+            {
+                "page_id": "main",
+                "page_token": "tok_main",
+                "topic_focus": "routine da dau",
+                "audience": "GenZ moi tap skincare",
+                "community_value": "Giai thich skincare bang ngon ngu de hieu",
+                "banned_topics": ["cam ket het mun"],
+                "research_sources": ["comments", "metrics"],
+            },
+            {"page_id": "page2", "page_token": "tok_page2", "tone": "am ap"},
         ])
         return PageRegistry(s)
 
@@ -48,12 +64,31 @@ class TestPageRegistry:
         ids = [p["page_id"] for p in pages]
         assert "main" in ids
         assert "page2" in ids
+        main = next(p for p in pages if p["page_id"] == "main")
+        assert main["topic_focus"] == "routine da dau"
+        assert main["community_value"] == "Giai thich skincare bang ngon ngu de hieu"
+        assert "page_token" not in main
 
     def test_get_page(self, registry):
         cfg = registry.get("main")
         assert cfg is not None
         assert hasattr(cfg, "page_id")
         assert cfg.page_token == "tok_main"
+        assert cfg.audience == "GenZ moi tap skincare"
+        assert cfg.banned_topics == ["cam ket het mun"]
+
+    def test_page_context_is_safe_for_agents(self, registry):
+        context = registry.page_context("main")
+        assert context["page_id"] == "main"
+        assert context["research_sources"] == ["comments", "metrics"]
+        assert "page_token" not in context
+
+    def test_settings_parses_fb_pages_json(self, monkeypatch):
+        from config import Settings
+        raw = '[{"page_id":"env_page","page_token":"tok_env","topic_focus":"cong dong tri mun"}]'
+        s = Settings.from_env({"PAGES": raw, "FANPAGE_AGENT_DISABLE_DOTENV": "1"})
+        assert s.pages[0]["page_id"] == "env_page"
+        assert s.get_page_config("env_page").topic_focus == "cong dong tri mun"
 
     def test_get_page_default(self, registry):
         cfg = registry.get(None)

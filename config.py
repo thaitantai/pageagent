@@ -25,6 +25,12 @@ class PageConfig:
     page_token: str
     name: str = ""
     brand_id: str = ""
+    topic_focus: str = ""
+    audience: str = ""
+    community_value: str = ""
+    tone: str = ""
+    banned_topics: list[str] = field(default_factory=list)
+    research_sources: list[str] = field(default_factory=list)
     api_version: str = "v21.0"
     is_default: bool = False
 
@@ -129,13 +135,7 @@ class Settings(BaseModel):
             if raw is None:
                 continue
             field_info = cls.model_fields[field_name]
-            if field_info.annotation is list or "list" in str(field_info.annotation):
-                kwargs[field_name] = _parse_csv_list(raw)
-            elif field_info.annotation is Path:
-                kwargs[field_name] = Path(raw)
-            elif field_info.annotation is bool or field_info.annotation == bool:
-                kwargs[field_name] = raw.lower() in ("true", "1", "yes")
-            elif field_name == "pages":
+            if field_name == "pages":
                 # JSON env var: FB_PAGES='[{"page_id":"...","page_token":"...","name":"..."}]'
                 import json as _json
                 try:
@@ -144,6 +144,12 @@ class Settings(BaseModel):
                         kwargs["pages"] = parsed
                 except (_json.JSONDecodeError, TypeError):
                     pass
+            elif field_info.annotation is list or "list" in str(field_info.annotation):
+                kwargs[field_name] = _parse_csv_list(raw)
+            elif field_info.annotation is Path:
+                kwargs[field_name] = Path(raw)
+            elif field_info.annotation is bool or field_info.annotation == bool:
+                kwargs[field_name] = raw.lower() in ("true", "1", "yes")
             else:
                 kwargs[field_name] = raw
 
@@ -176,6 +182,12 @@ class Settings(BaseModel):
                     page_token=pdata["page_token"],
                     name=pdata.get("name", ""),
                     brand_id=pdata.get("brand_id", pdata.get("page_id", "")),
+                    topic_focus=pdata.get("topic_focus", ""),
+                    audience=pdata.get("audience", ""),
+                    community_value=pdata.get("community_value", ""),
+                    tone=pdata.get("tone", ""),
+                    banned_topics=list(pdata.get("banned_topics", [])),
+                    research_sources=list(pdata.get("research_sources", [])),
                     api_version=pdata.get("api_version", self.fb_api_version),
                 )
         # Fallback to default

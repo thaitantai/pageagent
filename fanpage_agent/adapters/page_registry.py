@@ -21,6 +21,51 @@ from config import PageConfig, Settings
 
 logger = logging.getLogger(__name__)
 
+_SECRET_KEYS = {"access_token", "token", "secret", "api_key"}
+
+
+def _as_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return [str(value).strip()] if str(value).strip() else []
+
+
+def _page_config_from_dict(pdata: dict[str, Any], settings: Settings) -> PageConfig:
+    return PageConfig(
+        page_id=pdata["page_id"],
+        page_token=pdata.get("page_token", ""),
+        name=pdata.get("name", ""),
+        brand_id=pdata.get("brand_id", pdata["page_id"]),
+        topic_focus=pdata.get("topic_focus", ""),
+        audience=pdata.get("audience", ""),
+        community_value=pdata.get("community_value", ""),
+        tone=pdata.get("tone", ""),
+        banned_topics=_as_list(pdata.get("banned_topics")),
+        research_sources=_as_list(pdata.get("research_sources")),
+        api_version=pdata.get("api_version", settings.fb_api_version),
+        is_default=bool(pdata.get("is_default", False)),
+    )
+
+
+def _safe_page_dict(cfg: PageConfig) -> dict[str, Any]:
+    data = {
+        "page_id": cfg.page_id,
+        "name": cfg.name or "(unnamed)",
+        "is_default": cfg.is_default,
+        "brand_id": cfg.brand_id,
+        "topic_focus": cfg.topic_focus,
+        "audience": cfg.audience,
+        "community_value": cfg.community_value,
+        "tone": cfg.tone,
+        "banned_topics": list(cfg.banned_topics),
+        "research_sources": list(cfg.research_sources),
+    }
+    return {key: ("[REDACTED]" if key in _SECRET_KEYS else value) for key, value in data.items()}
+
 
 class PageRegistry:
     """Registry of Facebook page configurations.
@@ -67,16 +112,12 @@ class PageRegistry:
         return len(self._pages)
 
     def list_pages(self) -> list[dict[str, Any]]:
-        """Return a summary of all registered pages."""
-        return [
-            {
-                "page_id": cfg.page_id,
-                "name": cfg.name or "(unnamed)",
-                "is_default": cfg.is_default,
-                "brand_id": cfg.brand_id,
-            }
-            for cfg in self._pages.values()
-        ]
+        """Return a non-secret summary of all registered pages."""
+        return [_safe_page_dict(cfg) for cfg in self._pages.values()]
+
+    def page_context(self, page_id: str | None = None) -> dict[str, Any]:
+        """Return non-secret page context for research, strategy, and writing."""
+        return _safe_page_dict(self.get(page_id))
 
     # ── internal ─────────────────────────────────────────────────
 
@@ -88,13 +129,7 @@ class PageRegistry:
         # 1. Load from FB_PAGES list
         for pdata in getattr(self._settings, "pages", []):
             if isinstance(pdata, dict) and pdata.get("page_id") and pdata.get("page_token"):
-                cfg = PageConfig(
-                    page_id=pdata["page_id"],
-                    page_token=pdata["page_token"],
-                    name=pdata.get("name", ""),
-                    brand_id=pdata.get("brand_id", pdata["page_id"]),
-                    api_version=pdata.get("api_version", self._settings.fb_api_version),
-                )
+                cfg = _page_config_from_dict(pdata, self._settings)
                 self._pages[pdata["page_id"]] = cfg
 
         # 2. Always register the legacy single-page config
