@@ -9,6 +9,7 @@ from uuid import uuid4
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.models import ResearchPacket
 from fanpage_agent.services.research import ResearchService
+from fanpage_agent.services.research_sources import SourceRegistry
 
 
 DEFAULT_RESEARCH_OUTPUT_DIR = Path("data/research_packets")
@@ -24,17 +25,28 @@ def build_research_packet(
     fetch_external_trends: bool = True,
     page_id: str | None = None,
     page_context: dict[str, object] | None = None,
+    source_registry_file: str | Path | None = None,
 ) -> ResearchPacket:
     store = LocalSheetStore(
         calendar_csv=calendar_file,
         history_csv=history_file,
         metrics_csv=metrics_file,
     )
+    effective_page_context = page_context or {}
+    topic_focus = effective_page_context.get("topic_focus", [])
+    if not isinstance(topic_focus, list):
+        topic_focus = []
+    registry = SourceRegistry.from_file(source_registry_file)
+    registry_documents = registry.to_documents(
+        page_id=page_id or str(effective_page_context.get("page_id", "")),
+        topics=[str(item) for item in topic_focus],
+    )
     brief = ResearchService().build_brief(
         store=store,
         comment_csv=comment_file,
         campaign_notes_file=campaign_file,
         fetch_external_trends=fetch_external_trends,
+        source_documents=registry_documents,
     )
     packet_job_id = job_id or f"research-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     return ResearchPacket(
@@ -49,6 +61,7 @@ def build_research_packet(
             "comment_file": str(comment_file or ""),
             "campaign_file": str(campaign_file or ""),
             "calendar_file": str(calendar_file),
+            "source_registry_file": str(source_registry_file or ""),
         },
         brief=brief,
     )

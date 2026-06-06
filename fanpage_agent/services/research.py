@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, ResearchTopicScore, TrendItem
+from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, ResearchTopicScore, SourceDocument, TrendItem
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.web_search import WebSearchClient
@@ -48,6 +48,7 @@ class ResearchService:
         campaign_notes_file: str | Path | None = None,
         fetch_external_trends: bool = True,
         web_search_queries: list[str] | None = None,
+        source_documents: list[SourceDocument] | None = None,
     ) -> ResearchBrief:
         """Build research brief with optional web search + scrape.
 
@@ -118,6 +119,7 @@ class ResearchService:
         external_trends: list[TrendItem] = []
         trend_keywords: list[str] = []
         trend_clusters: dict[str, list[str]] = {}
+        source_documents = source_documents or []
 
         if fetch_external_trends and self._trend_scraper:
             try:
@@ -160,6 +162,7 @@ class ResearchService:
             top_performing_topics=top_performing_topics,
             frequent_questions=frequent_questions,
             campaign_focus=campaign_focus,
+            source_documents=source_documents,
         )
         confidence_score = self._confidence_score(evidence)
         quality_warnings = self._quality_warnings(evidence, external_trends)
@@ -191,6 +194,7 @@ class ResearchService:
             confidence_score=confidence_score,
             quality_warnings=quality_warnings,
             topic_scores=topic_scores,
+            source_documents=source_documents,
         )
 
     def _build_search_queries(
@@ -245,8 +249,20 @@ class ResearchService:
         top_performing_topics: list[str],
         frequent_questions: list[str],
         campaign_focus: list[str],
+        source_documents: list[SourceDocument] | None = None,
     ) -> list[ResearchEvidence]:
         evidence: list[ResearchEvidence] = []
+        for document in (source_documents or [])[:10]:
+            confidence = min(1.0, max(0.0, document.trust_score * 0.7 + document.freshness_score * 0.3))
+            evidence.append(ResearchEvidence(
+                claim=document.title or document.content[:120] or document.source_name,
+                source=document.source_name,
+                url=document.url,
+                evidence_type="registered_source",
+                confidence=round(confidence, 3),
+                source_id=document.source_id,
+                source_type=document.source_type,
+            ))
         for item in external_trends[:10]:
             confidence = 0.75 if item.url else 0.55
             evidence.append(ResearchEvidence(

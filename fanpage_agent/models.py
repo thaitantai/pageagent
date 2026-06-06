@@ -148,12 +148,42 @@ class TrendItem(BaseModel):
     relevance: str = ""
 
 
+class ResearchSource(BaseModel):
+    source_id: str
+    name: str
+    source_type: str = "website"
+    url: str = ""
+    topics: List[str] = Field(default_factory=list)
+    trust_score: float = 0.5
+    refresh_days: int = 7
+    allowed_pages: List[str] = Field(default_factory=list)
+    requires_auth: bool = False
+    enabled: bool = True
+    notes: str = ""
+
+
+class SourceDocument(BaseModel):
+    source_id: str
+    source_name: str
+    source_type: str = "website"
+    url: str = ""
+    title: str = ""
+    content: str = ""
+    published_at: str = ""
+    fetched_at: str = ""
+    trust_score: float = 0.5
+    freshness_score: float = 0.0
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
 class ResearchEvidence(BaseModel):
     claim: str
     source: str
     url: str = ""
     evidence_type: str = "source"
     confidence: float = 0.0
+    source_id: str = ""
+    source_type: str = ""
 
 
 class ResearchTopicScore(BaseModel):
@@ -184,6 +214,7 @@ class ResearchBrief(BaseModel):
     confidence_score: float = 0.0
     quality_warnings: List[str] = Field(default_factory=list)
     topic_scores: List[ResearchTopicScore] = Field(default_factory=list)
+    source_documents: List[SourceDocument] = Field(default_factory=list)
 
 
 class ResearchPacket(BaseModel):

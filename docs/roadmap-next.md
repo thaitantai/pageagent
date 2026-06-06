@@ -112,3 +112,4 @@ Viec can lam:
 
 - 2026-06-06: Da them ResearchPacket doc lap, `research-standalone`, `page-status` va test CLI.
 - 2026-06-06: Da noi `run-daily`/`deliver-daily-packet` sang ResearchPacket, van giu `research_brief` trong payload de khong pha workflow cu, dong thoi luu artifact `research_packet` khi `--save`.
+- 2026-06-06: Da them Source Registry va SourceDocument nen ResearchPacket co the ghi nhan nguon dang tin theo page/topic qua `--source-registry-file`.

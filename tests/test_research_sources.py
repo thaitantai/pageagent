@@ -1,0 +1,115 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from fanpage_agent.services.research_packet import build_research_packet
+from fanpage_agent.services.research_sources import SourceRegistry
+
+
+class ResearchSourcesTest(unittest.TestCase):
+    def test_source_registry_filters_by_page_and_topic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            registry_file = Path(tmp) / "sources.json"
+            registry_file.write_text(
+                json.dumps(
+                    {
+                        "sources": [
+                            {
+                                "source_id": "derm-01",
+                                "name": "Derm Clinic Blog",
+                                "source_type": "website",
+                                "url": "https://example.com/derm",
+                                "topics": ["soi da", "phuc hoi da"],
+                                "allowed_pages": ["spa-main"],
+                                "trust_score": 0.9,
+                                "notes": "Clinical skincare education.",
+                            },
+                            {
+                                "source_id": "ads-01",
+                                "name": "Low Trust Ads Blog",
+                                "topics": ["ads"],
+                                "trust_score": 0.2,
+                            },
+                            {
+                                "source_id": "disabled-01",
+                                "name": "Disabled Source",
+                                "topics": ["soi da"],
+                                "enabled": False,
+                            },
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            documents = SourceRegistry.from_file(registry_file).to_documents(
+                page_id="spa-main",
+                topics=["soi da"],
+            )
+
+        self.assertEqual([item.source_id for item in documents], ["derm-01"])
+        self.assertEqual(documents[0].source_name, "Derm Clinic Blog")
+        self.assertEqual(documents[0].trust_score, 0.9)
+
+    def test_research_packet_includes_registry_documents_as_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            history = tmpdir / "post_history.csv"
+            metrics = tmpdir / "post_metrics.csv"
+            comments = tmpdir / "comment_inbox.csv"
+            campaign = tmpdir / "campaign_notes.json"
+            calendar = tmpdir / "calendar.csv"
+            registry_file = tmpdir / "sources.json"
+
+            history.write_text(
+                "published_at,topic,hook,pillar,objective,permalink,reach,engagement_rate\n"
+                "2026-06-01,Khi nào cần soi da?,Hook,education,lead,https://example.com/1,1200,0.05\n",
+                encoding="utf-8",
+            )
+            metrics.write_text(
+                "published_at,topic,pillar,objective,reach,engagements,leads\n"
+                "2026-06-01,Khi nào cần soi da?,education,lead,1200,80,7\n",
+                encoding="utf-8",
+            )
+            comments.write_text("created_at,source,message\n", encoding="utf-8")
+            campaign.write_text(json.dumps({"campaign_focus": ["soi da"]}), encoding="utf-8")
+            calendar.write_text("date,topic,pillar,objective,status\n", encoding="utf-8")
+            registry_file.write_text(
+                json.dumps(
+                    [
+                        {
+                            "source_id": "derm-01",
+                            "name": "Derm Clinic Blog",
+                            "source_type": "website",
+                            "url": "https://example.com/derm",
+                            "topics": ["soi da"],
+                            "allowed_pages": ["spa-main"],
+                            "trust_score": 0.95,
+                            "notes": "Evidence about skin analysis.",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            packet = build_research_packet(
+                history_file=history,
+                metrics_file=metrics,
+                comment_file=comments,
+                campaign_file=campaign,
+                calendar_file=calendar,
+                job_id="test-research",
+                page_id="spa-main",
+                page_context={"page_id": "spa-main", "topic_focus": ["soi da"]},
+                source_registry_file=registry_file,
+                fetch_external_trends=False,
+            )
+
+        self.assertEqual(packet.brief.source_documents[0].source_id, "derm-01")
+        self.assertTrue(any(item.source_id == "derm-01" for item in packet.brief.evidence))
+        self.assertGreater(packet.brief.confidence_score, 0.7)
+
+
+if __name__ == "__main__":
+    unittest.main()
