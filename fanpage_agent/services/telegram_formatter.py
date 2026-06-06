@@ -360,6 +360,8 @@ class TelegramFormatterService:
         return "\n".join(lines).strip()
 
     def format_research_brief(self, payload: dict) -> str:
+        if isinstance(payload.get("brief"), dict):
+            payload = payload["brief"]
         evidence = payload.get("evidence") or []
         source_documents = payload.get("source_documents") or []
         quality_warnings = payload.get("quality_warnings") or []

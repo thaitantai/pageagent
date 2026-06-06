@@ -378,6 +378,22 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         self.assertIn("Khach hang can soi da", rendered)
         self.assertIn("quality warnings:", rendered)
 
+    def test_format_research_brief_accepts_research_packet_artifact(self) -> None:
+        payload = {
+            "packet_id": "rpkt-1",
+            "brief": {
+                "confidence_score": 0.76,
+                "source_documents": [{"source_id": "faq", "name": "FAQ", "trust_score": 0.9}],
+                "evidence": [{"evidence_type": "source_claim", "claim": "Khach hoi ve soi da.", "source": "FAQ"}],
+            },
+        }
+
+        rendered = TelegramFormatterService().format_research_brief(payload)
+
+        self.assertIn("confidence: 0.76", rendered)
+        self.assertIn("sources: 1 | evidence: 1 | warnings: 0", rendered)
+        self.assertIn("Khach hoi ve soi da", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
