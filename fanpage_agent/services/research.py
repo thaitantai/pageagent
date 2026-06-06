@@ -11,6 +11,7 @@ from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvide
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.web_search import WebSearchClient
+from fanpage_agent.services.research_insights import EvidenceExtractor, ResearchQualityGate
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,13 @@ class ResearchService:
         self,
         trend_scraper: TrendScraper | None = None,
         trend_analyzer: TrendAnalyzer | None = None,
+        evidence_extractor: EvidenceExtractor | None = None,
+        quality_gate: ResearchQualityGate | None = None,
     ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
+        self._evidence_extractor = evidence_extractor or EvidenceExtractor()
+        self._quality_gate = quality_gate or ResearchQualityGate()
 
     def build_brief(
         self,
@@ -157,15 +162,20 @@ class ResearchService:
             except Exception as exc:
                 logger.warning("TrendScraper/web search thất bại: %s", exc)
 
-        evidence = self._build_evidence(
+        evidence = self._evidence_extractor.extract(
             external_trends=external_trends,
             top_performing_topics=top_performing_topics,
             frequent_questions=frequent_questions,
             campaign_focus=campaign_focus,
             source_documents=source_documents,
         )
-        confidence_score = self._confidence_score(evidence)
-        quality_warnings = self._quality_warnings(evidence, external_trends)
+        quality_report = self._quality_gate.evaluate(
+            evidence=evidence,
+            source_documents=source_documents,
+            external_trends=external_trends,
+        )
+        confidence_score = quality_report.confidence_score
+        quality_warnings = quality_report.warnings
         topic_scores = self._score_topics(
             candidates=self._dedupe(next_angles + top_performing_topics),
             campaign_focus=campaign_focus,

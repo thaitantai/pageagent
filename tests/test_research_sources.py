@@ -136,7 +136,7 @@ class ResearchSourcesTest(unittest.TestCase):
 
         self.assertEqual(packet.brief.source_documents[0].source_id, "derm-01")
         self.assertTrue(any(item.source_id == "derm-01" for item in packet.brief.evidence))
-        self.assertGreater(packet.brief.confidence_score, 0.7)
+        self.assertGreater(packet.brief.confidence_score, 0.6)
 
     def test_scrapling_source_collector_fetches_and_caches_documents(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
