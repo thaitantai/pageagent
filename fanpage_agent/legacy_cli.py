@@ -879,17 +879,45 @@ def build_approval_audit_payload(args: argparse.Namespace) -> dict:
     }
 
 
+def _publish_blockers_for_operator(items: list[dict]) -> list[dict]:
+    blockers: list[dict] = []
+    for item in items:
+        status = item.get("status", "") or "unknown"
+        if status in {"published", "posted"}:
+            continue
+        approval_status = item.get("approval_status", "") or "unknown"
+        final_caption_ref = item.get("final_caption_ref")
+        reason_codes: list[str] = []
+        next_step = "ready_for_scheduled_publish"
+        if approval_status != "approved":
+            reason_codes.append("approval_status_not_approved")
+            next_step = "approve-caption"
+        elif not final_caption_ref:
+            reason_codes.append("missing_final_caption_ref")
+            next_step = "approve-caption"
+        if reason_codes:
+            blocked = dict(item)
+            blocked["reason_codes"] = reason_codes
+            blocked["next_step"] = next_step
+            blockers.append(blocked)
+    return blockers
+
+
 def build_operator_digest_payload(args: argparse.Namespace) -> dict:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=args)
     limit = getattr(args, "limit", None)
-    approval_items = store.list_calendar_items(
+    publish_candidates = store.list_calendar_items(
         status=getattr(args, "calendar_status", None),
-        approval_status=getattr(args, "approval_status", "pending"),
+        approval_status=None,
         date=getattr(args, "date", None),
         metrics_pending=False,
         limit=limit,
     )
+    approval_items = [
+        item for item in publish_candidates
+        if (item.get("approval_status") or "pending") == getattr(args, "approval_status", "pending")
+    ]
     approved_replies = store.list_triage_items(
         status=getattr(args, "triage_status", "approved"),
         priority=None,
@@ -903,14 +931,16 @@ def build_operator_digest_payload(args: argparse.Namespace) -> dict:
         metrics_pending=True,
         limit=limit,
     )
+    publish_blockers = _publish_blockers_for_operator(publish_candidates)
     return {
         "summary": {
             "pending_captions": len(approval_items),
             "approved_replies": len(approved_replies),
             "metrics_backlog": len(metrics_backlog),
+            "publish_blockers": len(publish_blockers),
         },
         "approval_queue": {
-            "items": approval_items,
+            "items": approval_items[:limit] if limit is not None else approval_items,
             "summary": summarize_calendar_items(approval_items),
         },
         "approved_replies": {
@@ -920,6 +950,10 @@ def build_operator_digest_payload(args: argparse.Namespace) -> dict:
         "metrics_backlog": {
             "items": metrics_backlog,
             "summary": summarize_calendar_items(metrics_backlog),
+        },
+        "publish_blockers": {
+            "items": publish_blockers[:limit] if limit is not None else publish_blockers,
+            "summary": summarize_calendar_items(publish_blockers),
         },
     }
 

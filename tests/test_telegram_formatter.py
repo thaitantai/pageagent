@@ -254,6 +254,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
                 "pending_captions": 1,
                 "approved_replies": 1,
                 "metrics_backlog": 1,
+                "publish_blockers": 1,
             },
             "approval_queue": {
                 "items": [
@@ -270,6 +271,16 @@ class TelegramFormatterServiceTest(unittest.TestCase):
                     {"calendar_id": "cal-2", "topic": "Routine tối", "published_at": "2026-06-25T10:00:00"}
                 ]
             },
+            "publish_blockers": {
+                "items": [
+                    {
+                        "calendar_id": "cal-3",
+                        "topic": "Routine trưa",
+                        "reason_codes": ["missing_final_caption_ref"],
+                        "next_step": "approve-caption",
+                    }
+                ]
+            },
         }
 
         rendered = TelegramFormatterService().format_operator_digest(payload)
@@ -278,10 +289,13 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         self.assertIn("Pending captions: 1", rendered)
         self.assertIn("Approved replies: 1", rendered)
         self.assertIn("Metrics backlog: 1", rendered)
+        self.assertIn("Publish blockers: 1", rendered)
         self.assertIn("cal-1", rendered)
         self.assertIn("approve-caption --calendar-id cal-1", rendered)
         self.assertIn("triage-1", rendered)
         self.assertIn("cal-2", rendered)
+        self.assertIn("cal-3", rendered)
+        self.assertIn("missing_final_caption_ref", rendered)
 
     def test_format_operator_digest_is_compact_and_next_action_focused(self) -> None:
         payload = {
@@ -289,6 +303,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
                 "pending_captions": 1,
                 "approved_replies": 1,
                 "metrics_backlog": 1,
+                "publish_blockers": 0,
             },
             "approval_queue": {
                 "items": [

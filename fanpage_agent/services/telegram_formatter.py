@@ -292,12 +292,14 @@ class TelegramFormatterService:
         approval_items = payload.get("approval_queue", {}).get("items", [])
         approved_reply_items = payload.get("approved_replies", {}).get("items", [])
         metrics_items = payload.get("metrics_backlog", {}).get("items", [])
+        publish_blockers = payload.get("publish_blockers", {}).get("items", [])
         lines = [
             "## Daily Operator Digest",
             (
                 f"Pending captions: {summary.get('pending_captions', 0)} | "
                 f"Approved replies: {summary.get('approved_replies', 0)} | "
-                f"Metrics backlog: {summary.get('metrics_backlog', 0)}"
+                f"Metrics backlog: {summary.get('metrics_backlog', 0)} | "
+                f"Publish blockers: {summary.get('publish_blockers', 0)}"
             ),
             "Next:",
         ]
@@ -320,6 +322,15 @@ class TelegramFormatterService:
                 f"{next_index}. record metrics for {item.get('calendar_id', '-')} — "
                 f"{item.get('topic', '-')} published {item.get('published_at', '-')}"
             )
+            next_index += 1
+        if publish_blockers:
+            item = publish_blockers[0]
+            reasons = ", ".join(item.get("reason_codes", [])) or "unknown"
+            lines.append(
+                f"{next_index}. unblock publish {item.get('calendar_id', '-')} — "
+                f"{item.get('topic', '-')} ({reasons}); next: {item.get('next_step', '-')}"
+            )
+            next_index += 1
         if next_index == 1:
             lines.append("- nothing pending")
         return "\n".join(lines).strip()
