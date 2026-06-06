@@ -365,6 +365,10 @@ class RoadmapStatusCliTest(unittest.TestCase):
         self.assertGreaterEqual(payload["phases_total"], 5)
         self.assertIn("Phase 1", payload["current_phase"])
         self.assertGreaterEqual(len(payload["immediate_priorities"]), 1)
+        self.assertGreaterEqual(len(payload["phase_statuses"]), 5)
+        self.assertIn("progress_entries", payload)
+        self.assertIn("next_recommended_actions", payload)
+        self.assertIn("remaining_tasks", payload["phase_statuses"][0])
 
 
 if __name__ == "__main__":

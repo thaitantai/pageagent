@@ -503,25 +503,61 @@ def _run_roadmap_status() -> None:
     roadmap_path = Path(__file__).resolve().parent.parent / "docs" / "roadmap-next.md"
     phases: list[str] = []
     priority_items: list[str] = []
+    progress_entries: list[str] = []
+    phase_tasks: dict[str, list[str]] = {}
     section: str | None = None
+    current_phase: str | None = None
 
     if roadmap_path.exists():
-        for line in roadmap_path.read_text(encoding="utf-8").splitlines():
+        for raw_line in roadmap_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
             if line.startswith("## Phase "):
-                phases.append(line.removeprefix("## ").strip())
+                current_phase = line.removeprefix("## ").strip()
+                phases.append(current_phase)
+                phase_tasks.setdefault(current_phase, [])
                 section = "phase"
+            elif line == "Viec can lam:":
+                section = "phase_tasks"
             elif line == "## Uu tien thuc thi ngay":
+                current_phase = None
                 section = "priority"
-            elif section == "priority" and line[:2] in {"1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9."}:
-                priority_items.append(line.strip())
+            elif line == "## Tien do thuc thi":
+                current_phase = None
+                section = "progress"
+            elif section == "phase_tasks" and current_phase and line.startswith("- "):
+                phase_tasks[current_phase].append(line.removeprefix("- ").strip())
+            elif section == "priority" and len(line) > 2 and line[0].isdigit() and line[1] == ".":
+                priority_items.append(line)
+            elif section == "progress" and line.startswith("- "):
+                progress_entries.append(line.removeprefix("- ").strip())
+
+    completed_text = " ".join(progress_entries).lower()
+    phase_statuses: list[dict[str, Any]] = []
+    for phase in phases:
+        tasks = phase_tasks.get(phase, [])
+        completed_tasks = [task for task in tasks if task.lower() in completed_text]
+        phase_statuses.append({
+            "phase": phase,
+            "tasks_total": len(tasks),
+            "tasks_confirmed_done": len(completed_tasks),
+            "status": "done" if tasks and len(completed_tasks) == len(tasks) else "active",
+            "remaining_tasks": [task for task in tasks if task not in completed_tasks],
+        })
+
+    active_phase = next((item for item in phase_statuses if item["status"] != "done"), None)
+    if active_phase is None and phase_statuses:
+        active_phase = phase_statuses[-1]
 
     print(json.dumps({
         "status": "ok",
         "roadmap": str(roadmap_path),
-        "current_phase": phases[0] if phases else "Phase 1: Don dep nen tang va tang kha nang quan sat",
-        "next_phase": phases[1] if len(phases) > 1 else None,
+        "current_phase": active_phase["phase"] if active_phase else "Phase 1: Don dep nen tang va tang kha nang quan sat",
+        "next_phase": next((phase for phase in phases if active_phase and phases.index(phase) > phases.index(active_phase["phase"])), None),
         "phases_total": len(phases),
+        "phase_statuses": phase_statuses,
         "immediate_priorities": priority_items,
+        "progress_entries": progress_entries,
+        "next_recommended_actions": (active_phase or {}).get("remaining_tasks", [])[:3],
     }, ensure_ascii=False, indent=2))
 
 
