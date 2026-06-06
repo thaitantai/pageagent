@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+encoded-might-498016-q3-1ff99b2c609b.json
 
 # Generated artifacts and local scratch data
 artifacts/
@@ -14,6 +15,7 @@ data/
 
 # Build artifacts
 *.egg-info/
+fanpage_agent.egg-info/
 
 # Python
 __pycache__/
