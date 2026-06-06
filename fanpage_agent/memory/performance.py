@@ -302,6 +302,15 @@ class PerformanceMemory:
         rows = self._query_patterns(order_by="avg_engagement ASC", limit=limit)
         return [self._row_to_pattern(r) for r in rows]
 
+    def get_patterns(
+        self,
+        pattern_type: str | None = None,
+        limit: int = 50,
+    ) -> list[PerformancePattern]:
+        """Return learned patterns for scoring and analysis."""
+        rows = self._query_patterns(pattern_type=pattern_type, limit=limit)
+        return [self._row_to_pattern(r) for r in rows]
+
     def get_recommendations(self, limit: int = 3) -> list[str]:
         """Get actionable content recommendations based on learned patterns."""
         top = self.get_top_patterns(limit=3)

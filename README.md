@@ -348,7 +348,7 @@ The command uses `cliff.toml` and should run as part of the deployment checklist
 
 ## Next implementation tasks
 
-- **P1:** A/B testing variants — writer generates 2+ variants, publisher picks best by pattern score
+- **P1:** A/B testing variants — writer generates 2+ variants, publisher picks best by pattern score (scoring service is in place; next step is wiring it into publish/approval CLI)
 - **P2:** Daily community digests — cron job that fetches comments and delivers triage summary to Telegram
 - **P2:** Dashboard HTML/Markdown tổng hợp cron health + artifact health + reach/engagement metrics
 - **P3:** Multi-language support for auto-replies based on comment language detection
