@@ -55,7 +55,7 @@ def sample_package() -> ContentPackage:
 
 class TestBackup:
     def test_backup_creates_file(self, memory: PerformanceMemory, sample_package: ContentPackage):
-        """Backup creates a .bak.1 file in the backups dir."""
+        """Backup creates a .bak.1 file in the memory snapshots dir."""
         memory.record_publish(sample_package, "v1", reach=1000, engagements=50, permalink="https://fb.com/1")
         path = memory.backup(keep=5)
         assert path.exists()
@@ -63,7 +63,7 @@ class TestBackup:
 
     def test_backup_dir_created(self, tmp_db: Path, memory: PerformanceMemory):
         """Backup dir is auto-created on first backup."""
-        raw_backup_dir = tmp_db.parent / "backups"
+        raw_backup_dir = tmp_db.parent / "memory_snapshots"
         assert not raw_backup_dir.exists()
         memory.backup()
         assert raw_backup_dir.exists()

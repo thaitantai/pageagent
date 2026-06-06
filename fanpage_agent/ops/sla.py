@@ -66,9 +66,9 @@ class SlaDashboard:
 
     @staticmethod
     def _default_data_dir() -> Path:
-        """Resolve default data dir from package location."""
-        pkg = Path(__file__).resolve().parent.parent.parent  # fanpage_agent/
-        return pkg / "data" / "agent"
+        """Resolve the default project runtime data dir."""
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return project_root / "data" / "agent"
 
     # ── snapshot builder ──────────────────────────────────────────
 
@@ -97,7 +97,7 @@ class SlaDashboard:
 
         # ── Backup ───────────────────────────────────────────────
         try:
-            bk_dir = self._data_dir / "backups"
+            bk_dir = self._data_dir / "memory_snapshots"
             if bk_dir.exists():
                 backups = sorted(bk_dir.iterdir(), key=os.path.getmtime, reverse=True)
                 s.backup_dir_count = len(backups)

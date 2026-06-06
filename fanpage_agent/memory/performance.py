@@ -24,7 +24,7 @@ from fanpage_agent.core.types import ContentPackage, PerformancePattern
 logger = logging.getLogger(__name__)
 
 BACKUP_PATTERN = "memory.db.bak.{idx}"
-BACKUP_DIR = "backups"
+MEMORY_SNAPSHOT_DIR = "memory_snapshots"
 DEFAULT_MAX_BACKUPS = 7
 AUTO_BACKUP_INTERVAL = 6 * 3600  # 6 hours in seconds
 
@@ -63,8 +63,8 @@ class PerformanceMemory:
 
     @property
     def backup_dir(self) -> Path:
-        """Directory where database backups are stored."""
-        bdir = self.db_path.parent / BACKUP_DIR
+        """Directory where memory database snapshots are stored."""
+        bdir = self.db_path.parent / MEMORY_SNAPSHOT_DIR
         bdir.mkdir(parents=True, exist_ok=True)
         return bdir
 
@@ -76,10 +76,10 @@ class PerformanceMemory:
         keep: int | None = None,
         force: bool = False,
     ) -> Path:
-        """Create a backup of the current database.
+        """Create a snapshot of the current memory database.
 
         Args:
-            keep: Number of backups to retain (default: max_backups).
+            keep: Number of memory snapshots to retain (default: max_backups).
             force: Skip interval check even if it's too soon.
 
         Returns:

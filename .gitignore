@@ -6,8 +6,9 @@ encoded-might-498016-q3-1ff99b2c609b.json
 
 # Generated artifacts and local scratch data
 artifacts/
-backups/
+data_snapshots/
 data/
+/fanpage_agent/data/
 *.db
 *.db-shm
 *.db-wal

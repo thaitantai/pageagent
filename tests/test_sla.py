@@ -42,7 +42,7 @@ class SlaDashboardTest(unittest.TestCase):
         self.assertEqual(snap.audit_error_rate_pct, 0.0)
 
     def test_db_no_backup_dir_no_crash(self) -> None:
-        """No backups directory shouldn't crash."""
+        """No memory snapshots directory shouldn't crash."""
         snap = self._dashboard().snapshot()
         self.assertEqual(snap.backup_dir_count, 0)
         self.assertIsNone(snap.last_backup_age_hours)

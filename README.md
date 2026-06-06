@@ -254,16 +254,21 @@ After each publish, the pipeline:
 
 ### Data Files
 
+Runtime data belongs in the project-level `data/` directory. Do not put SQLite DBs, operator CSVs, or generated packets inside `fanpage_agent/data/`; package directories should only contain importable code or packaged static resources.
+
 ```
-data/agent/
-├── memory.db              # PerformanceMemory SQLite DB
-│   ├── published_posts    # Post records + metrics
-│   └── ...                # Patterns, recommendations
-├── memory.db-shm          # SQLite shared memory
-├── memory.db-wal          # SQLite WAL
-├── state.json             # Tick state (calendar, community, performance, system)
-├── state.json.lock        # Concurrency lock
-└── replied_comments.json  # Comment dedup tracking
+data/
+├── agent/                 # Runtime state for the autonomous agent
+│   ├── memory.db          # PerformanceMemory SQLite DB
+│   ├── memory_snapshots/  # Rotated memory.db snapshots for restore
+│   ├── state.json         # Tick state (calendar, community, performance, system)
+│   ├── state.json.lock    # Concurrency lock
+│   └── replied_comments.json
+├── research_packets/      # Generated ResearchPacket JSON outputs
+├── sample/                # Safe sample inputs for docs/tests
+└── real/                  # Local live operator inputs; ignored by git
+
+data_snapshots/            # Manual pre-run or pre-live snapshots of project data; ignored by git
 ```
 
 ### Deployment
