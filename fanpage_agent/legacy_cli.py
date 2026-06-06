@@ -912,7 +912,7 @@ def build_operator_digest_payload(args: argparse.Namespace) -> dict:
         approval_status=None,
         date=getattr(args, "date", None),
         metrics_pending=False,
-        limit=limit,
+        limit=None,
     )
     approval_items = [
         item for item in publish_candidates
