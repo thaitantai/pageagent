@@ -254,7 +254,7 @@ After each publish, the pipeline:
 
 ### Data Files
 
-Runtime data belongs in the project-level `data/` directory. Do not put SQLite DBs, operator CSVs, or generated packets inside `fanpage_agent/data/`; package directories should only contain importable code or packaged static resources.
+Runtime data belongs in the project-level `data/` directory. Keep the top of `data/` as an index of purpose-based folders; do not leave loose CSV/JSON/DB files there. Do not put SQLite DBs, operator CSVs, or generated packets inside `fanpage_agent/data/`; package directories should only contain importable code or packaged static resources.
 
 ```
 data/
@@ -269,6 +269,8 @@ data/
 ├── real/                  # Local live operator inputs; ignored by git
 └── snapshots/             # Manual pre-run or pre-live snapshots of project data
 ```
+
+Loose root-level data files from earlier runs should be moved into `data/snapshots/<reason-date>/` before cleanup, then new live runs should read/write under `data/real/` or `data/agent/` depending on purpose.
 
 ### Deployment
 

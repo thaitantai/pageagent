@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from fanpage_agent.adapters.google_sheets_store import GoogleSheetsStore
 from fanpage_agent.config import Settings
@@ -12,9 +13,15 @@ class GoogleSheetsTriageOpsStoreTest(unittest.TestCase):
     def test_list_resolve_and_reopen_triage_rows_in_fake_sheet(self) -> None:
         root = Path(__file__).resolve().parents[1]
         sample = root / "data" / "sample" / "brand_profile.json"
-        comments = root / "data" / "comment_inbox.csv"
         profile = load_brand_profile(sample)
-        batch = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=comments)
+        with TemporaryDirectory() as tmp:
+            comments = Path(tmp) / "comment_inbox.csv"
+            comments.write_text(
+                "id,post_id,created_at,source,message\n"
+                ",,2026-06-08,comment,Da thieu nuoc thi nen bat dau tu dau?\n",
+                encoding="utf-8",
+            )
+            batch = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=comments)
         tables: dict[str, list[list[str]]] = {}
         store = GoogleSheetsStore(
             settings=Settings(artifacts_dir=Path("/tmp"), google_sheets_id="sheet-123", google_service_account_file="/tmp/creds.json"),
