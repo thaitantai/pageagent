@@ -574,6 +574,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return exit code 1 when runtime configuration checks fail.",
     )
+    ops_status_parser.add_argument(
+        "--include-cron",
+        action="store_true",
+        help="Include Hermes cron job/wrapper readiness checks in the payload.",
+    )
+    ops_status_parser.add_argument("--cron-jobs-file", default=str(DEFAULT_HERMES_CRON_JOBS_FILE))
+    ops_status_parser.add_argument("--cron-scripts-dir", default=str(DEFAULT_HERMES_SCRIPTS_DIR))
+    ops_status_parser.add_argument("--cron-workdir", default=str(ROOT_DIR))
+    ops_status_parser.add_argument(
+        "--fail-on-cron",
+        action="store_true",
+        help="Return exit code 1 when included Hermes cron checks fail.",
+    )
 
     hermes_cron_parser = subparsers.add_parser("hermes-cron-status")
     hermes_cron_parser.add_argument("--jobs-file", default=str(DEFAULT_HERMES_CRON_JOBS_FILE))
@@ -1971,6 +1984,10 @@ def build_ops_status_payload(
     *,
     now_timestamp: float | None = None,
     freshness_thresholds: dict[str, float] | None = None,
+    include_cron: bool = False,
+    cron_jobs_file: Path | None = None,
+    cron_scripts_dir: Path | None = None,
+    cron_workdir: str | None = None,
 ) -> dict:
     now = time.time() if now_timestamp is None else now_timestamp
     thresholds = freshness_thresholds or dict(OPS_ARTIFACT_FRESHNESS_HOURS)
@@ -2018,7 +2035,16 @@ def build_ops_status_payload(
     stale = sum(1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale"))
     fresh = sum(1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale"))
     runtime_config = build_runtime_config_status(settings)
-    return {
+    cron_status = None
+    cron_failed = 0
+    if include_cron:
+        cron_status = build_hermes_cron_status_payload(
+            jobs_file=cron_jobs_file or DEFAULT_HERMES_CRON_JOBS_FILE,
+            scripts_dir=cron_scripts_dir or DEFAULT_HERMES_SCRIPTS_DIR,
+            expected_workdir=cron_workdir or str(ROOT_DIR),
+        )
+        cron_failed = cron_status["summary"]["failed"]
+    payload = {
         "artifacts_dir": str(settings.artifacts_dir),
         "freshness_checked_at": now,
         "summary": {
@@ -2027,10 +2053,14 @@ def build_ops_status_payload(
             "fresh": fresh,
             "stale": stale,
             "runtime_failed": runtime_config["summary"]["failed"],
+            "cron_failed": cron_failed,
         },
         "artifacts": artifacts,
         "runtime_config": runtime_config,
     }
+    if cron_status is not None:
+        payload["cron"] = cron_status
+    return payload
 
 
 def cmd_ops_status(args: argparse.Namespace) -> int:
@@ -2040,11 +2070,21 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
         thresholds = _parse_freshness_thresholds(args.max_age_hours)
     except ValueError as exc:
         raise SystemExit(f"ops-status: {exc}") from exc
-    payload = build_ops_status_payload(settings, now_timestamp=now_timestamp, freshness_thresholds=thresholds)
+    payload = build_ops_status_payload(
+        settings,
+        now_timestamp=now_timestamp,
+        freshness_thresholds=thresholds,
+        include_cron=args.include_cron,
+        cron_jobs_file=Path(args.cron_jobs_file),
+        cron_scripts_dir=Path(args.cron_scripts_dir),
+        cron_workdir=args.cron_workdir,
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if args.fail_on_stale and payload["summary"]["stale"]:
         return 1
     if args.fail_on_runtime and payload["summary"]["runtime_failed"]:
+        return 1
+    if args.fail_on_cron and payload["summary"].get("cron_failed", 0):
         return 1
     return 0
 

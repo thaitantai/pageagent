@@ -1,10 +1,12 @@
 import json
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+from fanpage_agent.main import EXPECTED_HERMES_CRON_JOBS
 from tests.test_env import isolated_subprocess_env
 
 
@@ -197,6 +199,65 @@ class OpsStatusCliTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         payload = json.loads(completed.stdout)
         self.assertGreaterEqual(payload["summary"]["runtime_failed"], 1)
+
+    def test_ops_status_can_include_cron_readiness(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            artifacts = tmpdir / "artifacts"
+            artifacts.mkdir()
+            scripts_dir = tmpdir / "scripts"
+            scripts_dir.mkdir()
+            jobs = []
+            for idx, (name, expected) in enumerate(EXPECTED_HERMES_CRON_JOBS.items(), start=1):
+                wrapper = scripts_dir / expected["script"]
+                wrapper.write_text(
+                    f"#!/usr/bin/env bash\nexec /repo/{expected['project_script']}\n",
+                    encoding="utf-8",
+                )
+                wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
+                jobs.append(
+                    {
+                        "id": f"job-{idx}",
+                        "name": name,
+                        "script": expected["script"],
+                        "no_agent": True,
+                        "schedule_display": expected["schedule"],
+                        "deliver": "local",
+                        "workdir": "/repo",
+                        "enabled": True,
+                        "last_delivery_error": None,
+                    }
+                )
+            jobs_file = tmpdir / "jobs.json"
+            jobs_file.write_text(json.dumps({"jobs": jobs}), encoding="utf-8")
+            env = isolated_subprocess_env()
+            env["ARTIFACTS_DIR"] = str(artifacts)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "ops-status",
+                    "--include-cron",
+                    "--cron-jobs-file",
+                    str(jobs_file),
+                    "--cron-scripts-dir",
+                    str(scripts_dir),
+                    "--cron-workdir",
+                    "/repo",
+                    "--fail-on-cron",
+                ],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["summary"]["cron_failed"], 0)
+        self.assertEqual(payload["cron"]["summary"]["ok"], len(EXPECTED_HERMES_CRON_JOBS))
 
 
 if __name__ == "__main__":
