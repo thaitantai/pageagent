@@ -348,6 +348,35 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         self.assertIn("cal-2", rendered)
         self.assertIn("https://example.com/post-2", rendered)
 
+    def test_format_research_brief_surfaces_quality_and_source_insights(self) -> None:
+        payload = {
+            "confidence_score": 0.82,
+            "recommended_objectives": ["lead"],
+            "source_documents": [
+                {
+                    "source_id": "derm-01",
+                    "name": "Derm Clinic Blog",
+                    "trust_score": 0.95,
+                }
+            ],
+            "evidence": [
+                {
+                    "evidence_type": "source_claim",
+                    "claim": "Khach hang can soi da truoc treatment.",
+                    "source": "Derm Clinic Blog",
+                    "confidence": 0.9,
+                }
+            ],
+            "quality_warnings": ["Can them nguon doc lap."],
+        }
+
+        rendered = TelegramFormatterService().format_research_brief(payload)
+
+        self.assertIn("confidence: 0.82", rendered)
+        self.assertIn("sources: 1 | evidence: 1 | warnings: 1", rendered)
+        self.assertIn("source-backed insights:", rendered)
+        self.assertIn("Khach hang can soi da", rendered)
+        self.assertIn("quality warnings:", rendered)
 
 
 if __name__ == "__main__":

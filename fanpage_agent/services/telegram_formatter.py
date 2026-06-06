@@ -360,7 +360,15 @@ class TelegramFormatterService:
         return "\n".join(lines).strip()
 
     def format_research_brief(self, payload: dict) -> str:
-        lines = ["## Research Brief"]
+        evidence = payload.get("evidence") or []
+        source_documents = payload.get("source_documents") or []
+        quality_warnings = payload.get("quality_warnings") or []
+        confidence = payload.get("confidence_score", 0)
+        lines = [
+            "## Research Brief",
+            f"confidence: {confidence}",
+            f"sources: {len(source_documents)} | evidence: {len(evidence)} | warnings: {len(quality_warnings)}",
+        ]
         if payload.get("recommended_objectives"):
             lines.append(f"objective focus: {payload['recommended_objectives'][0]}")
         if payload.get("recommended_pillars"):
@@ -369,7 +377,20 @@ class TelegramFormatterService:
             lines.append(f"campaign focus: {', '.join(payload['campaign_focus'][:3])}")
         if payload.get("top_performing_topics"):
             lines.append(f"top topic: {payload['top_performing_topics'][0]}")
+        if source_documents:
+            top_sources = ", ".join(
+                f"{item.get('name') or item.get('title') or item.get('source_id', '-') } ({item.get('trust_score', 0)})"
+                for item in source_documents[:3]
+            )
+            lines.append(f"top sources: {top_sources}")
         lines.append("")
+        source_claims = [item for item in evidence if item.get("evidence_type") in {"source_claim", "external_source"}]
+        if source_claims:
+            lines.append("source-backed insights:")
+            for item in source_claims[:3]:
+                source = item.get("source") or item.get("source_id") or "-"
+                confidence_hint = item.get("confidence", "-")
+                lines.append(f"- {item.get('claim', '-')} ({source}, {confidence_hint})")
         if payload.get("frequent_questions"):
             lines.append("frequent questions:")
             lines.extend([f"- {item}" for item in payload["frequent_questions"][:3]])
@@ -379,6 +400,9 @@ class TelegramFormatterService:
         if payload.get("recommendations"):
             lines.append("recommendations:")
             lines.extend([f"- {item}" for item in payload["recommendations"][:3]])
+        if quality_warnings:
+            lines.append("quality warnings:")
+            lines.extend([f"- {item}" for item in quality_warnings[:3]])
         if payload.get("overused_topics"):
             lines.append("watchouts:")
             lines.extend([f"- overused topic: {item}" for item in payload["overused_topics"][:3]])
