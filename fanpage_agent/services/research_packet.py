@@ -37,7 +37,9 @@ def build_research_packet(
     )
     effective_page_context = page_context or {}
     topic_focus = effective_page_context.get("topic_focus", [])
-    if not isinstance(topic_focus, list):
+    if isinstance(topic_focus, str):
+        topic_focus = [topic_focus]
+    elif not isinstance(topic_focus, list):
         topic_focus = []
     registry = SourceRegistry.from_file(source_registry_file)
     selected_sources = registry.select(

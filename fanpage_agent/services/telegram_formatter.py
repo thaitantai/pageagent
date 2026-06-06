@@ -365,7 +365,7 @@ class TelegramFormatterService:
         evidence = payload.get("evidence") or []
         source_documents = payload.get("source_documents") or []
         quality_warnings = payload.get("quality_warnings") or []
-        confidence = payload.get("confidence_score", 0)
+        confidence = payload.get("confidence_score", payload.get("confidence", 0))
         lines = [
             "## Research Brief",
             f"confidence: {confidence}",

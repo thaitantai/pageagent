@@ -41,10 +41,20 @@ class SourceRegistry:
                 continue
             if topics_lower and source.topics:
                 source_topics = {topic.lower() for topic in source.topics}
-                if not topics_lower & source_topics:
+                if not self._topics_overlap(topics_lower, source_topics):
                     continue
             selected.append(source)
         return sorted(selected, key=lambda item: item.trust_score, reverse=True)
+
+    @staticmethod
+    def _topics_overlap(requested: set[str], source_topics: set[str]) -> bool:
+        for requested_topic in requested:
+            for source_topic in source_topics:
+                if requested_topic == source_topic:
+                    return True
+                if source_topic in requested_topic or requested_topic in source_topic:
+                    return True
+        return False
 
     def to_documents(self, page_id: str = "", topics: list[str] | None = None) -> list[SourceDocument]:
         documents: list[SourceDocument] = []

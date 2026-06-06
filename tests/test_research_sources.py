@@ -81,6 +81,15 @@ class ResearchSourcesTest(unittest.TestCase):
         self.assertEqual(documents[0].source_name, "Derm Clinic Blog")
         self.assertEqual(documents[0].trust_score, 0.9)
 
+    def test_source_registry_matches_topic_phrases_from_live_page_config(self) -> None:
+        registry = SourceRegistry([
+            ResearchSource(source_id="derm-01", name="Derm Clinic Blog", topics=["soi da"], trust_score=0.9),
+        ])
+
+        selected = registry.select(topics=["soi da cham soc da"])
+
+        self.assertEqual([item.source_id for item in selected], ["derm-01"])
+
     def test_research_packet_includes_registry_documents_as_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
@@ -137,6 +146,49 @@ class ResearchSourcesTest(unittest.TestCase):
         self.assertEqual(packet.brief.source_documents[0].source_id, "derm-01")
         self.assertTrue(any(item.source_id == "derm-01" for item in packet.brief.evidence))
         self.assertGreater(packet.brief.confidence_score, 0.6)
+
+    def test_research_packet_accepts_string_topic_focus_for_live_page_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            history = tmpdir / "post_history.csv"
+            metrics = tmpdir / "post_metrics.csv"
+            comments = tmpdir / "comment_inbox.csv"
+            campaign = tmpdir / "campaign_notes.json"
+            calendar = tmpdir / "calendar.csv"
+            registry_file = tmpdir / "sources.json"
+
+            history.write_text("published_at,topic,hook,pillar,objective,permalink,reach,engagement_rate\n", encoding="utf-8")
+            metrics.write_text("published_at,topic,pillar,objective,reach,engagements,leads\n", encoding="utf-8")
+            comments.write_text("created_at,source,message\n", encoding="utf-8")
+            campaign.write_text(json.dumps({"campaign_focus": ["soi da"]}), encoding="utf-8")
+            calendar.write_text("date,topic,pillar,objective,status\n", encoding="utf-8")
+            registry_file.write_text(
+                json.dumps([
+                    {
+                        "source_id": "derm-01",
+                        "name": "Derm Clinic Blog",
+                        "url": "https://example.com/derm",
+                        "topics": ["soi da"],
+                        "allowed_pages": ["spa-main"],
+                        "trust_score": 0.95,
+                    }
+                ]),
+                encoding="utf-8",
+            )
+
+            packet = build_research_packet(
+                history_file=history,
+                metrics_file=metrics,
+                comment_file=comments,
+                campaign_file=campaign,
+                calendar_file=calendar,
+                page_id="spa-main",
+                page_context={"page_id": "spa-main", "topic_focus": "soi da"},
+                source_registry_file=registry_file,
+                fetch_external_trends=False,
+            )
+
+        self.assertEqual(packet.brief.source_documents[0].source_id, "derm-01")
 
     def test_scrapling_source_collector_fetches_and_caches_documents(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
