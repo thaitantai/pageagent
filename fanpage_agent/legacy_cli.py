@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import date, datetime, timezone
@@ -567,6 +568,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--fail-on-stale",
         action="store_true",
         help="Return exit code 1 when any existing artifact is stale.",
+    )
+    ops_status_parser.add_argument(
+        "--fail-on-runtime",
+        action="store_true",
+        help="Return exit code 1 when runtime configuration checks fail.",
     )
 
     hermes_cron_parser = subparsers.add_parser("hermes-cron-status")
@@ -1871,6 +1877,95 @@ def _latest_artifact(
     return _artifact_status(name, matches[0], now_timestamp=now_timestamp, max_age_hours=max_age_hours)
 
 
+def _runtime_check(name: str, ok: bool, reason_codes: list[str], next_step: str, **details: Any) -> dict:
+    return {
+        "name": name,
+        "ok": ok,
+        "reason_codes": [] if ok else reason_codes,
+        "next_step": "" if ok else next_step,
+        **details,
+    }
+
+
+def build_runtime_config_status(settings: Settings) -> dict:
+    google_account = Path(settings.google_service_account_file) if settings.google_service_account_file else None
+    checks = [
+        _runtime_check(
+            "telegram_delivery",
+            bool(settings.telegram_bot_token and settings.telegram_chat_id),
+            ["missing_telegram_bot_token" if not settings.telegram_bot_token else "missing_telegram_chat_id"],
+            "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, then run send-telegram-preview.",
+            configured=bool(settings.telegram_bot_token and settings.telegram_chat_id),
+            base_url_configured=bool(settings.telegram_base_url),
+        ),
+        _runtime_check(
+            "facebook_publish",
+            bool(settings.fb_page_id and settings.fb_page_token),
+            ["missing_fb_page_id" if not settings.fb_page_id else "missing_fb_page_token"],
+            "Set FB_PAGE_ID and FB_PAGE_TOKEN before enabling publish-post or scheduled-publish.",
+            configured=bool(settings.fb_page_id and settings.fb_page_token),
+            api_version=settings.fb_api_version,
+        ),
+        _runtime_check(
+            "google_store",
+            settings.store_backend != "google"
+            or bool(
+                settings.google_sheets_id
+                and google_account is not None
+                and google_account.exists()
+            ),
+            [
+                reason
+                for reason, missing in (
+                    ("missing_google_sheets_id", not settings.google_sheets_id),
+                    ("missing_google_service_account_file", not settings.google_service_account_file),
+                    (
+                        "google_service_account_file_not_found",
+                        bool(google_account is not None and not google_account.exists()),
+                    ),
+                )
+                if missing
+            ],
+            "Use --store-backend local for pilot, or configure Google Sheets ID and service account file.",
+            store_backend=settings.store_backend,
+            service_account_file_configured=bool(settings.google_service_account_file),
+            service_account_file_exists=bool(google_account is not None and google_account.exists()),
+        ),
+        _runtime_check(
+            "llm_generation",
+            settings.llm_provider == "mock-local" or bool(settings.llm_api_key),
+            ["missing_llm_api_key"],
+            "Set LLM_API_KEY for non-mock providers, or use LLM_PROVIDER=mock-local for dry runs.",
+            provider=settings.llm_provider,
+            model=settings.llm_model,
+            api_key_configured=bool(settings.llm_api_key),
+        ),
+        _runtime_check(
+            "artifacts_dir",
+            settings.artifacts_dir.exists() and os.access(settings.artifacts_dir, os.W_OK),
+            [
+                "artifacts_dir_missing"
+                if not settings.artifacts_dir.exists()
+                else "artifacts_dir_not_writable"
+            ],
+            "Create ARTIFACTS_DIR and ensure the agent can write artifacts there.",
+            path=str(settings.artifacts_dir),
+            exists=settings.artifacts_dir.exists(),
+            writable=settings.artifacts_dir.exists() and os.access(settings.artifacts_dir, os.W_OK),
+        ),
+    ]
+    ok_count = sum(1 for item in checks if item["ok"])
+    failed = [item for item in checks if not item["ok"]]
+    return {
+        "summary": {
+            "checks": len(checks),
+            "ok": ok_count,
+            "failed": len(failed),
+        },
+        "checks": checks,
+    }
+
+
 def build_ops_status_payload(
     settings: Settings,
     *,
@@ -1922,6 +2017,7 @@ def build_ops_status_payload(
     existing = sum(1 for item in artifacts if item["exists"])
     stale = sum(1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale"))
     fresh = sum(1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale"))
+    runtime_config = build_runtime_config_status(settings)
     return {
         "artifacts_dir": str(settings.artifacts_dir),
         "freshness_checked_at": now,
@@ -1930,8 +2026,10 @@ def build_ops_status_payload(
             "missing": len(artifacts) - existing,
             "fresh": fresh,
             "stale": stale,
+            "runtime_failed": runtime_config["summary"]["failed"],
         },
         "artifacts": artifacts,
+        "runtime_config": runtime_config,
     }
 
 
@@ -1944,7 +2042,11 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
         raise SystemExit(f"ops-status: {exc}") from exc
     payload = build_ops_status_payload(settings, now_timestamp=now_timestamp, freshness_thresholds=thresholds)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 1 if args.fail_on_stale and payload["summary"]["stale"] else 0
+    if args.fail_on_stale and payload["summary"]["stale"]:
+        return 1
+    if args.fail_on_runtime and payload["summary"]["runtime_failed"]:
+        return 1
+    return 0
 
 
 def _cron_schedule_display(job: dict) -> str:
