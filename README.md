@@ -30,6 +30,7 @@ python3 -m unittest discover -s tests -v
 
 ## Roadmap va trang thai phat trien
 Roadmap giai doan tiep theo nam tai `docs/roadmap-next.md`.
+Package boundary notes nam tai `fanpage_agent/README.md`.
 
 ```bash
 python3 -m fanpage_agent.main roadmap-status
