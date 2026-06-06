@@ -70,6 +70,7 @@ HTTPServer(('127.0.0.1', port), Handler).serve_forever()
                     "--calendar-id", calendar_id,
                     "--published-at", published_at,
                     "--permalink", permalink,
+                    "--allow-unapproved",
                 ], cwd=root, env=isolated_subprocess_env(), capture_output=True, text=True, check=True)
 
             subprocess.run([

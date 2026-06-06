@@ -6,6 +6,7 @@ import sys
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any, cast
 
 from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.page_registry import PageRegistry
@@ -406,6 +407,11 @@ def build_parser() -> argparse.ArgumentParser:
     publish_parser.add_argument("--reach", type=int, default=0)
     publish_parser.add_argument("--engagement-rate", type=float, default=0.0)
     publish_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
+    publish_parser.add_argument(
+        "--allow-unapproved",
+        action="store_true",
+        help="Override safety guard and record a publish for an item that is not approved.",
+    )
     add_store_backend_arg(publish_parser)
 
     # ── process-pending: auto-approve eligible items ──────────
@@ -1342,16 +1348,65 @@ def cmd_reject_caption(args: argparse.Namespace) -> int:
     return 0
 
 
+def _find_calendar_item_for_publish(store: object, calendar_id: str) -> dict[str, Any] | None:
+    list_items = getattr(store, "list_calendar_items", None)
+    if not callable(list_items):
+        return None
+    try:
+        rows = cast(list[dict[str, Any]], list_items(limit=None))
+    except TypeError:
+        rows = cast(list[dict[str, Any]], list_items())
+    for row in rows:
+        if str(row.get("calendar_id", "")) == calendar_id:
+            return row
+    return None
+
+
+def _build_publish_block_payload(calendar_id: str, row: dict[str, object] | None) -> dict[str, object]:
+    approval_status = str((row or {}).get("approval_status", "missing") or "missing")
+    status = str((row or {}).get("status", "missing") or "missing")
+    final_caption_ref = str((row or {}).get("final_caption_ref", "") or "")
+    reason_codes: list[str] = []
+    if row is None:
+        reason_codes.append("calendar_item_not_found")
+    if approval_status != "approved":
+        reason_codes.append("approval_status_not_approved")
+    if status in {"published", "posted"}:
+        reason_codes.append("already_published")
+    if not final_caption_ref:
+        reason_codes.append("missing_final_caption_ref")
+    return {
+        "blocked": True,
+        "action": "publish-post",
+        "calendar_id": calendar_id,
+        "reason_codes": reason_codes,
+        "approval_status": approval_status,
+        "status": status,
+        "next_step": "Run approve-caption first, then retry publish-post. Use --allow-unapproved only for manual recovery.",
+    }
+
+
 def cmd_publish_post(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    row = build_store(settings=settings, args=args).publish_calendar_item(
+    store = build_store(settings=settings, args=args)
+    row = _find_calendar_item_for_publish(store, args.calendar_id)
+    if not args.allow_unapproved and (
+        row is None
+        or row.get("approval_status") != "approved"
+        or not row.get("final_caption_ref")
+        or row.get("status") in {"published", "posted"}
+    ):
+        print(json.dumps(_build_publish_block_payload(args.calendar_id, row), ensure_ascii=False, indent=2))
+        return 2
+
+    published = store.publish_calendar_item(
         calendar_id=args.calendar_id,
         published_at=args.published_at,
         permalink=args.permalink,
         reach=args.reach,
         engagement_rate=args.engagement_rate,
     )
-    print(json.dumps(row, ensure_ascii=False, indent=2))
+    print(json.dumps(published, ensure_ascii=False, indent=2))
     return 0
 
 

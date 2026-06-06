@@ -155,6 +155,71 @@ class ApprovalLifecycleCliTest(unittest.TestCase):
         self.assertEqual(publish_data["status"], "published")
         self.assertEqual(publish_data["permalink"], "https://example.com/post-1")
 
+    def test_cli_publish_blocks_unapproved_caption(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        sample = root / "data" / "sample" / "brand_profile.json"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            calendar = tmpdir / "content_calendar.csv"
+            history = tmpdir / "post_history.csv"
+            plan_json = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "plan-week",
+                    "--brand-file",
+                    str(sample),
+                    "--start-date",
+                    "2026-06-01",
+                    "--days",
+                    "1",
+                    "--write-calendar",
+                    "--calendar-file",
+                    str(calendar),
+                    "--history-file",
+                    str(history),
+                ],
+                cwd=root,
+                env=isolated_subprocess_env(),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            payload = json.loads(plan_json.stdout)
+            calendar_id = f"{payload['plan_title']}-1"
+
+            publish = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "fanpage_agent.main",
+                    "publish-post",
+                    "--calendar-file",
+                    str(calendar),
+                    "--history-file",
+                    str(history),
+                    "--calendar-id",
+                    calendar_id,
+                    "--published-at",
+                    "2026-06-02",
+                    "--permalink",
+                    "https://example.com/post-1",
+                ],
+                cwd=root,
+                env=isolated_subprocess_env(),
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(publish.returncode, 2)
+        publish_data = json.loads(publish.stdout)
+        self.assertTrue(publish_data["blocked"])
+        self.assertEqual(publish_data["action"], "publish-post")
+        self.assertIn("approval_status_not_approved", publish_data["reason_codes"])
+        self.assertIn("missing_final_caption_ref", publish_data["reason_codes"])
+
 
 if __name__ == "__main__":
     unittest.main()

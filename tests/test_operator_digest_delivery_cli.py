@@ -84,6 +84,7 @@ class OperatorDigestDeliveryCliTest(unittest.TestCase):
                     "2026-06-25T10:00:00",
                     "--permalink",
                     "https://example.com/post-2",
+                    "--allow-unapproved",
                 ],
                 cwd=root,
                 env=isolated_subprocess_env(),
