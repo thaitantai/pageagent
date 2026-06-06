@@ -266,9 +266,8 @@ data/
 │   └── replied_comments.json
 ├── research_packets/      # Generated ResearchPacket JSON outputs
 ├── sample/                # Safe sample inputs for docs/tests
-└── real/                  # Local live operator inputs; ignored by git
-
-data_snapshots/            # Manual pre-run or pre-live snapshots of project data; ignored by git
+├── real/                  # Local live operator inputs; ignored by git
+└── snapshots/             # Manual pre-run or pre-live snapshots of project data
 ```
 
 ### Deployment
