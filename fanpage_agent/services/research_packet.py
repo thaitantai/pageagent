@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
@@ -62,3 +63,13 @@ def save_research_packet(packet: ResearchPacket, output_dir: str | Path = DEFAUL
         encoding="utf-8",
     )
     return file_path
+
+
+def packet_to_brief_payload(packet: ResearchPacket) -> dict[str, Any]:
+    payload = packet.brief.model_dump(mode="json")
+    payload["research_packet_id"] = packet.packet_id
+    payload["research_packet_created_at"] = packet.created_at
+    payload["research_packet_job_id"] = packet.job_id
+    payload["page_id"] = packet.page_id
+    payload["page_context"] = packet.page_context
+    return payload

@@ -43,7 +43,16 @@ class ResearchCliTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            env = isolated_subprocess_env()
+            env = isolated_subprocess_env(
+                PAGES=json.dumps([
+                    {
+                        "page_id": "main",
+                        "page_token": "tok_main",
+                        "topic_focus": "cong dong soi da",
+                        "community_value": "Giai dap thac mac soi da bang ngon ngu de hieu",
+                    }
+                ], ensure_ascii=False)
+            )
             env["ARTIFACTS_DIR"] = str(artifacts_dir)
             completed = subprocess.run(
                 [
@@ -89,6 +98,9 @@ class ResearchCliTest(unittest.TestCase):
             self.assertIn("quality_warnings", payload["research_brief"])
             self.assertTrue(payload["research_brief"]["topic_scores"])
             self.assertIn("total_score", payload["research_brief"]["topic_scores"][0])
+            self.assertEqual(payload["research_packet"]["research_packet_job_id"], "daily-2026-06-14")
+            self.assertEqual(payload["research_packet"]["page_context"]["page_id"], "main")
+            self.assertTrue(Path(payload["artifacts"]["research_packet"]).exists())
             self.assertTrue(any("soi da" in note.lower() for note in payload["plan"]["strategy_notes"]))
 
     def test_research_standalone_writes_research_packet(self) -> None:

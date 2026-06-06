@@ -105,4 +105,10 @@ Viec can lam:
 1. Hoan tat ResearchPacket va CLI `research-standalone`.
 2. Giu `research-brief` legacy chay nhu cu de khong pha workflow hien tai.
 3. Dua `topic_scores`, `evidence`, `confidence_score` thanh input uu tien cho Planner/Writer.
-4. Sau do moi toi uu content scoring va multi-page sau, tranh mo rong khi Research chua co output dung chung.
+4. Ket noi `run-daily` va `deliver-daily-packet` voi ResearchPacket de daily ops co artifact nghien cuu chung.
+5. Sau do moi toi uu content scoring va multi-page sau, tranh mo rong khi Research chua co output dung chung.
+
+## Tien do thuc thi
+
+- 2026-06-06: Da them ResearchPacket doc lap, `research-standalone`, `page-status` va test CLI.
+- 2026-06-06: Da noi `run-daily`/`deliver-daily-packet` sang ResearchPacket, van giu `research_brief` trong payload de khong pha workflow cu, dong thoi luu artifact `research_packet` khi `--save`.

@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.page_registry import PageRegistry
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
@@ -32,6 +33,7 @@ from fanpage_agent.services.auto_content import AutoContentOrchestrator
 from fanpage_agent.services.hashtag import HashtagService
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
 from fanpage_agent.services.scheduled_publish import ScheduledPublishService
+from fanpage_agent.services.research_packet import build_research_packet, packet_to_brief_payload, save_research_packet
 from fanpage_agent.services.variant_scorer import VariantScorer
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
@@ -1026,11 +1028,19 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings)
     store = build_store(settings=settings, args=args)
-    research_brief = _build_research_service().build_brief(
-        store=store,
-        comment_csv=args.comment_file,
-        campaign_notes_file=args.campaign_file,
+    page_context = PageRegistry(settings).page_context(None)
+    research_packet = build_research_packet(
+        history_file=args.history_file,
+        metrics_file=args.metrics_file,
+        comment_file=args.comment_file,
+        campaign_file=args.campaign_file,
+        calendar_file=args.calendar_file,
+        job_id=f"daily-{args.run_date}",
+        fetch_external_trends=False,
+        page_id=str(page_context.get("page_id", "")),
+        page_context=page_context,
     )
+    research_brief = research_packet.brief
     packet = DailyOpsService(
         planner=PlannerService(llm_client=llm_client),
         writer=WriterService(llm_client=llm_client),
@@ -1042,8 +1052,12 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
         write_calendar=args.write_calendar,
         research_brief=research_brief,
     )
+    packet["research_packet"] = packet_to_brief_payload(research_packet)
     if args.save:
         packet["artifacts"] = build_daily_artifacts(settings, packet, args.run_date)
+        packet["artifacts"]["research_packet"] = str(
+            save_research_packet(research_packet, settings.artifacts_dir / "research_packets")
+        )
         if args.write_calendar:
             packet["store"] = {
                 "calendar": store.attach_draft_caption_ref(
@@ -1061,11 +1075,19 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings)
     store = build_store(settings=settings, args=args)
-    research_brief = _build_research_service().build_brief(
-        store=store,
-        comment_csv=args.comment_file,
-        campaign_notes_file=args.campaign_file,
+    page_context = PageRegistry(settings).page_context(None)
+    research_packet = build_research_packet(
+        history_file=args.history_file,
+        metrics_file=args.metrics_file,
+        comment_file=args.comment_file,
+        campaign_file=args.campaign_file,
+        calendar_file=args.calendar_file,
+        job_id=f"daily-{args.run_date}",
+        fetch_external_trends=False,
+        page_id=str(page_context.get("page_id", "")),
+        page_context=page_context,
     )
+    research_brief = research_packet.brief
     packet = DailyOpsService(
         planner=PlannerService(llm_client=llm_client),
         writer=WriterService(llm_client=llm_client),
@@ -1077,8 +1099,12 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
         write_calendar=args.write_calendar,
         research_brief=research_brief,
     )
+    packet["research_packet"] = packet_to_brief_payload(research_packet)
     if args.save:
         packet["artifacts"] = build_daily_artifacts(settings, packet, args.run_date)
+        packet["artifacts"]["research_packet"] = str(
+            save_research_packet(research_packet, settings.artifacts_dir / "research_packets")
+        )
         if args.write_calendar:
             packet["store"] = {
                 "calendar": store.attach_draft_caption_ref(
