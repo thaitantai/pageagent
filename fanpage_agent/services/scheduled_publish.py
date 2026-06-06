@@ -81,6 +81,9 @@ class ScheduledPublishService:
                 result.skipped.append({
                     "calendar_id": calendar_id,
                     "reason": "Already published",
+                    "reason_code": "already_published",
+                    "status": status,
+                    "approval_status": approval_status,
                 })
                 continue
 
@@ -89,6 +92,21 @@ class ScheduledPublishService:
                 result.skipped.append({
                     "calendar_id": calendar_id,
                     "reason": f"Not approved (status={approval_status})",
+                    "reason_code": "approval_status_not_approved",
+                    "status": status,
+                    "approval_status": approval_status,
+                    "next_step": "Approve the caption before scheduled-publish can publish it.",
+                })
+                continue
+
+            if not row.get("final_caption_ref"):
+                result.skipped.append({
+                    "calendar_id": calendar_id,
+                    "reason": "Missing final caption reference",
+                    "reason_code": "missing_final_caption_ref",
+                    "status": status,
+                    "approval_status": approval_status,
+                    "next_step": "Run approve-caption so the approved caption artifact is recorded.",
                 })
                 continue
 
@@ -97,6 +115,9 @@ class ScheduledPublishService:
                 result.skipped.append({
                     "calendar_id": calendar_id,
                     "reason": f"Scheduled for {item_date}, reference is {ref}",
+                    "reason_code": "scheduled_for_future",
+                    "status": status,
+                    "approval_status": approval_status,
                 })
                 continue
 

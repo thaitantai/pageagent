@@ -70,9 +70,13 @@ class AutoApprovalEngine:
 
             # Skip already-finalised items
             if approval_status in ("approved", "auto_approved") or status == "published":
+                reason_code = "already_published" if status == "published" else "already_finalized"
                 result.skipped.append({
                     "calendar_id": calendar_id,
                     "reason": f"Already {approval_status if approval_status != 'pending' else 'published'}",
+                    "reason_code": reason_code,
+                    "status": status,
+                    "approval_status": approval_status,
                 })
                 continue
 
@@ -81,6 +85,10 @@ class AutoApprovalEngine:
                 result.skipped.append({
                     "calendar_id": calendar_id,
                     "reason": "No draft caption ref",
+                    "reason_code": "missing_draft_caption_ref",
+                    "status": status,
+                    "approval_status": approval_status,
+                    "next_step": "Generate or attach a draft caption before process-pending.",
                 })
                 continue
 
@@ -96,6 +104,9 @@ class AutoApprovalEngine:
                     result.skipped.append({
                         "calendar_id": calendar_id,
                         "reason": "; ".join(banned_issues),
+                        "reason_code": "banned_phrase_detected",
+                        "status": status,
+                        "approval_status": approval_status,
                     })
                     continue
 
@@ -107,6 +118,9 @@ class AutoApprovalEngine:
                     result.skipped.append({
                         "calendar_id": calendar_id,
                         "reason": f"Duplicate topic with recent history: {row.get('topic', '')}",
+                        "reason_code": "duplicate_topic",
+                        "status": status,
+                        "approval_status": approval_status,
                     })
                     continue
 
@@ -133,6 +147,9 @@ class AutoApprovalEngine:
                     result.skipped.append({
                         "calendar_id": calendar_id,
                         "reason": "; ".join(v_result.issues),
+                        "reason_code": "verification_failed",
+                        "status": status,
+                        "approval_status": approval_status,
                     })
                     continue
 

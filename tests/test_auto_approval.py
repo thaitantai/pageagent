@@ -79,6 +79,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
         self.assertEqual(result.auto_approved_count, 1)  # item 2 passes
         self.assertEqual(result.skipped_count, 1)  # item 1 skipped
         self.assertIn("banned phrase", result.skipped[0]["reason"].lower())
+        self.assertEqual(result.skipped[0]["reason_code"], "banned_phrase_detected")
 
     # ── RED test 3: already approved ────────────────────────────
 
@@ -101,6 +102,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
 
         self.assertEqual(result.auto_approved_count, 1)  # item 2 auto-approved
         self.assertEqual(result.skipped_count, 1)  # item 1 skipped (already approved)
+        self.assertEqual(result.skipped[0]["reason_code"], "already_finalized")
 
     # ── RED test 4: verification fail ───────────────────────────
 

@@ -133,6 +133,28 @@ class ScheduledPublishServiceTest(unittest.TestCase):
         self.assertIn("published_at", rows[0])
         self.assertTrue(rows[0]["published_at"])  # not empty
 
+    def test_skipped_items_include_operator_reason_codes(self):
+        """Skipped scheduled items should explain what an operator must fix."""
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self._make_store_with_approved_items(Path(tmp))
+            rows = store._read_calendar_rows()
+            rows[0]["approval_status"] = "pending"
+            rows[0]["status"] = "planned"
+            rows[1]["final_caption_ref"] = ""
+            store._write_calendar_rows(rows)
+
+            service = ScheduledPublishService(
+                store=store,
+                brand_id=self.profile.brand_id,
+            )
+            result = service.publish_due(reference_date="2026-06-02")
+
+        reason_codes = {item["reason_code"] for item in result.skipped}
+        self.assertEqual(result.published_count, 0)
+        self.assertIn("approval_status_not_approved", reason_codes)
+        self.assertIn("missing_final_caption_ref", reason_codes)
+        self.assertTrue(all("approval_status" in item for item in result.skipped))
+
 
 class ScheduledPublishWithFacebookTest(unittest.TestCase):
     """Test publishing with FacebookClient integration."""
@@ -218,6 +240,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
             rows = store._read_calendar_rows()
             rows[0]["approval_status"] = "approved"
             rows[0]["status"] = "approved"
+            rows[0]["final_caption_ref"] = str(tmpdir / "caption.json")
             store._write_calendar_rows(rows)
 
             service = ScheduledPublishService(
@@ -258,6 +281,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
             rows = store._read_calendar_rows()
             rows[0]["approval_status"] = "approved"
             rows[0]["status"] = "approved"
+            rows[0]["final_caption_ref"] = str(tmpdir / "caption.json")
             store._write_calendar_rows(rows)
 
             service = ScheduledPublishService(
