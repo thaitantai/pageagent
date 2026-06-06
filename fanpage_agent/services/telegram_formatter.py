@@ -215,6 +215,7 @@ class TelegramFormatterService:
                         f"   status: {item.get('status', '-')} | approval: {item.get('approval_status', '-')}",
                         f"   pillar: {item.get('pillar', '-')}",
                         f"   draft caption: {item.get('draft_caption_ref', '-') or '-'}",
+                        *self._variant_score_lines(item),
                         *self._caption_action_lines(item),
                     ]
                 )
@@ -397,6 +398,26 @@ class TelegramFormatterService:
             f"approve: python3 -m fanpage_agent.main approve-caption --calendar-id {calendar_id} --caption-file {draft_caption_ref} --approved-by <NAME> --approved-at <ISO_TIME>",
             f"reject: python3 -m fanpage_agent.main reject-caption --calendar-id {calendar_id} --reason <REASON> --rejected-at <ISO_TIME>",
         ]
+
+    @staticmethod
+    def _variant_score_lines(item: dict) -> list[str]:
+        recommended = item.get("recommended_variant") or {}
+        scores = item.get("variant_scores") or []
+        if not recommended and not scores:
+            return []
+        lines = []
+        if recommended:
+            lines.append(
+                f"   recommended variant: {recommended.get('variant_id', '-')} "
+                f"(score {recommended.get('score', '-')})"
+            )
+        if scores:
+            compact = ", ".join(
+                f"{score.get('variant_id', '-')}: {score.get('score', '-')}"
+                for score in scores[:4]
+            )
+            lines.append(f"   variant scores: {compact}")
+        return lines
 
     @staticmethod
     def _caption_action_lines(item: dict) -> list[str]:

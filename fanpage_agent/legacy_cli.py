@@ -13,7 +13,9 @@ from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
 from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
+from fanpage_agent.core.types import ContentPackage, ContentVariant
 from fanpage_agent.loaders.brand_loader import load_brand_profile
+from fanpage_agent.memory.performance import PerformanceMemory
 from fanpage_agent.services.analytics import AnalyticsService
 from fanpage_agent.services.community_triage import CommunityTriageService
 from fanpage_agent.services.daily_ops import DailyOpsService
@@ -30,6 +32,7 @@ from fanpage_agent.services.auto_content import AutoContentOrchestrator
 from fanpage_agent.services.hashtag import HashtagService
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
 from fanpage_agent.services.scheduled_publish import ScheduledPublishService
+from fanpage_agent.services.variant_scorer import VariantScorer
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
 from fanpage_agent.scraping.trend_scraper import TrendScraper
@@ -305,6 +308,8 @@ def build_parser() -> argparse.ArgumentParser:
     approval_queue_parser.add_argument("--limit", type=int)
     approval_queue_parser.add_argument("--save", action="store_true")
     approval_queue_parser.add_argument("--chat-id")
+    approval_queue_parser.add_argument("--score-variants", action="store_true")
+    approval_queue_parser.add_argument("--memory-db", default=str(ROOT_DIR / "data" / "agent" / "memory.db"))
     add_store_backend_arg(approval_queue_parser)
 
     approval_audit_parser = subparsers.add_parser("approval-audit")
@@ -733,6 +738,72 @@ def build_triage_store_payload(args: argparse.Namespace) -> dict:
     }
 
 
+def _content_package_from_caption_item(item: dict) -> ContentPackage | None:
+    caption_ref = str(item.get("draft_caption_ref", "") or "")
+    if not caption_ref:
+        return None
+    caption_path = Path(caption_ref)
+    if not caption_path.is_absolute():
+        caption_path = ROOT_DIR / caption_path
+    if not caption_path.exists():
+        return None
+
+    raw = json.loads(caption_path.read_text(encoding="utf-8"))
+    variants = []
+    for index, raw_variant in enumerate(raw.get("variants", []), start=1):
+        label = str(raw_variant.get("label") or raw_variant.get("variant_id") or index)
+        variants.append(
+            ContentVariant(
+                variant_id=label,
+                topic=str(raw.get("topic") or item.get("topic", "")),
+                pillar=str(item.get("pillar", "")),
+                caption=str(raw_variant.get("caption", "")),
+                hook=str(raw_variant.get("hook", "")),
+                cta=str(raw_variant.get("cta", "")),
+                format=str(item.get("format", "") or "post_short"),
+                tone_tags=list(raw_variant.get("tone_tags", []) or []),
+                visual_brief=raw_variant.get("visual_brief"),
+            )
+        )
+    return ContentPackage(
+        package_id=str(item.get("calendar_id") or caption_path.stem),
+        brand_id=str(item.get("brand_id") or ""),
+        scheduled_date=str(item.get("date") or ""),
+        variants=variants,
+    )
+
+
+def enrich_items_with_variant_scores(items: list[dict], memory_db: str | Path | None) -> dict:
+    if not memory_db:
+        return {"scored_items": 0, "skipped_items": len(items)}
+
+    scorer = VariantScorer(PerformanceMemory(db_path=Path(memory_db)))
+    scored = 0
+    skipped = 0
+    for item in items:
+        package = _content_package_from_caption_item(item)
+        if package is None or not package.variants:
+            skipped += 1
+            continue
+        breakdowns = scorer.score_package(package)
+        item["variant_scores"] = [
+            {
+                "variant_id": breakdown.variant_id,
+                "score": breakdown.score,
+                "matched_patterns": breakdown.matched_patterns,
+            }
+            for breakdown in breakdowns
+        ]
+        if package.winning_variant:
+            item["recommended_variant"] = {
+                "variant_id": package.winning_variant.variant_id,
+                "score": package.winning_variant.score,
+                "caption_preview": package.winning_variant.caption[:160],
+            }
+        scored += 1
+    return {"scored_items": scored, "skipped_items": skipped}
+
+
 def build_calendar_store_payload(args: argparse.Namespace) -> dict:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     items = build_store(settings=settings, args=args).list_calendar_items(
@@ -742,10 +813,16 @@ def build_calendar_store_payload(args: argparse.Namespace) -> dict:
         metrics_pending=getattr(args, "metrics_pending", False),
         limit=getattr(args, "limit", None),
     )
-    return {
+    payload = {
         "items": items,
         "summary": summarize_calendar_items(items),
     }
+    if getattr(args, "score_variants", False):
+        payload["variant_scoring"] = enrich_items_with_variant_scores(
+            items,
+            getattr(args, "memory_db", None),
+        )
+    return payload
 
 
 def build_approval_audit_payload(args: argparse.Namespace) -> dict:
