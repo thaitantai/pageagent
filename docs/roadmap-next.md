@@ -114,3 +114,5 @@ Viec can lam:
 - 2026-06-06: Da noi `run-daily`/`deliver-daily-packet` sang ResearchPacket, van giu `research_brief` trong payload de khong pha workflow cu, dong thoi luu artifact `research_packet` khi `--save`.
 - 2026-06-06: Da them Source Registry va SourceDocument nen ResearchPacket co the ghi nhan nguon dang tin theo page/topic qua `--source-registry-file`.
 - 2026-06-06: Da them ScraplingSourceCollector opt-in qua `--fetch-source-documents`, co cache `--source-cache-dir` de ResearchPacket luu noi dung nguon that khi can.
+- 2026-06-06: Da them Evidence & Insight Extractor va Research Quality Gate de bien SourceDocument thanh evidence co `source_id`/`trust_score` va canh bao chat luong.
+- 2026-06-06: Da nang format Research Brief cho operator thay duoc confidence, so nguon, source-backed insights va quality warnings ngay trong digest.
