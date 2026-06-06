@@ -240,6 +240,10 @@ def cli() -> None:
                        help="page id whose profile should guide research/strategy")
     parser.add_argument("--source-registry-file",
                        help="JSON registry of trusted research sources")
+    parser.add_argument("--fetch-source-documents", action="store_true",
+                       help="fetch registry URLs with Scrapling and store extracted text")
+    parser.add_argument("--source-cache-dir", default="data/research_source_cache",
+                       help="cache directory for fetched source documents")
     parser.add_argument("--no-external-trends", action="store_true",
                        help="skip external trend fetch for deterministic/offline runs")
 
@@ -282,6 +286,8 @@ def cli() -> None:
             job_id=args.job_id,
             page_id=args.page_id,
             source_registry_file=args.source_registry_file,
+            fetch_source_documents=args.fetch_source_documents,
+            source_cache_dir=args.source_cache_dir,
             fetch_external_trends=not args.no_external_trends,
         )
 
@@ -424,6 +430,8 @@ def _run_research_standalone(
     job_id: str | None = None,
     page_id: str | None = None,
     source_registry_file: str | None = None,
+    fetch_source_documents: bool = False,
+    source_cache_dir: str | None = None,
     fetch_external_trends: bool = True,
 ) -> None:
     from config import Settings
@@ -441,6 +449,8 @@ def _run_research_standalone(
         page_id=str(page_context.get("page_id", page_id or "")),
         page_context=page_context,
         source_registry_file=source_registry_file,
+        fetch_source_documents=fetch_source_documents,
+        source_cache_dir=source_cache_dir,
         fetch_external_trends=fetch_external_trends,
     )
     output_path = save_research_packet(packet, output_dir=output_dir)

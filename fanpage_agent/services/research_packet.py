@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.models import ResearchPacket
+from fanpage_agent.scraping.source_collector import ScraplingSourceCollector
 from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.research_sources import SourceRegistry
 
@@ -26,6 +27,8 @@ def build_research_packet(
     page_id: str | None = None,
     page_context: dict[str, object] | None = None,
     source_registry_file: str | Path | None = None,
+    fetch_source_documents: bool = False,
+    source_cache_dir: str | Path | None = None,
 ) -> ResearchPacket:
     store = LocalSheetStore(
         calendar_csv=calendar_file,
@@ -37,10 +40,17 @@ def build_research_packet(
     if not isinstance(topic_focus, list):
         topic_focus = []
     registry = SourceRegistry.from_file(source_registry_file)
-    registry_documents = registry.to_documents(
+    selected_sources = registry.select(
         page_id=page_id or str(effective_page_context.get("page_id", "")),
         topics=[str(item) for item in topic_focus],
     )
+    if fetch_source_documents:
+        registry_documents = ScraplingSourceCollector(cache_dir=source_cache_dir).collect(selected_sources)
+    else:
+        registry_documents = registry.to_documents(
+            page_id=page_id or str(effective_page_context.get("page_id", "")),
+            topics=[str(item) for item in topic_focus],
+        )
     brief = ResearchService().build_brief(
         store=store,
         comment_csv=comment_file,
@@ -62,6 +72,7 @@ def build_research_packet(
             "campaign_file": str(campaign_file or ""),
             "calendar_file": str(calendar_file),
             "source_registry_file": str(source_registry_file or ""),
+            "source_cache_dir": str(source_cache_dir or ""),
         },
         brief=brief,
     )

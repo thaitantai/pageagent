@@ -173,6 +173,8 @@ def build_parser() -> argparse.ArgumentParser:
     daily_parser.add_argument("--comment-file", default=str(DEFAULT_COMMENT_FILE))
     daily_parser.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE))
     daily_parser.add_argument("--source-registry-file")
+    daily_parser.add_argument("--fetch-source-documents", action="store_true")
+    daily_parser.add_argument("--source-cache-dir", default="data/research_source_cache")
     daily_parser.add_argument("--write-calendar", action="store_true")
     daily_parser.add_argument("--save", action="store_true")
     add_store_backend_arg(daily_parser)
@@ -187,6 +189,8 @@ def build_parser() -> argparse.ArgumentParser:
     daily_delivery_parser.add_argument("--comment-file", default=str(DEFAULT_COMMENT_FILE))
     daily_delivery_parser.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE))
     daily_delivery_parser.add_argument("--source-registry-file")
+    daily_delivery_parser.add_argument("--fetch-source-documents", action="store_true")
+    daily_delivery_parser.add_argument("--source-cache-dir", default="data/research_source_cache")
     daily_delivery_parser.add_argument("--write-calendar", action="store_true")
     daily_delivery_parser.add_argument("--save", action="store_true")
     daily_delivery_parser.add_argument("--chat-id")
@@ -1042,6 +1046,8 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
         page_id=str(page_context.get("page_id", "")),
         page_context=page_context,
         source_registry_file=args.source_registry_file,
+        fetch_source_documents=args.fetch_source_documents,
+        source_cache_dir=args.source_cache_dir,
     )
     research_brief = research_packet.brief
     packet = DailyOpsService(
@@ -1090,6 +1096,8 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
         page_id=str(page_context.get("page_id", "")),
         page_context=page_context,
         source_registry_file=args.source_registry_file,
+        fetch_source_documents=args.fetch_source_documents,
+        source_cache_dir=args.source_cache_dir,
     )
     research_brief = research_packet.brief
     packet = DailyOpsService(
