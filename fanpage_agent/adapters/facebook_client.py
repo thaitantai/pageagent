@@ -277,6 +277,60 @@ class FacebookClient:
         return raw.get("data", [])
 
     # ------------------------------------------------------------------
+    # Cross-page public API (any page_id, not just ours)
+    # ------------------------------------------------------------------
+
+    def get_public_page_info(self, page_id: str) -> dict:
+        """Fetch basic info about any public Facebook page.
+
+        Uses the authenticated page's token; the Graph API returns
+        public metadata for any page a Page Access Token can see.
+
+        Returns dict with keys: ``id``, ``name``, ``category``,
+        ``description``, ``link``, ``fan_count``. Key may be absent
+        if the field is not public.
+        """
+        return self._request(
+            "GET",
+            f"/{self.api_version}/{page_id}",
+            params={
+                "fields": "id,name,category,description,link,fan_count",
+            },
+        )
+
+    def get_public_page_posts(
+        self, page_id: str, limit: int = 25
+    ) -> list[dict]:
+        """Fetch recent posts from any public Facebook page.
+
+        Returns the same insight-shaped dicts as :meth:`get_page_posts`,
+        keyed by ``id``, ``message``, ``created_time``, ``permalink_url``,
+        with like/comment/share counts.
+
+        Parameters
+        ----------
+        page_id : str
+            Target page ID (can be any public page).
+        limit : int
+            Max posts to fetch (max API limit: 100 per call).
+        """
+        fields = (
+            "id,message,created_time,permalink_url,shares,"
+            "likes.limit(0).summary(true),comments.limit(0).summary(true)"
+        )
+        raw = self._request(
+            "GET",
+            f"/{self.api_version}/{page_id}/posts",
+            params={
+                "fields": fields,
+                "limit": str(limit),
+                "access_token": self.settings.fb_page_token,
+            },
+        )
+        data = raw.get("data", [])
+        return [self._parse_post_insights(item) for item in data]
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 

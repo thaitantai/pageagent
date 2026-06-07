@@ -35,6 +35,7 @@ class PageConfig:
     content_policy: dict = field(default_factory=dict)
     banned_topics: list[str] = field(default_factory=list)
     research_sources: list[str] = field(default_factory=list)
+    competitor_pages: list[str] = field(default_factory=list)
     api_version: str = "v21.0"
     is_default: bool = False
 
@@ -197,6 +198,7 @@ class Settings(BaseModel):
                     content_policy=dict(pdata.get("content_policy", {})),
                     banned_topics=list(pdata.get("banned_topics", [])),
                     research_sources=list(pdata.get("research_sources", [])),
+                    competitor_pages=list(pdata.get("competitor_pages", [])),
                     api_version=pdata.get("api_version", self.fb_api_version),
                 )
         # Fallback to default

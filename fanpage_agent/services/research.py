@@ -18,6 +18,9 @@ from fanpage_agent.models import (
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.services.competitor_page_discovery import (
+    CompetitorPageDiscoveryService,
+)
 from fanpage_agent.services.offer_discovery import OfferDiscoveryService
 from fanpage_agent.services.offer_evaluator import OfferEvaluator
 from fanpage_agent.services.product_topic_discovery import (
@@ -55,6 +58,7 @@ class ResearchService:
         quality_gate: ResearchQualityGate | None = None,
         topic_discovery: ProductAwareTopicDiscovery | None = None,
         offer_evaluator: OfferEvaluator | None = None,
+        competitor_discovery: CompetitorPageDiscoveryService | None = None,
     ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
@@ -62,6 +66,7 @@ class ResearchService:
         self._quality_gate = quality_gate or ResearchQualityGate()
         self._topic_discovery = topic_discovery or ProductAwareTopicDiscovery()
         self._offer_evaluator = offer_evaluator
+        self._competitor_discovery = competitor_discovery or CompetitorPageDiscoveryService()
 
     def build_brief(
         self,
@@ -75,6 +80,8 @@ class ResearchService:
         page_context: dict[str, Any] | None = None,
         discover_product_topics: bool = False,
         discover_offers: bool = False,
+        scan_competitor_pages: bool = False,
+        competitor_page_ids: list[str] | None = None,
         max_product_topics: int = 8,
     ) -> ResearchBrief:
         """Build research brief with optional web search + scrape.
@@ -213,6 +220,26 @@ class ResearchService:
                 recommendations.append(
                     f"Phát hiện {len(discovered)} offer mới từ nội dung crawl — "
                     "đã đưa vào pipeline đánh giá."
+                )
+
+        # --- CompetitorPageDiscovery: phân tích post Facebook page cùng niche ---
+        if scan_competitor_pages and competitor_page_ids:
+            fb_pages = list(dict.fromkeys(p.strip() for p in competitor_page_ids if p.strip()))
+            discovered_offers, new_pages = self._competitor_discovery.discover(
+                competitor_page_ids=fb_pages,
+                existing_offers=[p.product_name for p in product_topics],
+            )
+            if discovered_offers:
+                product_topics.extend(discovered_offers)
+                recommendations.append(
+                    f"Phát hiện {len(discovered_offers)} offer từ phân tích "
+                    f"{len(fb_pages)} page Facebook cùng niche."
+                )
+            if new_pages:
+                new_page_str = ", ".join(new_pages[:3])
+                recommendations.append(
+                    f"Tự động phát hiện {len(new_pages)} page Facebook mới từ "
+                    f"mention trong post — {new_page_str}."
                 )
 
         quality_report = self._quality_gate.evaluate(
