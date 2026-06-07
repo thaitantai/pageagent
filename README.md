@@ -1,8 +1,40 @@
 # Fanpage Agent
 
-Fanpage Agent la runtime duy nhat dang duoc phat trien lien tuc cho viec lap ke hoach, tao noi dung, duyet, xuat ban, cham soc cong dong va bao cao hieu qua fanpage.
+> Fanpage Agent là runtime duy nhất đang được phát triển liên tục cho việc lập kế hoạch, tạo nội dung, duyệt, xuất bản, chăm sóc cộng đồng và báo cáo hiệu quả fanpage.
 
-## Setup OpenRouter để test thật
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Architecture](#architecture)
+- [Deployment](#deployment)
+- [Development](#development)
+- [Ghi chú](#ghi-chu)
+
+## Features
+
+| Trạng thái | Tính năng |
+|------------|-----------|
+| ✅ | Tick cycle: gather → decide → auto-generate → publish → repeat |
+| ✅ | Facebook API publishing với PerformanceMemory recording |
+| ✅ | Auto self-reply: LLM-generated comment ngay sau publish |
+| ✅ | Quality gate: generic pattern rejection (9 patterns), 10-200 char bounds |
+| ✅ | Facebook Insights: reach / engaged_users / engagement_rate qua /insights edge |
+| ✅ | Writer: 6 hook patterns (education, problem, emotion, story, list, curiosity) với deterministic rotation |
+| ✅ | Rotating hashtag pool per pillar |
+| ✅ | Visual brief field trong ContentVariant |
+| ✅ | CommunityAgent: live comment fetch + triage từ Facebook API |
+| ✅ | Weekly analytics report cron |
+| ✅ | Research Agent: topic discovery, trend analysis, offer evaluation |
+| ✅ | AccessTrade affiliate API tích hợp |
+| ✅ | Competitor page discovery từ Facebook |
+| ✅ | Multi-agent pipeline: Research → Strategist → Writer → Designer → Publisher |
+| ✅ | Hermes cron status reporter |
+| ✅ | Settings auto-load từ .env |
+| ✅ | replied_comments.json dedup tracking |
+
+## Quick Start
 1. Copy env template:
 ```bash
 cp .env.example .env
@@ -15,29 +47,38 @@ cp .env.example .env
 LLM_MODEL=google/gemma-3-27b-it:free
 LLM_MODEL_CANDIDATES=meta-llama/llama-3.3-8b-instruct:free,mistralai/mistral-small-3.2-24b-instruct:free,qwen/qwen3-14b:free
 LLM_MAX_TOKENS=900
+
 # nếu account có credit, có thể dùng:
+
 # LLM_MODEL=openai/gpt-4.1-mini
+
 # LLM_MODEL_CANDIDATES=
+
 # LLM_MAX_TOKENS=1200
 ```
 
 4. Repo giờ tự đọc `.env`, nên không cần `source .env` thủ công nữa. Khi model đầu fail kiểu `No endpoints found`, `404`, `402 insufficient credits`, client sẽ tự thử model kế tiếp trong `LLM_MODEL_CANDIDATES`. `LLM_MAX_TOKENS` cho phép hạ request size khi account credit thấp.
 
-## Chạy test
+### Chạy test
+
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-## Roadmap va trang thai phat trien
-Roadmap giai doan tiep theo nam tai `docs/roadmap-next.md`.
-Package boundary notes nam tai `fanpage_agent/README.md`.
+### Roadmap và trạng thái phát triển
+
+Roadmap giai đoạn tiếp theo nằm tại `docs/roadmap-next.md`.
+Package boundary notes nằm tại `fanpage_agent/README.md`.
 
 ```bash
 python3 -m fanpage_agent.main roadmap-status
 python3 -m fanpage_agent.main harness-status --data-dir data/agent --limit 5
 ```
 
-## Sinh weekly plan
+## Usage
+
+### Weekly plan
+
 ```bash
 python3 -m fanpage_agent.main plan-week \
   --brand-file data/sample/brand_profile.json \
@@ -46,7 +87,8 @@ python3 -m fanpage_agent.main plan-week \
   --save
 ```
 
-## Sinh caption package
+### Caption package
+
 ```bash
 python3 -m fanpage_agent.main write-caption \
   --brand-file data/sample/brand_profile.json \
@@ -57,26 +99,9 @@ python3 -m fanpage_agent.main write-caption \
   --save
 ```
 
-## Gửi preview Telegram thật
+### Research brief
+
 ```bash
-export TELEGRAM_BOT_TOKEN=your-bot-token
-export TELEGRAM_CHAT_ID=your-chat-id
-python3 -m fanpage_agent.main send-telegram-preview \
-  --artifact-type plan \
-  --input-file artifacts/plans/weekly-plan-brand_abc-2026-06-30.json
-
-python3 -m fanpage_agent.main send-telegram-preview \
-  --artifact-type approval \
-  --input-file artifacts/approvals/approval-queue.json
-
-python3 -m fanpage_agent.main send-telegram-preview \
-  --artifact-type metrics \
-  --input-file artifacts/metrics/metrics-backlog.json
-
-python3 -m fanpage_agent.main send-telegram-preview \
-  --artifact-type research \
-  --input-file artifacts/research/research-brief.json
-
 python3 -m fanpage_agent.main deliver-research-brief \
   --history-file data/post_history.csv \
   --metrics-file data/post_metrics.csv \
@@ -85,12 +110,57 @@ python3 -m fanpage_agent.main deliver-research-brief \
   --save
 ```
 
-## Approval queue từ calendar
+### Daily packet
+
 ```bash
+python3 -m fanpage_agent.main deliver-daily-packet \
+  --brand-file data/sample/brand_profile.json \
+  --run-date "$(date +%F)" \
+  --days 1 \
+  --calendar-file data/content_calendar.csv \
+  --history-file data/post_history.csv \
+  --metrics-file data/post_metrics.csv \
+  --comment-file data/comment_inbox.csv \
+  --campaign-file data/campaign_notes.json \
+  --write-calendar \
+  --save \
+  --store-backend local
+```
+
+`run-daily --write-calendar --save` và `deliver-daily-packet --write-calendar --save`
+sẽ lưu thêm `artifacts.caption_package` và ghi `draft_caption_ref` vào row calendar.
+
+### Telegram preview
+
+```bash
+export TELEGRAM_BOT_TOKEN=your-bot-token
+export TELEGRAM_CHAT_ID=your-chat-id
+
+# Plan preview
+python3 -m fanpage_agent.main send-telegram-preview \
+  --artifact-type plan \
+  --input-file artifacts/plans/weekly-plan-brand_abc-2026-06-30.json
+
+# Approval preview
+python3 -m fanpage_agent.main send-telegram-preview \
+  --artifact-type approval \
+  --input-file artifacts/approvals/approval-queue.json
+
+# Research preview
+python3 -m fanpage_agent.main send-telegram-preview \
+  --artifact-type research \
+  --input-file artifacts/research/research-brief.json
+```
+
+### Approval queue
+
+```bash
+# List pending items
 python3 -m fanpage_agent.main list-calendar-items \
   --calendar-file data/content_calendar.csv \
   --approval-status pending
 
+# Deliver queue digest
 python3 -m fanpage_agent.main deliver-approval-queue \
   --calendar-file data/content_calendar.csv \
   --history-file data/post_history.csv \
@@ -99,10 +169,8 @@ python3 -m fanpage_agent.main deliver-approval-queue \
   --limit 5
 ```
 
-`run-daily --write-calendar --save` và `deliver-daily-packet --write-calendar --save`
-sẽ lưu thêm `artifacts.caption_package` và ghi `draft_caption_ref` vào row calendar để người duyệt mở artifact rồi gọi `approve-caption` / `reject-caption`.
+### Post metrics
 
-## Ghi metric thật sau publish
 ```bash
 python3 -m fanpage_agent.main record-post-metrics \
   --calendar-file data/content_calendar.csv \
@@ -115,7 +183,8 @@ python3 -m fanpage_agent.main record-post-metrics \
   --recorded-at 2026-06-26T08:00:00
 ```
 
-## Metrics backlog để follow-up bài đã publish
+### Metrics backlog
+
 ```bash
 python3 -m fanpage_agent.main list-calendar-items \
   --calendar-file data/content_calendar.csv \
@@ -131,14 +200,17 @@ python3 -m fanpage_agent.main deliver-metrics-backlog \
   --limit 5
 ```
 
-## Community triage + state workflow
+### Community triage
+
 ```bash
+# Triage comments
 python3 -m fanpage_agent.main triage-community \
   --brand-file data/sample/brand_profile.json \
   --comment-file data/comment_inbox.csv \
   --triage-file data/comment_triage.csv \
   --write-store
 
+# Approve triage reply
 python3 -m fanpage_agent.main approve-triage-reply \
   --triage-file data/comment_triage.csv \
   --triage-id <TRIAGE_ID> \
@@ -146,6 +218,7 @@ python3 -m fanpage_agent.main approve-triage-reply \
   --approved-at 2026-06-24T09:00:00 \
   --assigned-to closer-1
 
+# Mark as sent
 python3 -m fanpage_agent.main mark-triage-reply-sent \
   --triage-file data/comment_triage.csv \
   --triage-id <TRIAGE_ID> \
@@ -153,17 +226,14 @@ python3 -m fanpage_agent.main mark-triage-reply-sent \
   --reply-permalink https://facebook.com/comment/123 \
   --assigned-to closer-1
 
+# Resolve triage item
 python3 -m fanpage_agent.main resolve-triage-item \
   --triage-file data/comment_triage.csv \
   --triage-id <TRIAGE_ID> \
   --resolved-at 2026-06-24T10:00:00 \
   --assigned-to closer-1
 
-python3 -m fanpage_agent.main list-triage-items \
-  --triage-file data/comment_triage.csv \
-  --status reopened \
-  --assigned-to qa-reviewer
-
+# Deliver triage digest
 python3 -m fanpage_agent.main deliver-triage-community \
   --brand-file data/sample/brand_profile.json \
   --triage-file data/comment_triage.csv \
@@ -172,9 +242,7 @@ python3 -m fanpage_agent.main deliver-triage-community \
   --limit 3
 ```
 
-## Hermes cron deployment
-
-Cron jobs thật đang được triển khai qua Hermes no-agent script jobs để tránh gửi trùng Telegram:
+### Hermes cron status
 
 ```bash
 hermes cron list
@@ -183,15 +251,27 @@ python3 -m fanpage_agent.main ops-status
 python3 -m fanpage_agent.main ops-status --fail-on-stale
 ```
 
----
+### Operator digest
 
-## Multi-Agent Pipeline
+```bash
+python3 -m fanpage_agent.main deliver-operator-digest \
+  --calendar-file data/content_calendar.csv \
+  --history-file data/post_history.csv \
+  --metrics-file data/post_metrics.csv \
+  --triage-file data/comment_triage.csv \
+  --limit 5 \
+  --skip-empty \
+  --save \
+  --store-backend local
+```
+
+## Architecture
 
 Fanpage Agent is a multi-agent orchestrator that runs as a Docker daemon and auto-generates content for Facebook.
 
-### Architecture
+### Pipeline
 
-```
+```text
 🕐 Daemon (tick 600s)
   ├─ 1. Gather state (calendar, community, performance, system)
   ├─ 2. Decide actions
@@ -255,9 +335,9 @@ After each publish, the pipeline:
 
 ### Data Files
 
-Runtime data belongs in the project-level `data/` directory. Keep the top of `data/` as an index of purpose-based folders; do not leave loose CSV/JSON/DB files there. Do not put SQLite DBs, operator CSVs, or generated packets inside `fanpage_agent/data/`; package directories should only contain importable code or packaged static resources.
+Runtime data belongs in the project-level `data/` directory. Keep the top of `data/` as an index of purpose-based folders; do not leave loose CSV/JSON/DB files there.
 
-```
+```text
 data/
 ├── agent/                 # Runtime state for the autonomous agent
 │   ├── memory.db          # PerformanceMemory SQLite DB
@@ -271,9 +351,9 @@ data/
 └── snapshots/             # Manual pre-run or pre-live snapshots of project data
 ```
 
-Loose root-level data files from earlier runs should be moved into `data/snapshots/<reason-date>/` before cleanup, then new live runs should read/write under `data/real/` or `data/agent/` depending on purpose.
+## Deployment
 
-### Deployment
+### Docker
 
 ```bash
 # Build image
@@ -310,29 +390,16 @@ docker ps --filter name=fanpage-agent --format "{{.Status}}"
 | `fanpage-agent-status` | `0 */6 * * *` | container health + memory report via no-agent script |
 | `fanpage-agent-weekly-report` | `0 2 * * 1` | Weekly analytics report (posts, reach, engagement, patterns) |
 
-### Current Status
+Detailed cron documentation at `docs/cron/`:
+- [Hermes jobs](docs/cron/hermes-jobs.md) — 9 deployed jobs with schedule and wrapper contract
+- [Daily ops](docs/cron/daily-ops.md), [Research brief](docs/cron/research-brief.md), [Approval queue](docs/cron/approval-queue.md)
+- [Operator digest](docs/cron/operator-digest.md), [Approval audit](docs/cron/approval-audit.md)
+- [Weekly report](docs/cron/weekly-report.md), [Metrics backlog](docs/cron/metrics-backlog.md)
+- [Community triage](docs/cron/community-triage.md), [Approved triage replies](docs/cron/approved-triage-replies.md)
 
-| ✅ Container running with auto-restart (interval 600s)
-| ✅ Tick cycle: gather → decide → auto-generate → publish → repeat
-| ✅ Facebook API publishing with PerformanceMemory recording
-| ✅ Publisher fix: posts now recorded in memory.db
-| ✅ Settings fix: .env auto-loaded from cwd, load_dotenv=True in agent runtime
-| ✅ CLI `tick` and `daemon` modes work
-| ✅ Hermes cron status reporter configured
-| ✅ Content pipe: writer output → publisher message (non-hardcoded)
-| ✅ CommunityAgent: live comment fetch + triage from Facebook API
-| ✅ Weekly analytics report cron (no-agent, every Monday)
-| ✅ **Auto self-reply**: LLM-generated comment posted right after publish
-| ✅ **Quality gate**: generic pattern rejection (9 patterns), 10–200 char bounds
-| ✅ **Facebook Insights**: real reach / engaged_users / engagement_rate via /insights edge
-| ✅ **track_performance** wired after publish in orchestrator pipeline
-| ✅ **refresh_metrics** periodic refresh every 3 ticks
-| ✅ **Writer: 6 hook patterns** (education, problem, emotion, story, list, curiosity) with deterministic rotation
-| ✅ **Rotating hashtag pool** per pillar for organic diversity
-| ✅ **visual_brief** field in ContentVariant for template/image-prompt paths
-| ✅ **replied_comments.json** dedup tracking for auto-replies
+## Development
 
-## Release notes
+### Release notes
 
 Project releases use git-cliff to generate `CHANGELOG.md` from Git history.
 
@@ -346,14 +413,15 @@ Project releases use git-cliff to generate `CHANGELOG.md` from Git history.
 
 The command uses `cliff.toml` and should run as part of the deployment checklist before creating the Git tag. See `docs/deploy.md` for the full deploy checklist.
 
-## Next implementation tasks
+### Next implementation tasks
 
-- **P1:** A/B testing variants — writer generates 2+ variants, `VariantScorer` ranks them from performance memory, and `deliver-approval-queue --score-variants --memory-db data/agent/memory.db` shows the recommended variant before operator approval.
+- **P1:** A/B testing variants — writer generates 2+ variants, `VariantScorer` ranks them from performance memory
 - **P2:** Daily community digests — cron job that fetches comments and delivers triage summary to Telegram
 - **P2:** Dashboard HTML/Markdown tổng hợp cron health + artifact health + reach/engagement metrics
 - **P3:** Multi-language support for auto-replies based on comment language detection
 
-## Ghi chú
+### Ghi chú
+
 - Bản này đã có lane OpenAI-compatible thật.
 - Đã có eval-all tối thiểu.
 - Đã có Telegram delivery thật cho artifact preview.

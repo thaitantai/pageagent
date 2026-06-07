@@ -1,10 +1,10 @@
 # Community Affiliate Page
 
-## Muc tieu
+## Mục tiêu
 
-Page kieu `community_affiliate` uu tien gia tri cong dong truoc, affiliate la lop kiem tien phia sau. Research Agent chi de xuat offer khi topic co loi ich ro cho nguoi doc va co metadata de Writer/Approval tranh hard-sell.
+Page kiểu `community_affiliate` ưu tiên giá trị cộng đồng trước, affiliate là lớp kiếm tiền phía sau. Research Agent chỉ đề xuất offer khi topic có lợi ích rõ cho người đọc và có metadata để Writer/Approval tránh hard-sell.
 
-## Page context de xuat
+## Page context đề xuất
 
 ```json
 {
@@ -34,19 +34,19 @@ Page kieu `community_affiliate` uu tien gia tri cong dong truoc, affiliate la lo
     "require_evidence_before_recommendation": true
   }
 }
-```
+```text
 
-## Cach Research Agent dung context
+## Cách Research Agent dùng context
 
-- Doc `affiliate_offers` truoc `products_services` de tao buying guide, comparison, checklist, red flags va FAQ.
-- Gan `community_first` de downstream hieu topic phai uu tien gia tri cong dong.
-- Gan `affiliate_disclosure_required` neu policy yeu cau disclosure.
-- Gan `claim_guard_required` va `risk_level=medium` khi offer co `do_not_claim`.
-- Dung `industry_focus`, `customer_pain_points`, `benefits`, `proof_points`, `competitors` de tao research query va topic score.
+- Đọc `affiliate_offers` trước `products_services` de tao buying guide, comparison, checklist, red flags va FAQ.
+- Gắn `community_first` để downstream hiểu topic phải ưu tiên giá trị cộng đồng.
+- Gắn `affiliate_disclosure_required` nếu policy yêu cầu disclosure.
+- Gắn `claim_guard_required` và `risk_level=medium` khi offer có `do_not_claim`.
+- Dùng `industry_focus`, `customer_pain_points`, `benefits`, `proof_points`, `competitors` để tạo research query và topic score.
 
-## Nguyen tac noi dung
+## Nguyên tắc nội dung
 
-- Bai viet nen bat dau tu van de nguoi mua, khong bat dau tu link.
-- Neu co gioi thieu san pham, can co ly do phu hop va disclosure affiliate.
-- Bai so sanh nen noi ro ai phu hop voi ai, khong tuyen bo mot san pham tot nhat cho moi nguoi.
-- Claim nhay cam ve suc khoe, tai chinh, me va be, my pham can nguon va guardrail ro.
+- Bài viết nên bắt đầu từ vấn đề người mua, không bắt đầu từ link.
+- Nếu có giới thiệu sản phẩm, cần có lý do phù hợp và disclosure affiliate.
+- Bài so sánh nên nói rõ ai phù hợp với ai, không tuyên bố một sản phẩm tốt nhất cho mọi người.
+- Claim nhạy cảm về sức khỏe, tài chính, mẹ và bé, mỹ phẩm cần nguồn và guardrail rõ.

@@ -34,20 +34,6 @@ from fanpage_agent.services.research_insights import EvidenceExtractor, Research
 
 logger = logging.getLogger(__name__)
 
-# Query mặc định để search trend khi không có campaign focus
-FALLBACK_SEARCH_QUERIES: list[str] = [
-    "xu hướng chăm sóc da 2026",
-    "skincare routine mới nhất",
-    "dưỡng da mùa hè Gen Z",
-    "mẹo làm đẹp an toàn cho da dầu mụn",
-    "thực phẩm chức năng làm đẹp da uy tín",
-    "review kem chống nắng tốt nhất 2026",
-    "treatment da mụn hiệu quả tại nhà",
-    "serum vitamin C review tốt nhất",
-    "retinoid cho người mới bắt đầu",
-    "chăm sóc da ban đêm đúng cách",
-]
-
 # Số items tối đa từ web search trong research brief
 MAX_SEARCH_ITEMS_IN_BRIEF = 15
 
@@ -174,7 +160,8 @@ class ResearchService:
             try:
                 # --- Bước 1: Web Search (nếu có WebSearchClient) ---
                 search_queries = self._build_search_queries(
-                    campaign_focus, top_performing_topics, web_search_queries
+                    campaign_focus, top_performing_topics, web_search_queries,
+                    page_context=page_context,
                 )
                 web_trends = self._trend_scraper.search_trends(
                     queries=search_queries,
@@ -375,10 +362,12 @@ class ResearchService:
         campaign_focus: list[str],
         top_performing_topics: list[str],
         override_queries: list[str] | None,
+        page_context: dict[str, Any] | None = None,
     ) -> list[str]:
         """Tự sinh search queries từ campaign focus + performance data.
 
-        Ưu tiên: override → campaign → top topics → fallback.
+        Ưu tiên: override → campaign → top topics → fallback (theo niche).
+        Nếu không có dữ liệu và không biết niche → trả về [] để tránh search lạc đề.
         """
         if override_queries:
             return override_queries
@@ -395,7 +384,7 @@ class ResearchService:
             queries.append(f"{topic} mới nhất")
             queries.append(f"{topic} xu hướng")
 
-        # Dedup + fallback nếu thiếu
+        # Dedup
         seen: set[str] = set()
         deduped: list[str] = []
         for q in queries:
@@ -404,16 +393,17 @@ class ResearchService:
                 seen.add(ql)
                 deduped.append(q)
 
-        # Thêm fallback nếu chưa đủ query
-        if len(deduped) < 3:
-            for fq in FALLBACK_SEARCH_QUERIES:
-                if fq.lower() not in seen:
-                    deduped.append(fq)
-                    seen.add(fq.lower())
-                if len(deduped) >= 5:
-                    break
+        # Fallback chỉ khi hoàn toàn không có query nào + biết niche
+        if not deduped:
+            industry = (page_context or {}).get("industry_focus", "").strip()
+            if industry:
+                deduped = [
+                    f"xu hướng {industry} 2026",
+                    f"{industry} mới nhất",
+                    f"mẹo {industry} hiệu quả",
+                ]
+            # Nếu không biết niche → trả về [] — search lạc đề còn tệ hơn không search
 
-        # Giới hạn tối đa 8 queries mỗi lần build brief
         return deduped[:8]
 
     def _build_evidence(

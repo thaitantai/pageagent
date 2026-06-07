@@ -14,6 +14,7 @@ from typing import Any
 from fanpage_agent.adapters.llm_adapter import LLMAdapter
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
+from fanpage_agent.prompts._loader import PromptLoader
 
 # ── Quality thresholds ──────────────────────────────────────────────
 _MIN_REPLY_LENGTH = 10
@@ -25,18 +26,8 @@ _GENERIC_REPLY_MODELS = [
 ]
 _REPLY_TIMESTAMPS_FILE = "data/agent/reply_timestamps.json"
 
-_COMMUNITY_SYSTEM_PROMPT = """Bạn là Community Manager cho fanpage skincare GenZ.
-
-NHIỆM VỤ: Trả lời bình luận của khách hàng với giọng điệu chân thật, ấm áp, gần gũi.
-
-NGUYÊN TẮC:
-- Khách khen: cảm ơn và hỏi thêm để tương tác
-- Khách hỏi: trả lời chuyên môn nhưng dễ hiểu, gợi ý inbox nếu cần tư vấn cá nhân
-- Khách phàn nàn: xin lỗi chân thành, đề nghị hỗ trợ riêng
-- Spam: không cần reply
-- GenZ tone: tự nhiên, friendly, không copy-paste
-
-Trả lời bằng JSON thuần, không markdown."""
+def _community_system_prompt() -> str:
+    return PromptLoader.load("community_system.md")
 
 
 class CommunityAgent(BaseAgent):
@@ -321,7 +312,7 @@ Output JSON:
   "reasoning": "tại sao reply thế này",
   "quality_score": 0.0
 }}"""
-            data = self._llm.generate_json(_COMMUNITY_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(_community_system_prompt(), prompt)
             if data:
                 suggestion = data.get("suggestion", "")
                 quality = data.get("quality_score", 0.5)
@@ -430,7 +421,7 @@ Output JSON:
   "summary": "tóm tắt 1-2 câu bằng tiếng Việt",
   "trend": "positive|negative|neutral"
 }}"""
-            data = self._llm.generate_json(_COMMUNITY_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(_community_system_prompt(), prompt)
             if data:
                 return AgentResult(
                     task_id="sentiment-summary",

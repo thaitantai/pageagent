@@ -3,7 +3,7 @@
 ## Mục tiêu
 Sau khi bài đã được publish, cập nhật metric thật vào content calendar và `post_metrics` store để weekly report và research loop đọc được dữ liệu mới nhất.
 
-## Command cơ bản
+### Command
 ```bash
 python3 -m fanpage_agent.main record-post-metrics \
   --calendar-file data/content_calendar.csv \
@@ -16,7 +16,7 @@ python3 -m fanpage_agent.main record-post-metrics \
   --recorded-at 2026-06-26T08:00:00
 ```
 
-## Hành vi
+### Hành vi
 - tìm row `calendar_id` trong content calendar
 - cập nhật:
   - `reach`
@@ -27,12 +27,12 @@ python3 -m fanpage_agent.main record-post-metrics \
   - `calendar`
   - `metric`
 
-## Rule vận hành
+### Rule vận hành
 - nên chạy sau `publish-post`
 - `published_at` và `permalink` nên có trước khi record metrics
 - command này không gửi Telegram; nó làm giàu store để research/report dùng lại
 
-## Verify checklist
+### Verify checklist
 - `publish-post` đã chạy thành công
 - `record-post-metrics` trả `reach`, `engagement_rate`, `engagements`, `leads` đúng
 - `weekly-report` đọc thấy row metric mới

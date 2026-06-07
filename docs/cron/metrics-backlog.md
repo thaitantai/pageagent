@@ -3,7 +3,7 @@
 ## Mục tiêu
 Tìm các bài đã publish nhưng chưa được nhập metrics thật, rồi gửi digest Telegram để người vận hành biết post nào cần cập nhật `reach / engagements / leads`.
 
-## Command cơ bản
+### Command
 ```bash
 python3 -m fanpage_agent.main deliver-metrics-backlog \
   --calendar-file data/content_calendar.csv \
@@ -14,7 +14,7 @@ python3 -m fanpage_agent.main deliver-metrics-backlog \
   --limit 5
 ```
 
-## Hành vi
+### Hành vi
 - đọc `content_calendar`
 - lọc row có:
   - `status = published`
@@ -23,11 +23,11 @@ python3 -m fanpage_agent.main deliver-metrics-backlog \
 - render digest Telegram compact
 - gửi 1 message với các item cần nhập metrics
 
-## Khi dùng
+### Khi dùng
 - chạy mỗi sáng hoặc cuối ngày sau khi team đã publish bài
 - dùng như queue follow-up trước khi chạy `record-post-metrics`
 
-## Command follow-up
+### Command follow-up
 ```bash
 python3 -m fanpage_agent.main record-post-metrics \
   --calendar-file data/content_calendar.csv \
@@ -40,7 +40,7 @@ python3 -m fanpage_agent.main record-post-metrics \
   --recorded-at 2026-06-29T08:00:00
 ```
 
-## Verify checklist
+### Verify checklist
 - `deliver-metrics-backlog` chỉ show bài published chưa có metrics
 - item đã chạy `record-post-metrics` không còn nằm trong backlog
 - Telegram digest có `calendar_id` + `permalink` để operator tra nhanh

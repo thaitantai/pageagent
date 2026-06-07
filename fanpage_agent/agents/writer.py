@@ -19,6 +19,7 @@ from fanpage_agent.core.types import (
     ContentPackage,
     ContentVariant,
 )
+from fanpage_agent.prompts._loader import PromptLoader
 
 
 def _extract_research_grounding(research_packet: dict[str, Any] | None) -> tuple[str, list[dict[str, Any]], str]:
@@ -86,50 +87,8 @@ _TONE_PERSONAS: dict[str, dict[str, str]] = {
     },
 }
 
-_WRITER_SYSTEM_PROMPT = """Bạn là Copywriter chuyên content skincare/healthcare cho GenZ Việt Nam (18-25 tuổi).
-
-NHIỆM VỤ: Viết caption Facebook thu hút, chân thật, đúng giọng GenZ theo TONE PERSONA được chỉ định.
-
-NGUYÊN TẮC CHUNG:
-- Ngắn gọn, dễ hiểu, gần gũi (xưng mình/bạn)
-- Kiến thức chuyên môn nhưng không khô khan - lồng kiến thức vào câu chuyện
-- KHÔNG phóng đại, KHÔNG hứa hẹn kết quả thần kỳ ("trắng sau 1 tuần", "hết mụn ngay lập tức")
-- Mỗi caption có: hook hút → body ngắn → CTA khéo léo
-- Luôn kết thúc bằng 1 câu hỏi mở để GenZ vào tương tác
-
-CÁC TONE PERSONA CÓ SẴN (chọn đúng 1 cho mỗi variant):
-1. 💬 Chia sẻ thật - Kể chuyện cá nhân, honest, vulnerable. Hook: từng sai → giờ hiểu. CTA: hỏi kinh nghiệm tương tự.
-2. 📚 Chuyên môn nhẹ - Fact-based, giải thích dễ hiểu. Hook: bác sĩ nói / nghiên cứu chỉ ra. CTA: cùng thảo luận.
-3. 😆 Hài hước / Meme - GenZ humor, exaggeration, từ lóng nhẹ (POV, thảo nào, xỉu). CTA: vote/comment hài.
-4. ❓ Hỏi đáp tương tác - Post dạng câu hỏi, debate, poll. KHÔNG đưa đáp án ngay. CTA: Yes/No, bạn nghĩ sao.
-5. 🔍 Review thực tế - Review honest: ưu + nhược. Hook: review thật không filter. CTA: bạn đã dùng chưa?
-
-VÍ DỤ GIỌNG VIẾT TỐT:
-• "Mình từng nghĩ toner là bước không thể thiếu cho da dầu… cho tới khi đọc nghiên cứu của bác sĩ da liễu 🤯 Mọi người có biết da dầu thực ra cần gì nhất không?"
-• "Review thật: Kem chống nắng 100k mình dùng suốt 3 tháng qua - được cái chống nắng tốt, mỏng nhẹ. Nhưng có điểm trừ là… 👇"
-• "Có bạn nào từng mua serum vì thấy quảng cáo 'trắng sau 7 ngày' chưa? Mình xin phép nói thật nhé 🙈 Dưới góc nhìn của một người làm trong ngành…"
-
-VÍ DỤ GIỌNG VIẾT CẦN TRÁNH:
-• Quá quảng cáo: "Sản phẩm này là số 1 thị trường…" ❌
-• Mơ hồ: "Chăm sóc da đúng cách mỗi ngày" ❌
-• Quá dài dòng: viết 3-4 đoạn văn không điểm nhấn ❌
-
-YÊU CẦU BẮT BUỘC:
-|- Hook: chọn 1 trong 6 style mở đầu bên dưới, phù hợp với tone persona:
-|  (A) Câu hỏi - "Bạn có bao giờ…?" (gắn với pain point cụ thể)
-|  (B) Sự thật ngược - "Mình từng nghĩ X, nhưng thực ra Y" (tạo surprise)
-|  (C) Con số - "3 bước/5 phút/2 loại serum…" (định lượng dễ nhớ)
-|  (D) Kể chuyện - "Hôm bữa mình…" (personal vignette, relatable)
-|  (E) Đánh đố - "Bạn có biết [sự thật bất ngờ về skincare] không?" (trivia hook)
-|  (F) Đồng cảm - "Có bạn nào…? Mình cũng từng vậy" (shared experience)
-|- Caption: 2-3 câu ngắn, có emoji, tự nhiên
-|- CTA: 1 câu hỏi tương tác cuối bài (không kêu gọi mua hàng)
-|- tone_tags: gồm 2-3 từ khóa, PHẢI có tên tone persona được giao (vd: ["chia_sẻ_thật", "gần_gũi"])
-|- Hashtags: #skincare #skincareroutine #genzskincare + 2-3 tag liên quan chi tiết (vd: #dau #trimun #duongam)
-
-FORMATS: text_image (ảnh + chữ), carousel (nhiều ảnh), reel (video).
-
-Trả lời bằng JSON thuần, không markdown. KHÔNG để trống field nào."""
+def _writer_system_prompt() -> str:
+    return PromptLoader.load("writer_system.md")
 
 
 class WriterAgent(BaseAgent):
@@ -266,39 +225,22 @@ class WriterAgent(BaseAgent):
                             f"  Variant {i+1}: TONE = \"{label}\""
                 for i, (_, label) in enumerate(assigned)
             )
-            prompt = f"""Viết {count} variant caption cho bài đăng Facebook về chủ đề skincare.
-
-Thương hiệu: {self._brand_id}
-Chủ đề: {topic}
-Pillar: {pillar}
-Số lượng variant: {count}
-Page context: {page_context or 'khong co'}
-Research evidence bat buoc bam theo:
-{evidence_text or '- Khong co evidence; viet can trong va noi ro la goc nhin tong hop.'}
-
-MỖI VARIANT PHẢI DÙNG ĐÚNG TONE PERSONA được chỉ định:
-
-{persona_section}
-
-Output JSON:
-{{
-  "variants": [
-    {{
-      "topic": "{topic}",
-      "pillar": "{pillar}",
-      "caption": "caption hoàn chỉnh (2-3 câu, có emoji, kết câu hỏi)",
-      "hook": "câu mở đầu thu hút (1 câu)",
-      "cta": "kêu gọi hành động (1 câu ngắn)",
-      "format": "text_image|carousel|reel",
-      "tone_tags": ["tone_persona_used", "keyword"],
-      "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"],
-      "visual_brief": "mô tả ngắn visual style cho ảnh/carousel/reel - mood, màu sắc, cách bố trí, phong cách ảnh"
-    }}
-  ]
-}}"""
+            brand_id = self._brand_id
+            page_context_str = str(page_context or 'khong co')
+            evidence_text_val = evidence_text or '- Khong co evidence; viet can trong va noi ro la goc nhin tong hop.'
+            prompt = PromptLoader.format(
+                "writer_user_variants.md",
+                count=count,
+                topic=topic,
+                pillar=pillar,
+                brand_id=brand_id,
+                page_context_str=page_context_str,
+                evidence_text=evidence_text_val,
+                persona_section=persona_section,
+            )
 
             data = self._llm.generate_json(
-                _WRITER_SYSTEM_PROMPT, prompt,
+                _writer_system_prompt(), prompt,
                 max_tokens=3000,
                 temperature=0.7,
             )
@@ -328,7 +270,7 @@ Output JSON:
                         # regenerate low scorers with higher temperature
                         retry_prompt = prompt + f"\n\n⚠️ {len(low)} variant(s) failed quality check (score < 3.0). Regenerate specifically variant #{[scored.index(v)+1 for v in low]} with stronger hook, clearer value, and a more engaging CTA. BE MORE CREATIVE."
                         retry_data = self._llm.generate_json(
-                            _WRITER_SYSTEM_PROMPT, retry_prompt,
+                            _writer_system_prompt(), retry_prompt,
                             max_tokens=3000,
                             temperature=0.85,
                         )
@@ -581,21 +523,13 @@ Output JSON:
     def _generate_hooks(self, topic: str, count: int) -> AgentResult:
         """Generate N hook options - LLM or template fallback."""
         if self._llm and topic:
-            prompt = f"""Viết {count} câu hook thu hút cho bài đăng Facebook về: {topic}
-
-Chủ đề: {topic}
-Đối tượng: GenZ Việt Nam (18-25), quan tâm skincare
-
-Output JSON:
-{{
-  "hooks": [
-    "hook 1 - ngắn gọn, gây tò mò, có cảm xúc",
-    "hook 2",
-    ...
-  ]
-}}"""
+            prompt = PromptLoader.format(
+                "writer_user_hooks.md",
+                count=count,
+                topic=topic,
+            )
             data = self._llm.generate_json(
-                _WRITER_SYSTEM_PROMPT, prompt,
+                _writer_system_prompt(), prompt,
                 max_tokens=1500,
                 temperature=0.8,
             )
@@ -627,19 +561,13 @@ Output JSON:
     def _rewrite_variant(self, variant_id: str, feedback: str) -> AgentResult:
         """Revise a variant - LLM rewrite or stub."""
         if self._llm and feedback:
-            prompt = f"""Viết LẠI caption dựa trên phản hồi sau:
-
-Variant ID: {variant_id}
-Phản hồi: {feedback}
-
-Output JSON:
-{{
-  "variant_id": "{variant_id}",
-  "revised_caption": "caption đã sửa theo feedback",
-  "changes": "mô tả ngắn những gì đã thay đổi"
-}}"""
+            prompt = PromptLoader.format(
+                "writer_user_rewrite.md",
+                variant_id=variant_id,
+                feedback=feedback,
+            )
             data = self._llm.generate_json(
-                _WRITER_SYSTEM_PROMPT, prompt,
+                _writer_system_prompt(), prompt,
                 max_tokens=2000,
                 temperature=0.6,
             )

@@ -3,7 +3,7 @@
 ## Mục tiêu
 Chạy packet vận hành hằng ngày, sinh plan + caption preview, rồi gửi cả 2 message lên Telegram.
 
-## Command
+### Command
 
 Cron-safe wrapper:
 
@@ -28,7 +28,7 @@ python3 -m fanpage_agent.main deliver-daily-packet \
   --store-backend local
 ```
 
-## Store backend note
+### Store backend note
 
 Wrapper does not force `--store-backend`; it lets the app read `.env` by default. Set shell `STORE_BACKEND=local` or `STORE_BACKEND=google` only when you intentionally want to override `.env` for one run.
 
@@ -47,11 +47,11 @@ export GOOGLE_SERVICE_ACCOUNT_FILE=/absolute/path/to/service-account.json
 export GOOGLE_SHEETS_TABS_PREFIX=fp
 ```
 
-## Telegram output
+### Telegram output
 - Message 1: Weekly Plan preview
 - Message 2: Caption Package preview
 
-## Cron mapping (Hermes)
+### Cron mapping (Hermes)
 No-agent script job, save scheduler output locally to avoid duplicate Telegram messages:
 
 ```text
@@ -61,7 +61,7 @@ Deliver: local
 Workdir: /home/tantai/.hermes/fanpage-agent
 ```
 
-## Verify
+### Verify
 - command exit code = 0
 - wrapper smoke test with fake Telegram returns `delivery.sent_count = 2`
 - JSON output có `delivery.sent_count = 2`

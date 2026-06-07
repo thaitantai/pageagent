@@ -21,6 +21,7 @@ from typing import Any
 
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
+from fanpage_agent.prompts._loader import PromptLoader
 
 warnings.filterwarnings(
     "ignore",
@@ -688,33 +689,16 @@ class ResearchAgent(BaseAgent):
 
     def _llm_extract(self, text: str, pillar: str) -> list[dict[str, str | int]]:
         try:
-            system_prompt = (
-                "Bạn là chuyên gia research nội dung skincare. "
-                "Nhiệm vụ: từ đoạn text blog đã crawl, trích xuất các chủ đề, "
-                "thành phần, xu hướng đáng chú ý liên quan đến pillar "
-                f"'{pillar}' của fanpage skincare GenZ."
+            system_prompt = PromptLoader.format(
+                "researcher_extract_system.md",
+                pillar=pillar,
             )
             truncated = text[:8000]
-            user_prompt = f"""Đoạn text từ blog skincare:
-
-{truncated}
-
-Hãy trích xuất tối đa 5 findings (chủ đề/thành phần/xu hướng) quan trọng nhất.
-
-Output JSON:
-{{{{
-  "findings": [
-    {{{{
-      "pillar": "{pillar}",
-      "topic": "chủ đề ngắn gọn (tối đa 100 ký tự)",
-      "key_points": "1-2 câu tóm tắt nội dung chính",
-      "relevance": 1-5  (mức độ liên quan đến skincare GenZ, 5 là cao nhất),
-      "source_type": "trend|ingredient|tip|myth|product"
-    }}}}
-  ]
-}}}}
-
-Chỉ trả về JSON, không markdown."""
+            user_prompt = PromptLoader.format(
+                "researcher_extract_user.md",
+                truncated=truncated,
+                pillar=pillar,
+            )
             data = self._llm.generate_json(
                 system_prompt, user_prompt,
                 max_tokens=1000, temperature=0.3,

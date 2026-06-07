@@ -66,7 +66,7 @@ Each Hermes wrapper is intentionally tiny:
 #!/usr/bin/env bash
 set -euo pipefail
 exec /home/tantai/.hermes/fanpage-agent/scripts/run_<lane>.sh
-```
+```python
 
 Project scripts keep the real command flags, including `--save`, and read backend/runtime config from `.env`.
 
@@ -187,6 +187,7 @@ For real LLM generation:
 LLM_PROVIDER=...
 LLM_MODEL=...
 LLM_API_KEY=...
+
 # optional
 LLM_BASE_URL=...
 ```

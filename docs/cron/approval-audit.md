@@ -43,6 +43,7 @@ python3 -m fanpage_agent.main deliver-approval-audit \
 ```bash
 export TELEGRAM_BOT_TOKEN='[REDACTED]'
 export TELEGRAM_CHAT_ID='[REDACTED]'
+
 # optional for tests/smoke
 export TELEGRAM_BASE_URL='https://api.telegram.org'
 ```

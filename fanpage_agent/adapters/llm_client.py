@@ -17,6 +17,7 @@ from fanpage_agent.models import (
     ResearchBrief,
     WeeklyPlan,
 )
+from fanpage_agent.prompts._loader import PromptLoader
 
 
 class MockLLMClient:
@@ -511,36 +512,11 @@ class OpenAICompatibleClient:
 
     @staticmethod
     def _weekly_plan_system_prompt() -> str:
-        return (
-            "Bạn là planner cho fanpage skincare GenZ. "
-            "TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT — mọi đề xuất phải trung thành với brand_traits và writing_rules.\n\n"
-            "NGUYÊN TẮC NỘI DUNG:\n"
-            "• Mỗi ngày 1 chủ đề KHÁC — không lặp pillar/angle 2 ngày liên tiếp\n"
-            "• Hook phải gây tò mò, có insight thật — không 'Bạn đã biết...?' chung chung\n"
-            "• Topic phải cụ thể (vd: 'Dưỡng ẩm cho da dầu mùa hè — chọn gel hay lotion?')\n"
-            "• Visual brief phải mô tả được bố cục ảnh, không chỉ tone\n"
-            "• CTA khớp objective: reach → CTA nhẹ (lưu/chia sẻ), lead → CTA rõ (link/bình luận)\n"
-            "• Format mix giữa các pillar: post_short (tips nhanh), post_long (chia sẻ sâu), reel (trend/visual)\n\n"
-            "Chỉ trả về đúng 1 JSON object hợp lệ, không markdown, không giải thích. "
-            "Bám brand voice, tránh generic, tránh overclaim.\n"
-        )
+        return PromptLoader.load("planner_system.md")
 
     @staticmethod
     def _caption_system_prompt() -> str:
-        return (
-            "Bạn là content writer cho fanpage skincare — viết cho GenZ (18-25 tuổi). "
-            "TONE OF VOICE LÀ YẾU TỐ QUAN TRỌNG NHẤT: giọng văn quyết định caption.\n\n"
-            "NGUYÊN TẮC VIẾT:\n"
-            "• Hook 3 giây đầu: gây tò mò, chạm vào pain point thật — KHÔNG 'điều ít ai nói đến'\n"
-            "• Captition ngắn: 80-150 từ, chia đoạn ngắn 1-2 câu, dễ đọc trên mobile\n"
-            "• Ngôn ngữ GenZ: gần gũi, dùng 'mình'/'bạn', đặt câu hỏi ở cuối để kích tương tác\n"
-            "• Không hoa mỹ, không claim tuyệt đối ('hiệu quả nhất', 'số 1'), không giật gân\n"
-            "• Kết CTA đúng objective: reach → mời chia sẻ/góp ý; lead → mời link/ib\n"
-            "• Mỗi variant (A/B/C) phải khác nhau rõ — khác hook, khác angle, khác cách tiếp cận\n"
-            "• Visual brief mô tả cụ thể: ảnh minh hoạ gì? layout ra sao? (vd: 'before/after 2 bức, chú thích số ngày')\n\n"
-            "Sample phrases trong brand_context là tham chiếu GIỌNG — bắt chước phong cách, không sao chép nội dung.\n\n"
-            "Chỉ trả về 1 JSON object hợp lệ, không markdown, không giải thích."
-        )
+        return PromptLoader.load("caption_system.md")
 
     @staticmethod
     def _compact_profile_payload(profile: BrandProfile) -> dict:
@@ -609,23 +585,19 @@ class OpenAICompatibleClient:
         days: int,
         research_brief: ResearchBrief | None,
     ) -> str:
-        return json.dumps(
-            {
-                "task": "generate_weekly_plan",
-                "start_date": start_date,
-                "requested_day_count": days,
-                "brand_context": OpenAICompatibleClient._compact_profile_payload(profile),
-                "research_brief": OpenAICompatibleClient._compact_research_payload(research_brief),
-                "requirements": {
-                    "plan_title_format": f"weekly-plan-{profile.brand_id}-{start_date}",
-                    "one_plan_day_per_requested_day": True,
-                    "days_output_must_be_array": "Return days as a JSON array of day objects, never as a number.",
-                    "return_json_only": True,
-                    "day_fields": ["date", "pillar", "objective", "topic", "angle", "format", "hook", "cta", "visual_brief", "risk_notes"],
-                    "top_level_fields": ["plan_title", "days", "strategy_notes", "gaps_or_assumptions"],
-                },
-            },
-            ensure_ascii=False,
+        return PromptLoader.format(
+            "planner_user_weekly_plan.md",
+            start_date=start_date,
+            days=days,
+            brand_context=json.dumps(
+                OpenAICompatibleClient._compact_profile_payload(profile),
+                ensure_ascii=False,
+            ),
+            research_brief=json.dumps(
+                OpenAICompatibleClient._compact_research_payload(research_brief),
+                ensure_ascii=False,
+            ),
+            brand_id=profile.brand_id,
         )
 
     @staticmethod
@@ -643,22 +615,13 @@ class OpenAICompatibleClient:
         compact_profile["approved_cta_patterns"] = [
             item for item in compact_profile["approved_cta_patterns"] if item["objective"] == objective
         ] or compact_profile["approved_cta_patterns"][:2]
-        return json.dumps(
-            {
-                "task": "generate_caption_package",
-                "topic": topic,
-                "pillar": pillar,
-                "objective": objective,
-                "format": fmt,
-                "brand_context": compact_profile,
-                "requirements": {
-                    "minimum_variants": 1,
-                    "return_json_only": True,
-                    "variant_fields": ["label", "hook", "caption", "cta", "tone_tags", "visual_brief"],
-                    "top_level_fields": ["topic", "variants", "dos", "donts"],
-                },
-            },
-            ensure_ascii=False,
+        return PromptLoader.format(
+            "caption_user.md",
+            topic=topic,
+            pillar=pillar,
+            objective=objective,
+            fmt=fmt,
+            brand_context=json.dumps(compact_profile, ensure_ascii=False),
         )
 
 

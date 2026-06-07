@@ -32,6 +32,7 @@ python3 -m fanpage_agent.main preview-telegram \
   --artifact-type research \
   --input-file artifacts/research/research-brief.json
 ```
+
 - Nếu muốn gửi lại artifact đã có mà không rebuild, dùng:
 ```bash
 python3 -m fanpage_agent.main send-telegram-preview \

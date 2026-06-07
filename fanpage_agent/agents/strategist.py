@@ -16,22 +16,11 @@ from fanpage_agent.core.types import (
     AgentRole,
     AgentTask,
 )
+from fanpage_agent.prompts._loader import PromptLoader
 
-_STRATEGIST_SYSTEM_PROMPT = """Bạn là Strategist của một fanpage skincare/healthcare cho GenZ (18-25 tuổi).
 
-NHIỆM VỤ: Lên chiến lược nội dung, đề xuất chủ đề, phân tích xu hướng.
-
-PHONG CÁCH: chân thật, ấm áp, dễ hiểu, chuyên môn, gần gũi. Ngắn gọn, không phóng đại.
-
-PILLARS (cột nội dung):
-- skincare_routine: Routine chăm sóc da các bước
-- ingredient_deepdive: Phân tích thành phần mỹ phẩm
-- myth_busting: Vạch trần lầm tưởng skincare
-- product_review: Review/so sánh sản phẩm
-- genz_lifestyle: Lối sống, self-care cho GenZ
-- medical_reference: Kiến thức y khoa tham khảo
-
-Trả lời bằng JSON thuần, không markdown."""
+def _strategist_system_prompt() -> str:
+    return PromptLoader.load("strategist_system.md")
 
 
 class StrategistAgent(BaseAgent):
@@ -184,7 +173,7 @@ Yêu cầu output JSON:
 }}
 
 Đa dạng pillar, ưu tiên chủ đề GenZ skincare thực tế."""
-            data = self._llm.generate_json(_STRATEGIST_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(_strategist_system_prompt(), prompt)
             if data:
                 return AgentResult(
                     task_id=f"plan-{days}d",
@@ -376,7 +365,7 @@ Output JSON:
     }}
   ]
 }}"""
-            data = self._llm.generate_json(_STRATEGIST_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(_strategist_system_prompt(), prompt)
             if data and "ideas" in data:
                 return AgentResult(
                     task_id=f"ideas-{pillar}",
@@ -419,7 +408,7 @@ Output JSON:
   "hot_topics": ["chủ đề hot 1", "chủ đề hot 2", ...],
   "actionable_insights": ["gợi ý hành động 1", ...]
 }}"""
-            data = self._llm.generate_json(_STRATEGIST_SYSTEM_PROMPT, prompt)
+            data = self._llm.generate_json(_strategist_system_prompt(), prompt)
             if data:
                 return AgentResult(
                     task_id="trends",

@@ -28,7 +28,7 @@ Use project-level folders for mutable data:
 ```text
 data/          # local/runtime DBs, state, live inputs, snapshots; ignored by Git
 artifacts/     # generated reports, briefs, previews, and packets; ignored by Git
-```
+```text
 
 Do not create these under `fanpage_agent/`:
 
@@ -41,7 +41,7 @@ fanpage_agent/artifacts/
 .env
 .env.*
 *encoded-*.json
-```
+```text
 
 If the package ever needs static resources, keep them read-only, non-secret, small, and documented as package resources. Runtime code should write to `data/` or `artifacts/`, never into this package directory.
 

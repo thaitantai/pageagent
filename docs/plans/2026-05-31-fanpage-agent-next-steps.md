@@ -31,6 +31,7 @@
 **Objective:** Cho runtime đọc đủ token/chat/base URL từ env.
 
 **Files:**
+
 - Modify: `fanpage_agent/config.py`
 - Modify: `.env.example`
 - Test: `tests/test_config.py`
@@ -38,17 +39,20 @@
 **Verification:**
 ```bash
 python3 -m unittest tests.test_config -v
-```
+```text
+
 Expected: pass, có assert cho telegram fields.
 
 ### Task 2: Tạo Telegram adapter
 **Objective:** Có HTTP client gửi message text qua Telegram Bot API.
 
 **Files:**
+
 - Create: `fanpage_agent/adapters/telegram_client.py`
 - Test: `tests/test_telegram_client.py`
 
 **Behavior:**
+
 - require `TELEGRAM_BOT_TOKEN`
 - require `TELEGRAM_CHAT_ID` hoặc override qua CLI
 - POST tới `/bot<TOKEN>/sendMessage`
@@ -59,12 +63,14 @@ Expected: pass, có assert cho telegram fields.
 ```bash
 python3 -m unittest tests.test_telegram_client -v
 ```
+
 Expected: pass với fake local server / patched urlopen.
 
 ### Task 3: Thêm CLI `send-telegram-preview`
 **Objective:** Đọc artifact JSON, render bằng formatter hiện có, gửi thật lên Telegram.
 
 **Files:**
+
 - Modify: `fanpage_agent/main.py`
 - Test: `tests/test_send_telegram_cli.py`
 - Reuse: `fanpage_agent/services/telegram_formatter.py`
@@ -75,7 +81,9 @@ python3 -m fanpage_agent.main send-telegram-preview \
   --artifact-type plan \
   --input-file artifacts/plans/weekly-plan-....json
 ```
+
 Optional:
+
 - `--chat-id`
 - `--disable-web-page-preview` (optional future, not needed now)
 
@@ -83,12 +91,14 @@ Optional:
 ```bash
 python3 -m unittest tests.test_send_telegram_cli -v
 ```
+
 Expected: CLI gửi thành công tới fake Telegram endpoint và trả JSON result.
 
 ### Task 4: Smoke run end-to-end cho Telegram delivery
 **Objective:** Chứng minh flow artifact -> formatter -> sender -> API call chạy được.
 
 **Files:**
+
 - No new code, run smoke only
 
 **Verification:**
@@ -96,6 +106,7 @@ Expected: CLI gửi thành công tới fake Telegram endpoint và trả JSON res
 python3 -m unittest discover -s tests -v
 python3 -m fanpage_agent.main send-telegram-preview ...
 ```
+
 Expected: full suite pass, smoke CLI pass.
 
 ---
@@ -104,21 +115,25 @@ Expected: full suite pass, smoke CLI pass.
 
 ### Task 5: Mở rộng config cho Google Sheets
 **Files:**
+
 - Modify: `fanpage_agent/config.py`
 - Modify: `.env.example`
 - Test: `tests/test_config.py`
 
 **Fields:**
+
 - `GOOGLE_SHEETS_ID`
 - `GOOGLE_SERVICE_ACCOUNT_FILE`
 - optional `GOOGLE_SHEETS_TABS_PREFIX`
 
 ### Task 6: Tạo `GoogleSheetsStore`
 **Files:**
+
 - Create: `fanpage_agent/adapters/google_sheets_store.py`
 - Test: `tests/test_google_sheets_store.py`
 
 **Minimum operations:**
+
 - append plan rows
 - read post history
 - read post metrics
@@ -126,6 +141,7 @@ Expected: full suite pass, smoke CLI pass.
 
 ### Task 7: Chọn store qua config/CLI
 **Files:**
+
 - Modify: `fanpage_agent/main.py`
 - Maybe create: `fanpage_agent/adapters/store_factory.py`
 - Test: update CLI tests
@@ -138,6 +154,7 @@ Expected: full suite pass, smoke CLI pass.
 
 ### Task 8: Tạo command cho daily operator packet delivery
 **Files:**
+
 - Modify: `fanpage_agent/main.py`
 - Maybe create: `fanpage_agent/services/delivery.py`
 - Tests: `tests/test_delivery_cli.py`
@@ -146,11 +163,13 @@ Expected: full suite pass, smoke CLI pass.
 
 ### Task 9: Tạo command cho weekly report delivery
 **Files:**
+
 - Modify: `fanpage_agent/main.py`
 - Tests: `tests/test_weekly_report_delivery_cli.py`
 
 ### Task 10: Tạo cron specs/docs
 **Files:**
+
 - Create: `docs/cron/daily-ops.md`
 - Create: `docs/cron/weekly-report.md`
 
@@ -162,12 +181,14 @@ Expected: full suite pass, smoke CLI pass.
 
 ### Task 11: Tạo triage service + schema
 **Files:**
+
 - Modify: `fanpage_agent/models.py`
 - Create: `fanpage_agent/services/community_triage.py`
 - Tests: `tests/test_community_triage.py`
 
 ### Task 12: Add CLI for draft reply
 **Files:**
+
 - Modify: `fanpage_agent/main.py`
 - Tests: `tests/test_triage_cli.py`
 
