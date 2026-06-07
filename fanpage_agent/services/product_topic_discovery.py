@@ -35,6 +35,10 @@ class ProductTopicCandidate:
     risk_level: str = "low"
     reason_codes: list[str] = field(default_factory=list)
 
+    @property
+    def is_affiliate_offer(self) -> bool:
+        return "affiliate_offer" in self.reason_codes
+
     def as_topic_score_metadata(self) -> dict[str, Any]:
         return {
             "angle": self.angle,
@@ -90,7 +94,7 @@ class ProductAwareTopicDiscovery:
             pain = pain_values[index % len(pain_values)] if pain_values else "nhu cầu mua hàng"
             benefit = benefits[index % len(benefits)] if benefits else pain
             topic = template.format(product=name, category=category, pain=pain, benefit=benefit)
-            reason_codes = ["affiliate_offer", "community_first", f"angle:{angle}"]
+            reason_codes = ["affiliate_offer", "community_first", "evidence_required", f"angle:{angle}"]
             if disclosure_required:
                 reason_codes.append(_AFFILIATE_DISCLOSURE)
             if do_not_claim:

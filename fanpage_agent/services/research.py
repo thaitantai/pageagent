@@ -188,6 +188,7 @@ class ResearchService:
         )
         confidence_score = quality_report.confidence_score
         quality_warnings = quality_report.warnings
+        quality_warnings.extend(self._affiliate_evidence_warnings(product_topics, evidence))
         topic_scores = self._score_topics(
             candidates=self._dedupe(next_angles + top_performing_topics),
             campaign_focus=campaign_focus,
@@ -323,6 +324,22 @@ class ResearchService:
             ))
         return evidence
 
+    def _affiliate_evidence_warnings(
+        self,
+        product_topics: list[ProductTopicCandidate],
+        evidence: list[ResearchEvidence],
+    ) -> list[str]:
+        warnings: list[str] = []
+        for topic in product_topics:
+            if not topic.is_affiliate_offer:
+                continue
+            confidence = self._topic_source_confidence(topic.topic, evidence)
+            if confidence < 0.45:
+                warnings.append(
+                    f"Affiliate topic '{topic.topic}' chưa có evidence đủ mạnh; chỉ dùng làm câu hỏi nghiên cứu, không dùng làm khuyến nghị mua."
+                )
+        return warnings
+
     def _score_topics(
         self,
         candidates: list[str],
@@ -347,7 +364,13 @@ class ResearchService:
             customer_value = product_topic.customer_value if product_topic else question_overlap
             content_potential = min(1.0, 0.30 + customer_value * 0.35 + source_confidence * 0.3)
             fanpage_fit = min(1.0, 0.40 + brand_relevance * 0.35 + customer_value * 0.2)
+            affiliate_without_evidence = bool(
+                product_topic and product_topic.is_affiliate_offer and source_confidence < 0.45
+            )
             risk_penalty = 0.08 if product_topic and product_topic.risk_level == "medium" else 0.0
+            if affiliate_without_evidence:
+                risk_penalty += 0.18
+                content_potential = min(content_potential, 0.45)
             total = max(0.0, (
                 brand_relevance * 0.25
                 + novelty * 0.16
@@ -358,6 +381,8 @@ class ResearchService:
                 + (1.0 - duplication_risk) * 0.03
                 - risk_penalty
             ))
+            if affiliate_without_evidence:
+                total = min(total, 0.49)
             rationale = self._topic_score_rationale(
                 topic=topic,
                 brand_relevance=brand_relevance,
@@ -377,7 +402,7 @@ class ResearchService:
                 duplication_risk=round(duplication_risk, 3),
                 product_relevance=round(product_topic.product_relevance, 3) if product_topic else 0.0,
                 customer_value=round(customer_value, 3),
-                risk_level=product_topic.risk_level if product_topic else "",
+                risk_level="high" if affiliate_without_evidence else (product_topic.risk_level if product_topic else ""),
                 rationale=rationale,
             ))
         return sorted(scores, key=lambda item: item.total_score, reverse=True)
@@ -423,6 +448,8 @@ class ResearchService:
                 signals.append(f"giải quyết pain point {product_topic.customer_pain}")
             if product_topic.risk_level == "medium":
                 signals.append("cần guardrail claim")
+            if product_topic.is_affiliate_offer and source_confidence < 0.45:
+                signals.append("chưa đủ evidence để khuyến nghị mua")
         if brand_relevance >= 0.5:
             signals.append("sát campaign/brand")
         if novelty >= 0.7:
