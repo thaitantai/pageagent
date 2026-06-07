@@ -49,6 +49,39 @@ class ResearchInsightsTest(unittest.TestCase):
         self.assertTrue(any("đa nguồn" in item for item in report.warnings))
         self.assertTrue(any("fetch thất bại" in item for item in report.warnings))
 
+    def test_marks_claims_corroborated_by_independent_sources(self) -> None:
+        documents = [
+            SourceDocument(
+                source_id="derm-01",
+                source_name="Derm Clinic Blog",
+                url="https://example.com/skin-analysis",
+                content="Soi da định kỳ giúp phát hiện mất nước trước khi chọn treatment phục hồi.",
+                trust_score=0.9,
+                freshness_score=0.8,
+            ),
+            SourceDocument(
+                source_id="journal-01",
+                source_name="Derm Journal",
+                url="https://journal.example/skin-analysis",
+                content="Quy trình soi da giúp bác sĩ nhận diện mất nước và chọn treatment phù hợp hơn.",
+                trust_score=0.95,
+                freshness_score=0.7,
+            ),
+        ]
+
+        evidence = EvidenceExtractor().extract(
+            source_documents=documents,
+            campaign_focus=["soi da", "treatment"],
+        )
+
+        source_claims = [item for item in evidence if item.evidence_type == "source_claim"]
+        self.assertTrue(any(item.support_count >= 2 for item in source_claims))
+        self.assertTrue(any("Derm Journal" in item.corroborating_sources for item in source_claims))
+
+        report = ResearchQualityGate().evaluate(evidence=evidence, source_documents=documents)
+
+        self.assertFalse(any("corroborate" in item for item in report.warnings))
+
 
 if __name__ == "__main__":
     unittest.main()

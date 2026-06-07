@@ -196,6 +196,8 @@ class ResearchEvidence(BaseModel):
     confidence: float = 0.0
     source_id: str = ""
     source_type: str = ""
+    support_count: int = 1
+    corroborating_sources: List[str] = Field(default_factory=list)
 
 
 class ResearchTopicScore(BaseModel):

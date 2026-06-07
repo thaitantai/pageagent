@@ -19,6 +19,9 @@ class ResearchQualityReport:
 class EvidenceExtractor:
     """Turn raw source documents and internal signals into sourced evidence."""
 
+    def __init__(self, min_corroboration_overlap: int = 2):
+        self._min_corroboration_overlap = min_corroboration_overlap
+
     def extract(
         self,
         *,
@@ -83,7 +86,44 @@ class EvidenceExtractor:
                     confidence=0.6,
                 )
             )
-        return evidence
+        return self._with_corroboration(evidence)
+
+    def _with_corroboration(self, evidence: list[ResearchEvidence]) -> list[ResearchEvidence]:
+        enriched: list[ResearchEvidence] = []
+        for item in evidence:
+            supporting_sources = self._supporting_sources(item, evidence)
+            support_count = max(1, len(supporting_sources) + 1)
+            confidence = item.confidence
+            if supporting_sources:
+                confidence = min(1.0, confidence + min(0.12, 0.04 * len(supporting_sources)))
+            enriched.append(
+                item.model_copy(
+                    update={
+                        "confidence": round(confidence, 3),
+                        "support_count": support_count,
+                        "corroborating_sources": supporting_sources,
+                    }
+                )
+            )
+        return enriched
+
+    def _supporting_sources(
+        self,
+        target: ResearchEvidence,
+        evidence: list[ResearchEvidence],
+    ) -> list[str]:
+        target_terms = self._focus_terms([target.claim])
+        if not target_terms:
+            return []
+
+        sources: list[str] = []
+        for candidate in evidence:
+            if candidate.source == target.source:
+                continue
+            candidate_terms = self._focus_terms([candidate.claim])
+            if len(target_terms & candidate_terms) >= self._min_corroboration_overlap:
+                sources.append(candidate.source)
+        return sorted(set(sources))
 
     def _claims_from_document(self, document: SourceDocument, focus_terms: set[str]) -> list[str]:
         candidates = [sentence.strip() for sentence in _SENTENCE_SPLIT_RE.split(document.content) if sentence.strip()]
@@ -145,6 +185,7 @@ class ResearchQualityGate:
         source_names = {item.source for item in evidence if item.source}
         url_count = sum(1 for item in evidence if item.url)
         sourced_claims = [item for item in evidence if item.evidence_type in {"source_claim", "external_source"}]
+        corroborated_claims = [item for item in sourced_claims if item.support_count >= 2]
         failed_fetches = [doc for doc in source_documents if doc.metadata.get("fetch_status") == "error"]
         dominant_source = self._dominant_source(evidence)
 
@@ -159,6 +200,8 @@ class ResearchQualityGate:
             warnings.append("Evidence chưa có URL nguồn để Writer trích dẫn hoặc kiểm chứng.")
         if len(sourced_claims) < 2:
             warnings.append("Chưa có đủ claim cụ thể từ nguồn đã thu thập.")
+        if len(checkable_sources) >= 2 and not corroborated_claims:
+            warnings.append("Chưa có claim nào được corroborate bởi nguồn độc lập khác.")
         if failed_fetches:
             warnings.append(f"Có {len(failed_fetches)} nguồn fetch thất bại; đang dùng fallback metadata.")
         if dominant_source:
@@ -173,7 +216,10 @@ class ResearchQualityGate:
     def _confidence_score(evidence: list[ResearchEvidence]) -> float:
         if not evidence:
             return 0.0
-        return round(sum(item.confidence for item in evidence) / len(evidence), 3)
+        base_score = sum(item.confidence for item in evidence) / len(evidence)
+        corroborated_count = sum(1 for item in evidence if item.support_count >= 2)
+        corroboration_bonus = min(0.08, corroborated_count * 0.01)
+        return round(min(1.0, base_score + corroboration_bonus), 3)
 
     @staticmethod
     def _dominant_source(evidence: list[ResearchEvidence]) -> str:
