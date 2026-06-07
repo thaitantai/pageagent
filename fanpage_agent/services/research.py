@@ -139,9 +139,6 @@ class ResearchService:
         product_topics: list[ProductTopicCandidate] = []
         if discover_product_topics:
             product_topics = self._topic_discovery.discover(page_context or {}, max_topics=max_product_topics)
-        product_topic_titles = [item.topic for item in product_topics]
-        next_angles = self._dedupe(product_topic_titles + campaign_focus + frequent_questions + top_performing_topics)[:5]
-
         recommendations: list[str] = []
         if recommended_objectives:
             recommendations.append(f"Ưu tiên objective {recommended_objectives[0]} trong vòng nội dung kế tiếp.")
@@ -241,6 +238,10 @@ class ResearchService:
                     f"Tự động phát hiện {len(new_pages)} page Facebook mới từ "
                     f"mention trong post — {new_page_str}."
                 )
+
+        # Tính next_angles sau khi đã gom đủ product_topics từ mọi nguồn
+        product_topic_titles = [item.topic for item in product_topics]
+        next_angles = self._dedupe(product_topic_titles + campaign_focus + frequent_questions + top_performing_topics)[:5]
 
         quality_report = self._quality_gate.evaluate(
             evidence=evidence,
