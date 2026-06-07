@@ -22,6 +22,25 @@ def _product_context():
     }
 
 
+def _affiliate_context():
+    return {
+        "industry_focus": "đồ gia dụng thông minh",
+        "community_value": "giúp người mua chọn đúng theo nhu cầu thật",
+        "customer_pain_points": ["phòng ngủ nhiều bụi nhưng ngân sách hạn chế"],
+        "affiliate_offers": [{
+            "name": "Máy lọc không khí phổ thông",
+            "category": "máy lọc không khí",
+            "benefits": ["phù hợp phòng nhỏ"],
+            "competitors": ["Mẫu A", "Mẫu B"],
+            "do_not_claim": ["chữa bệnh hô hấp"],
+        }],
+        "content_policy": {
+            "affiliate_disclosure_required": True,
+            "require_pros_cons": True,
+        },
+    }
+
+
 def test_product_topic_discovery_generates_guarded_candidates():
     discovery = ProductAwareTopicDiscovery()
 
@@ -33,6 +52,20 @@ def test_product_topic_discovery_generates_guarded_candidates():
     assert candidates[0].risk_level == "medium"
     assert "claim_guard_required" in candidates[0].reason_codes
     assert "Serum phục hồi da" in candidates[0].research_query
+
+
+def test_affiliate_topic_discovery_prefers_community_buying_angles():
+    discovery = ProductAwareTopicDiscovery()
+
+    candidates = discovery.discover(_affiliate_context(), max_topics=4)
+
+    assert len(candidates) == 4
+    assert candidates[0].angle == "buying_guide"
+    assert "máy lọc không khí" in candidates[0].topic
+    assert "community_first" in candidates[0].reason_codes
+    assert "affiliate_disclosure_required" in candidates[0].reason_codes
+    assert "claim_guard_required" in candidates[0].reason_codes
+    assert any(candidate.angle == "comparison" for candidate in candidates)
 
 
 def test_research_service_can_prioritize_product_aware_topics():

@@ -51,6 +51,10 @@ class TestPageRegistry:
                 "topic_focus": "routine da dau",
                 "audience": "GenZ moi tap skincare",
                 "community_value": "Giai thich skincare bang ngon ngu de hieu",
+                "industry_focus": "do gia dung thong minh",
+                "customer_pain_points": ["khong biet chon theo dien tich phong"],
+                "affiliate_offers": [{"name": "May loc khong khi", "category": "may loc khong khi"}],
+                "content_policy": {"affiliate_disclosure_required": True},
                 "banned_topics": ["cam ket het mun"],
                 "research_sources": ["comments", "metrics"],
             },
@@ -75,12 +79,16 @@ class TestPageRegistry:
         assert hasattr(cfg, "page_id")
         assert cfg.page_token == "tok_main"
         assert cfg.audience == "GenZ moi tap skincare"
+        assert cfg.industry_focus == "do gia dung thong minh"
+        assert cfg.affiliate_offers[0]["name"] == "May loc khong khi"
         assert cfg.banned_topics == ["cam ket het mun"]
 
     def test_page_context_is_safe_for_agents(self, registry):
         context = registry.page_context("main")
         assert context["page_id"] == "main"
         assert context["research_sources"] == ["comments", "metrics"]
+        assert context["affiliate_offers"][0]["category"] == "may loc khong khi"
+        assert context["content_policy"]["affiliate_disclosure_required"] is True
         assert "page_token" not in context
 
     def test_settings_parses_fb_pages_json(self, monkeypatch):

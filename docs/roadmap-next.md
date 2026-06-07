@@ -116,3 +116,4 @@ Viec can lam:
 - 2026-06-06: Da them ScraplingSourceCollector opt-in qua `--fetch-source-documents`, co cache `--source-cache-dir` de ResearchPacket luu noi dung nguon that khi can.
 - 2026-06-06: Da them Evidence & Insight Extractor va Research Quality Gate de bien SourceDocument thanh evidence co `source_id`/`trust_score` va canh bao chat luong.
 - 2026-06-06: Da nang format Research Brief cho operator thay duoc confidence, so nguon, source-backed insights va quality warnings ngay trong digest.
+- 2026-06-06: Da them Community Affiliate context de page uu tien gia tri cong dong, doc `affiliate_offers`, gan disclosure/risk metadata va tao topic buying guide/comparison/checklist thay vi hard-sell.

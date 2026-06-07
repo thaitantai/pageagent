@@ -29,6 +29,11 @@ class PageConfig:
     audience: str = ""
     community_value: str = ""
     tone: str = ""
+    industry_focus: str = ""
+    customer_pain_points: list[str] = field(default_factory=list)
+    products_services: list[dict] = field(default_factory=list)
+    affiliate_offers: list[dict] = field(default_factory=list)
+    content_policy: dict = field(default_factory=dict)
     banned_topics: list[str] = field(default_factory=list)
     research_sources: list[str] = field(default_factory=list)
     api_version: str = "v21.0"
@@ -186,6 +191,11 @@ class Settings(BaseModel):
                     audience=pdata.get("audience", ""),
                     community_value=pdata.get("community_value", ""),
                     tone=pdata.get("tone", ""),
+                    industry_focus=pdata.get("industry_focus", ""),
+                    customer_pain_points=list(pdata.get("customer_pain_points", [])),
+                    products_services=list(pdata.get("products_services", [])),
+                    affiliate_offers=list(pdata.get("affiliate_offers", [])),
+                    content_policy=dict(pdata.get("content_policy", {})),
                     banned_topics=list(pdata.get("banned_topics", [])),
                     research_sources=list(pdata.get("research_sources", [])),
                     api_version=pdata.get("api_version", self.fb_api_version),
