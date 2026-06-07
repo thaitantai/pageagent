@@ -5,7 +5,10 @@ import json
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from fanpage_agent.affiliate import AffiliateRegistry
 
 from fanpage_agent.models import (
     CommentInboxEntry,
@@ -59,6 +62,7 @@ class ResearchService:
         topic_discovery: ProductAwareTopicDiscovery | None = None,
         offer_evaluator: OfferEvaluator | None = None,
         competitor_discovery: CompetitorPageDiscoveryService | None = None,
+        affiliate_registry: AffiliateRegistry | None = None,
     ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
@@ -67,6 +71,14 @@ class ResearchService:
         self._topic_discovery = topic_discovery or ProductAwareTopicDiscovery()
         self._offer_evaluator = offer_evaluator
         self._competitor_discovery = competitor_discovery or CompetitorPageDiscoveryService()
+        self._affiliate_registry = affiliate_registry
+        if self._affiliate_registry is None:
+            try:
+                from fanpage_agent.affiliate import AffiliateRegistry as _AffiliateRegistry
+
+                self._affiliate_registry = _AffiliateRegistry()
+            except Exception:
+                self._affiliate_registry = None
 
     def build_brief(
         self,
@@ -83,6 +95,7 @@ class ResearchService:
         scan_competitor_pages: bool = False,
         competitor_page_ids: list[str] | None = None,
         max_product_topics: int = 8,
+        fetch_affiliate_offers: bool = False,
     ) -> ResearchBrief:
         """Build research brief with optional web search + scrape.
 
@@ -237,6 +250,42 @@ class ResearchService:
                 recommendations.append(
                     f"Tự động phát hiện {len(new_pages)} page Facebook mới từ "
                     f"mention trong post — {new_page_str}."
+                )
+
+        # --- AffiliateRegistry: pull products from AF networks (AccessTrade, Shopee...) ---
+        if fetch_affiliate_offers and self._affiliate_registry:
+            try:
+                affiliate_candidates = self._affiliate_registry.discover_all(
+                    niche=page_context.get("industry_focus", "skincare") if page_context else "skincare",
+                    max_total_candidates=10,
+                )
+                if affiliate_candidates:
+                    existing_names = {p.product_name.lower() for p in product_topics}
+                    new_candidates = [
+                        c
+                        for c in affiliate_candidates
+                        if c.product_name.lower() not in existing_names
+                    ]
+                    if new_candidates:
+                        product_topics.extend(new_candidates)
+                        recommendations.append(
+                            f"Pull {len(new_candidates)} sản phẩm affiliate từ các network "
+                            f"(AccessTrade, Shopee...) — đã tích hợp vào pipeline."
+                        )
+                        network_sources = set()
+                        for c in new_candidates:
+                            for rc in c.reason_codes:
+                                if rc.startswith("affiliate_network:"):
+                                    network_sources.add(
+                                        rc.split(":", 1)[1]
+                                    )
+                        if network_sources:
+                            recommendations.append(
+                                f"Nguồn affiliate network: {', '.join(sorted(network_sources))}."
+                            )
+            except Exception as exc:
+                logger.warning(
+                    "AffiliateRegistry discover failed: %s", exc
                 )
 
         # Tính next_angles sau khi đã gom đủ product_topics từ mọi nguồn
