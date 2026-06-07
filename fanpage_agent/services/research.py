@@ -18,6 +18,8 @@ from fanpage_agent.models import (
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.services.offer_discovery import OfferDiscoveryService
+from fanpage_agent.services.offer_evaluator import OfferEvaluator
 from fanpage_agent.services.product_topic_discovery import (
     ProductAwareTopicDiscovery,
     ProductTopicCandidate,
@@ -52,12 +54,14 @@ class ResearchService:
         evidence_extractor: EvidenceExtractor | None = None,
         quality_gate: ResearchQualityGate | None = None,
         topic_discovery: ProductAwareTopicDiscovery | None = None,
+        offer_evaluator: OfferEvaluator | None = None,
     ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
         self._evidence_extractor = evidence_extractor or EvidenceExtractor()
         self._quality_gate = quality_gate or ResearchQualityGate()
         self._topic_discovery = topic_discovery or ProductAwareTopicDiscovery()
+        self._offer_evaluator = offer_evaluator
 
     def build_brief(
         self,
@@ -70,6 +74,7 @@ class ResearchService:
         source_candidates: list[SourceCandidate] | None = None,
         page_context: dict[str, Any] | None = None,
         discover_product_topics: bool = False,
+        discover_offers: bool = False,
         max_product_topics: int = 8,
     ) -> ResearchBrief:
         """Build research brief with optional web search + scrape.
@@ -191,6 +196,25 @@ class ResearchService:
             campaign_focus=campaign_focus,
             source_documents=source_documents,
         )
+
+        # --- OfferDiscovery: tự động phát hiện offer mới từ nội dung crawl ---
+        if discover_offers and (source_documents or external_trends):
+            existing_names = [p.product_name for p in product_topics]
+            discovery = OfferDiscoveryService()
+            discovered = discovery.discover(
+                source_documents=source_documents,
+                external_trends=external_trends if fetch_external_trends else None,
+                existing_offers=existing_names,
+                max_offers=4,
+            )
+            if discovered:
+                product_topics.extend(discovered)
+                product_topic_titles = [item.topic for item in product_topics]
+                recommendations.append(
+                    f"Phát hiện {len(discovered)} offer mới từ nội dung crawl — "
+                    "đã đưa vào pipeline đánh giá."
+                )
+
         quality_report = self._quality_gate.evaluate(
             evidence=evidence,
             source_documents=source_documents,
@@ -199,6 +223,39 @@ class ResearchService:
         confidence_score = quality_report.confidence_score
         quality_warnings = quality_report.warnings
         quality_warnings.extend(self._affiliate_evidence_warnings(product_topics, evidence))
+
+        # --- OfferEvaluator: tự động tìm evidence cho offer chưa đủ tin cậy ---
+        if self._offer_evaluator is not None and product_topics:
+            niche = (page_context or {}).get("industry_focus", "")
+            for pt in product_topics:
+                if not pt.is_affiliate_offer:
+                    continue
+                # Chỉ evaluate nếu chưa có evidence đủ mạnh
+                current_confidence = self._topic_source_confidence(pt.topic, evidence)
+                if current_confidence >= 0.45:
+                    continue
+                result = self._offer_evaluator.evaluate(
+                    topic=pt,
+                    existing_evidence=evidence,
+                    niche_name=niche or None,
+                )
+                # Thêm evidence mới từ search rounds
+                for new_ev in result.evidence_found:
+                    if not any(e.claim == new_ev.claim for e in evidence):
+                        evidence.append(new_ev)
+                # Cảnh báo nếu vẫn chưa đủ
+                if not result.is_ready:
+                    quality_warnings.append(
+                        f"Offer '{pt.product_name}' chưa đủ evidence (score {result.total_score:.2f}, "
+                        f"sau {result.rounds_used} vòng tìm kiếm). "
+                        + (" ".join(result.suggestions[:1]) if result.suggestions else "")
+                    )
+                else:
+                    quality_warnings.append(
+                        f"Offer '{pt.product_name}' đã có evidence (score {result.total_score:.2f}, "
+                        f"sau {result.rounds_used} vòng tìm kiếm)."
+                    )
+
         topic_scores = self._score_topics(
             candidates=self._dedupe(next_angles + top_performing_topics),
             campaign_focus=campaign_focus,
