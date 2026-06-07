@@ -20,7 +20,6 @@ import requests
 
 from fanpage_agent.config import Settings
 
-
 # ---------------------------------------------------------------------------
 #  Interface
 # ---------------------------------------------------------------------------
@@ -94,7 +93,7 @@ class MockImageService(ImageService):
         return p
 
     def generate(self, prompt: str, output_dir: str | Path | None = None) -> str:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw
 
         out_dir = Path(output_dir or self.default_output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -182,7 +181,7 @@ class MockImageService(ImageService):
         return ImageFont.load_default()
 
     @staticmethod
-    def _wrap_text(draw: "ImageDraw.Draw", text: str, font, max_width: int) -> list[str]:
+    def _wrap_text(draw, text: str, font, max_width: int) -> list[str]:
         words = text.split()
         lines: list[str] = []
         current = ""

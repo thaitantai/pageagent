@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from fanpage_agent.models import BrandProfile, CaptionPackage, PostHistoryEntry, VerificationResult, WeeklyPlan
+from fanpage_agent.models import (
+    BrandProfile,
+    CaptionPackage,
+    PostHistoryEntry,
+    VerificationResult,
+    WeeklyPlan,
+)
 
 
 class VerifierService:

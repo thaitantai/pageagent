@@ -3,41 +3,37 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
+from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
-from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.analytics import AnalyticsService
+from fanpage_agent.main import (
+    DEFAULT_CALENDAR_FILE,
+    DEFAULT_CAMPAIGN_FILE,
+    DEFAULT_COMMENT_FILE,
+    DEFAULT_HERMES_CRON_JOBS_FILE,
+    DEFAULT_HERMES_SCRIPTS_DIR,
+    DEFAULT_HISTORY_FILE,
+    DEFAULT_METRICS_FILE,
+    EXPECTED_HERMES_CRON_JOBS,
+    OPS_ARTIFACT_FRESHNESS_HOURS,
+    ROOT_DIR,
+    add_store_backend_arg,
+)
+from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
+from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.services.analytics_dashboard import AnalyticsDashboardService
 from fanpage_agent.services.evals import EvalService
 from fanpage_agent.services.hashtag import HashtagService
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
 from fanpage_agent.services.telegram_formatter import TelegramFormatterService
-from fanpage_agent.scraping.trend_scraper import TrendScraper
-from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.utils import dump_json
-
-from fanpage_agent.main import (
-    ROOT_DIR,
-    DEFAULT_CALENDAR_FILE,
-    DEFAULT_HISTORY_FILE,
-    DEFAULT_METRICS_FILE,
-    DEFAULT_COMMENT_FILE,
-    DEFAULT_CAMPAIGN_FILE,
-    DEFAULT_TRIAGE_FILE,
-    DEFAULT_HERMES_CRON_JOBS_FILE,
-    DEFAULT_HERMES_SCRIPTS_DIR,
-    EXPECTED_HERMES_CRON_JOBS,
-    OPS_ARTIFACT_FRESHNESS_HOURS,
-    add_store_backend_arg,
-)
 
 
 def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
@@ -488,7 +484,7 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
             print(f"  {item['score']:.0%} - {item['title'][:60]}")
     else:
         # Full report
-        print(f"=== 🌐 Research Trends ===")
+        print("=== 🌐 Research Trends ===")
         print(f"Tong: {report['total_trends']} trends tu {len(report['sources'])} nguon\n")
 
         print("--- Top Keywords ---")
@@ -576,8 +572,6 @@ def cmd_fetch_fb_comments(args: argparse.Namespace) -> int:
 
     Get recent published posts → fetch comments → dedup by FB comment id → save.
     """
-    import csv
-    from fanpage_agent.adapters.facebook_client import FacebookClient
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     comment_path = Path(args.comment_file)
@@ -681,7 +675,6 @@ def cmd_eval_all(args: argparse.Namespace) -> int:
 
 
 def cmd_generate_dashboard(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.analytics_dashboard import AnalyticsDashboardService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     metrics = build_store(settings=settings, args=args).read_post_metrics()

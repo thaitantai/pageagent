@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-
 _PRODUCT_TOPIC_TEMPLATES = [
     ("education", "{pain}: {product} có giúp gì và cần lưu ý gì?"),
     ("myth_busting", "Những hiểu lầm thường gặp khi dùng {product} cho {pain}"),

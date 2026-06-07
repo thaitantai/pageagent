@@ -9,13 +9,11 @@ The bus provides:
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
-from datetime import datetime, timezone
 from typing import Any
 
-from fanpage_agent.core.types import AgentRole, AgentTask, AgentResult, ActionPriority
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.harness import AgentHarness
+from fanpage_agent.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
 
 
 class AgentBus:

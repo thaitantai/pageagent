@@ -5,9 +5,7 @@ from typing import Any
 
 from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
-from fanpage_agent.models import PostMetric
 from fanpage_agent.services.analytics import AnalyticsService
-
 
 AnyStore = Any  # type alias for any store implementation
 

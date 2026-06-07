@@ -7,7 +7,6 @@ Modules register with register_subcommand(subparsers) and expose handle(args).
 from __future__ import annotations
 
 import argparse
-import sys
 
 
 def main() -> int:
@@ -27,11 +26,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     from fanpage_cli import (
         agent as agent_module,
+    )
+    from fanpage_cli import (
         approval as approval_module,
+    )
+    from fanpage_cli import (
         content as content_module,
+    )
+    from fanpage_cli import (
         deliver as deliver_module,
+    )
+    from fanpage_cli import (
         ops as ops_module,
+    )
+    from fanpage_cli import (
         plan as plan_module,
+    )
+    from fanpage_cli import (
         triage as triage_module,
     )
 

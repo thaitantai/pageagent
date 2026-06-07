@@ -7,9 +7,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from fanpage_agent.audit import audit
 from fanpage_agent.config import Settings
 from fanpage_agent.throttle import TokenBucket
-from fanpage_agent.audit import audit, AuditManager
 
 logger = logging.getLogger(__name__)
 

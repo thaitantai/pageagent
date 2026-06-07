@@ -3,15 +3,20 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import timezone
 
+from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
-from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
+from fanpage_agent.main import (
+    DEFAULT_CALENDAR_FILE,
+    DEFAULT_HISTORY_FILE,
+    DEFAULT_METRICS_FILE,
+    ROOT_DIR,
+)
 from fanpage_agent.services.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
@@ -22,12 +27,6 @@ from fanpage_agent.services.scheduled_publish import ScheduledPublishService
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
 from fanpage_agent.utils import dump_json
-from fanpage_agent.main import (
-    ROOT_DIR,
-    DEFAULT_CALENDAR_FILE,
-    DEFAULT_HISTORY_FILE,
-    DEFAULT_METRICS_FILE,
-)
 
 
 def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:
@@ -226,7 +225,6 @@ def cmd_publish_post(args: argparse.Namespace) -> int:
 
 
 def cmd_process_pending(args: argparse.Namespace) -> int:
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
@@ -305,7 +303,6 @@ def cmd_generate_image(args: argparse.Namespace) -> int:
 
 def cmd_list_calendar(args: argparse.Namespace) -> int:
     """List content calendar items with filters."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -341,7 +338,6 @@ def cmd_list_calendar(args: argparse.Namespace) -> int:
 
 def cmd_approve_calendar_item(args: argparse.Namespace) -> int:
     """Approve a content calendar item."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -360,7 +356,6 @@ def cmd_approve_calendar_item(args: argparse.Namespace) -> int:
 
 def cmd_reject_calendar_item(args: argparse.Namespace) -> int:
     """Reject a content calendar item."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -378,7 +373,6 @@ def cmd_reject_calendar_item(args: argparse.Namespace) -> int:
 
 def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
     """Find gaps in the content calendar."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -403,10 +397,9 @@ def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
 def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
     """Auto-detect and fill gaps in the content calendar."""
     import json as _json
-    from fanpage_agent.services.calendar_gap_service import CalendarGapService
-    from fanpage_agent.services.planner import PlannerService
-    from fanpage_agent.services.writer import WriterService
+
     from fanpage_agent.adapters.sheet_store import LocalSheetStore
+    from fanpage_agent.services.writer import WriterService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)

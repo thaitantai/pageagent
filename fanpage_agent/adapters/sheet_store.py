@@ -268,7 +268,8 @@ class LocalSheetStore:
 
         Returns list of gap dicts with keys: start_date, end_date, gap_days.
         """
-        from datetime import date as _date, timedelta
+        from datetime import date as _date
+        from datetime import timedelta
 
         rows = self._read_calendar_rows()
         if brand_id:

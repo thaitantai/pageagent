@@ -12,8 +12,8 @@ from fanpage_agent.adapters.fb_adapter import FacebookAdapter
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.types import (
     ActionPriority,
-    AgentRole,
     AgentResult,
+    AgentRole,
     AgentTask,
     ContentPackage,
     ContentVariant,
@@ -218,7 +218,7 @@ class PublisherAgent(BaseAgent):
         page_id: str | None = None,
     ) -> None:
         """Record a simple (non-package) post in PerformanceMemory."""
-        from fanpage_agent.core.types import ContentPackage, ContentVariant
+        from fanpage_agent.core.types import ContentPackage
 
         effective_brand_id = page_id or ""
         variant = ContentVariant(

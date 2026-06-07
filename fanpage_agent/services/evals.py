@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fanpage_agent.adapters.llm_client import MockLLMClient
-from fanpage_agent.models import BrandProfile, CaptionPackage, PlanDay, ResearchBrief, WeeklyPlan
+from fanpage_agent.models import BrandProfile, PlanDay, ResearchBrief, WeeklyPlan
 from fanpage_agent.services.planner import PlannerService
 from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.verifier import VerifierService

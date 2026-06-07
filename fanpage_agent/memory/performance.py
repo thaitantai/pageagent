@@ -14,7 +14,6 @@ import logging
 import re
 import shutil
 import sqlite3
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -393,7 +392,6 @@ class PerformanceMemory:
     def format_summary(self) -> str:
         """Compact summary for Telegram reports."""
         pillars = self.pillar_performance()
-        recent = self.get_recent_posts(limit=5)
         recs = self.get_recommendations(limit=3)
 
         lines = ["📊 *Performance Memory*"]

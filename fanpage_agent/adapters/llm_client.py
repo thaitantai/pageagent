@@ -9,7 +9,14 @@ from urllib.request import Request, urlopen
 from pydantic import ValidationError
 
 from fanpage_agent.config import Settings
-from fanpage_agent.models import BrandProfile, CaptionPackage, CaptionVariant, PlanDay, ResearchBrief, WeeklyPlan
+from fanpage_agent.models import (
+    BrandProfile,
+    CaptionPackage,
+    CaptionVariant,
+    PlanDay,
+    ResearchBrief,
+    WeeklyPlan,
+)
 
 
 class MockLLMClient:
@@ -82,7 +89,6 @@ class MockLLMClient:
         traits = profile.tone_of_voice.brand_traits
         rules = profile.tone_of_voice.writing_rules
         avoid = profile.tone_of_voice.things_to_avoid
-        sample = profile.tone_of_voice.sample_phrases
 
         # Build dos from writing_rules (positive phrasing) + commonsense defaults
         dos_rules = list(rules) if rules else ["Giữ câu ngắn", "Nhấn lợi ích thực tế", "Dùng CTA đã duyệt"]

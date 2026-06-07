@@ -2,13 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
+from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.store_factory import build_store
-from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
+from fanpage_agent.main import (
+    DEFAULT_CALENDAR_FILE,
+    DEFAULT_CAMPAIGN_FILE,
+    DEFAULT_COMMENT_FILE,
+    DEFAULT_HISTORY_FILE,
+    DEFAULT_METRICS_FILE,
+    ROOT_DIR,
+    build_daily_artifacts,
+    build_research_brief,
+)
 from fanpage_agent.services.analytics import AnalyticsService
 from fanpage_agent.services.daily_ops import DailyOpsService
 from fanpage_agent.services.delivery import DeliveryService
@@ -17,16 +26,6 @@ from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
 from fanpage_agent.utils import dump_json
-from fanpage_agent.main import (
-    ROOT_DIR,
-    DEFAULT_CALENDAR_FILE,
-    DEFAULT_HISTORY_FILE,
-    DEFAULT_METRICS_FILE,
-    DEFAULT_COMMENT_FILE,
-    DEFAULT_CAMPAIGN_FILE,
-    build_research_brief,
-    build_daily_artifacts,
-)
 
 
 def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:

@@ -5,17 +5,16 @@ and content ideas. Falls back to templates if no LLM is configured.
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
 from fanpage_agent.adapters.llm_adapter import LLMAdapter
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.types import (
-    AgentRole,
-    AgentResult,
-    AgentTask,
     ActionPriority,
+    AgentResult,
+    AgentRole,
+    AgentTask,
 )
 
 _STRATEGIST_SYSTEM_PROMPT = """Bạn là Strategist của một fanpage skincare/healthcare cho GenZ (18-25 tuổi).

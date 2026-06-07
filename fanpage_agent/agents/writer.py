@@ -13,12 +13,13 @@ from fanpage_agent.adapters.llm_adapter import LLMAdapter
 from fanpage_agent.core.agent import BaseAgent
 from fanpage_agent.core.types import (
     ActionPriority,
-    AgentRole,
     AgentResult,
+    AgentRole,
     AgentTask,
     ContentPackage,
     ContentVariant,
 )
+
 
 def _extract_research_grounding(research_packet: dict[str, Any] | None) -> tuple[str, list[dict[str, Any]], str]:
     """Return concise writer grounding from a ResearchPacket-shaped dict."""
@@ -714,7 +715,9 @@ Output JSON:
 
     def _base_hashtags(self, pillar: str = "", tick_offset: int = 0) -> list[str]:
         """Base hashtags with pillar-specific rotation and dedup from memory."""
-        import json, os, sqlite3
+        import json
+        import os
+        import sqlite3
 
         base: list[str] = ["skincare", "skincareroutine", "genzskincare", "damatdep"]
 

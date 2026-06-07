@@ -13,7 +13,6 @@ from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.research_sources import SourceRegistry
 from fanpage_agent.services.source_discovery import WebSourceDiscovery
 
-
 DEFAULT_RESEARCH_OUTPUT_DIR = Path("data/research_packets")
 
 

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from pathlib import Path
-import re
 
-from fanpage_agent.models import BrandProfile, CommentInboxEntry, CommunityTriageBatch, CommunityTriageItem
+from fanpage_agent.models import (
+    BrandProfile,
+    CommentInboxEntry,
+    CommunityTriageBatch,
+    CommunityTriageItem,
+)
 from fanpage_agent.services.research import ResearchService
 
 

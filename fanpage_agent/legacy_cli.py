@@ -9,41 +9,44 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
+from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.page_registry import PageRegistry
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
-from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
 from fanpage_agent.core.types import ContentPackage, ContentVariant
 from fanpage_agent.loaders.brand_loader import load_brand_profile
 from fanpage_agent.memory.performance import PerformanceMemory
+from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
+from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.scraping.web_search import WebSearchClient
 from fanpage_agent.services.analytics import AnalyticsService
-from fanpage_agent.services.community_triage import CommunityTriageService
-from fanpage_agent.services.daily_ops import DailyOpsService
-from fanpage_agent.services.delivery import DeliveryService
-from fanpage_agent.services.evals import EvalService
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.research import ResearchService
-from fanpage_agent.services.telegram_formatter import TelegramFormatterService
 from fanpage_agent.services.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
 )
 from fanpage_agent.services.auto_content import AutoContentOrchestrator
+from fanpage_agent.services.community_triage import CommunityTriageService
+from fanpage_agent.services.daily_ops import DailyOpsService
+from fanpage_agent.services.delivery import DeliveryService
+from fanpage_agent.services.evals import EvalService
 from fanpage_agent.services.hashtag import HashtagService
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
+from fanpage_agent.services.planner import PlannerService
+from fanpage_agent.services.research import ResearchService
+from fanpage_agent.services.research_packet import (
+    build_research_packet,
+    packet_to_brief_payload,
+    save_research_packet,
+)
 from fanpage_agent.services.scheduled_publish import ScheduledPublishService
-from fanpage_agent.services.research_packet import build_research_packet, packet_to_brief_payload, save_research_packet
+from fanpage_agent.services.telegram_formatter import TelegramFormatterService
 from fanpage_agent.services.variant_scorer import VariantScorer
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
-from fanpage_agent.scraping.trend_scraper import TrendScraper
-from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
-from fanpage_agent.scraping.web_search import WebSearchClient
 from fanpage_agent.utils import dump_json
-
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_CALENDAR_FILE = ROOT_DIR / "data" / "content_calendar.csv"
@@ -1480,7 +1483,6 @@ def cmd_publish_post(args: argparse.Namespace) -> int:
 
 
 def cmd_process_pending(args: argparse.Namespace) -> int:
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
@@ -1559,7 +1561,6 @@ def cmd_generate_image(args: argparse.Namespace) -> int:
 
 def cmd_list_calendar(args: argparse.Namespace) -> int:
     """List content calendar items with filters."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -1595,7 +1596,6 @@ def cmd_list_calendar(args: argparse.Namespace) -> int:
 
 def cmd_approve_calendar_item(args: argparse.Namespace) -> int:
     """Approve a content calendar item."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -1614,7 +1614,6 @@ def cmd_approve_calendar_item(args: argparse.Namespace) -> int:
 
 def cmd_reject_calendar_item(args: argparse.Namespace) -> int:
     """Reject a content calendar item."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -1632,7 +1631,6 @@ def cmd_reject_calendar_item(args: argparse.Namespace) -> int:
 
 def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
     """Find gaps in the content calendar."""
-    settings = Settings.from_env(root_dir=ROOT_DIR)
     store = LocalSheetStore(
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
@@ -1657,10 +1655,11 @@ def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
 def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
     """Auto-detect and fill gaps in the content calendar."""
     import json as _json
+
+    from fanpage_agent.adapters.sheet_store import LocalSheetStore
     from fanpage_agent.services.calendar_gap_service import CalendarGapService
     from fanpage_agent.services.planner import PlannerService
     from fanpage_agent.services.writer import WriterService
-    from fanpage_agent.adapters.sheet_store import LocalSheetStore
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
@@ -2297,7 +2296,7 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
             print(f"  {item['score']:.0%} - {item['title'][:60]}")
     else:
         # Full report
-        print(f"=== 🌐 Research Trends ===")
+        print("=== 🌐 Research Trends ===")
         print(f"Tong: {report['total_trends']} trends tu {len(report['sources'])} nguon\n")
 
         print("--- Top Keywords ---")
@@ -2386,6 +2385,7 @@ def cmd_fetch_fb_comments(args: argparse.Namespace) -> int:
     Get recent published posts → fetch comments → dedup by FB comment id → save.
     """
     import csv
+
     from fanpage_agent.adapters.facebook_client import FacebookClient
 
     settings = Settings.from_env(root_dir=ROOT_DIR)

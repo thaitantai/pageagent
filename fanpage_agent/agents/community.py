@@ -8,14 +8,12 @@ Includes self-reply on new posts for early engagement boost.
 from __future__ import annotations
 
 import json
-import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fanpage_agent.adapters.llm_adapter import LLMAdapter
 from fanpage_agent.core.agent import BaseAgent
-from fanpage_agent.core.types import ActionPriority, AgentRole, AgentResult, AgentTask
+from fanpage_agent.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
 
 # ── Quality thresholds ──────────────────────────────────────────────
 _MIN_REPLY_LENGTH = 10
@@ -531,7 +529,7 @@ Output JSON:
                     "reply_preview": reply_text[:60],
                     "quality_score": quality,
                 })
-            except Exception as e:
+            except Exception:
                 errors += 1
 
         return AgentResult(

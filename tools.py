@@ -9,7 +9,6 @@ Moved from fanpage_agent/agent/tools.py.
 
 from __future__ import annotations
 
-import csv
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -18,25 +17,21 @@ from typing import Any
 from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
-from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.adapters.telegram_client import TelegramClient
-from fanpage_agent.main import build_daily_artifacts, build_ops_status_payload
+from fanpage_agent.config import Settings
+from fanpage_agent.legacy_cli import build_daily_artifacts, build_ops_status_payload
 from fanpage_agent.loaders.brand_loader import load_brand_profile
 from fanpage_agent.models import BrandProfile
 from fanpage_agent.services.calendar_gap_service import CalendarGapService
 from fanpage_agent.services.community_triage import CommunityTriageService
 from fanpage_agent.services.content_stats import compute_content_stats
 from fanpage_agent.services.daily_ops import DailyOpsService
-from fanpage_agent.services.image_gen import build_image_service
 from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
 from fanpage_agent.services.planner import PlannerService
 from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.scheduled_publish import ScheduledPublishService
 from fanpage_agent.services.verifier import VerifierService
 from fanpage_agent.services.writer import WriterService
-
-from fanpage_agent.config import Settings
-
 
 # ── helpers shared by tools ────────────────────────────────────
 
@@ -63,7 +58,7 @@ def _local_store() -> LocalSheetStore:
 
 
 def _profile(settings: Settings | None = None) -> BrandProfile:
-    s = settings or _settings()
+    settings or _settings()
     path = DEFAULT_BRAND if DEFAULT_BRAND.exists() else ROOT_DIR / "data" / "sample" / "brand_profile.json"
     if not path.exists():
         raise FileNotFoundError(f"Brand profile not found at {path}")
@@ -370,7 +365,7 @@ def _make_tool_triage_community(max_items: int = 10) -> dict:
 
 
 def _make_tool_approve_triage_reply(item_id: str) -> dict:
-    s = _settings()
+    _settings()
     store = _local_store()
     now = datetime.now(timezone.utc).isoformat()
     result = store.approve_triage_reply(item_id, approved_by="agent", approved_at=now)
@@ -378,7 +373,7 @@ def _make_tool_approve_triage_reply(item_id: str) -> dict:
 
 
 def _make_tool_reject_triage_reply(item_id: str, reason: str = "") -> dict:
-    s = _settings()
+    _settings()
     store = _local_store()
     now = datetime.now(timezone.utc).isoformat()
     result = store.reject_triage_reply(item_id, reason=reason or "Rejected by agent", rejected_at=now)
@@ -386,7 +381,7 @@ def _make_tool_reject_triage_reply(item_id: str, reason: str = "") -> dict:
 
 
 def _make_tool_approve_calendar_item(calendar_id: str) -> dict:
-    s = _settings()
+    _settings()
     store = _local_store()
     now = datetime.now(timezone.utc).isoformat()
     result = store.approve_calendar_item(calendar_id, approved_by="agent", final_caption_ref="", approved_at=now)
@@ -394,7 +389,7 @@ def _make_tool_approve_calendar_item(calendar_id: str) -> dict:
 
 
 def _make_tool_reject_calendar_item(calendar_id: str) -> dict:
-    s = _settings()
+    _settings()
     store = _local_store()
     now = datetime.now(timezone.utc).isoformat()
     result = store.reject_calendar_item(calendar_id, reason="Rejected by agent", rejected_at=now)

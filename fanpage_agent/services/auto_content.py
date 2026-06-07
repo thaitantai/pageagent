@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import re
 from collections import Counter
@@ -19,7 +18,6 @@ from fanpage_agent.models import (
 from fanpage_agent.services.planner import PlannerService
 from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.writer import WriterService
-from fanpage_agent.scraping.web_search import WebSearchClient
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +93,7 @@ class AutoContentReport:
     def format_telegram(self, brand_name: str = "") -> str:
         """Telegram-friendly report."""
         lines: list[str] = []
-        lines.append(f"🤖 *Auto Content Cycle*")
+        lines.append("🤖 *Auto Content Cycle*")
         lines.append(f"📅 {self.run_date}")
         if brand_name:
             lines.append(f"🏷 {brand_name}")
@@ -142,8 +140,8 @@ class AutoContentReport:
         if self.gaps:
             lines.append("💡 *Gợi ý hành động:*")
             lines.append(f"  1. Duyệt {len(self.gaps)} gaps — chọn topic phù hợp tone brand")
-            lines.append(f"  2. Dùng `auto-content-cycle --draft` để auto sinh draft")
-            lines.append(f"  3. Dùng `plan-week` để đưa vào lịch content")
+            lines.append("  2. Dùng `auto-content-cycle --draft` để auto sinh draft")
+            lines.append("  3. Dùng `plan-week` để đưa vào lịch content")
         else:
             lines.append("✅ Không phát hiện gap — trends đang được khai thác tốt.")
 

@@ -7,11 +7,21 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, ResearchTopicScore, SourceCandidate, SourceDocument, TrendItem
-from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.models import (
+    CommentInboxEntry,
+    ResearchBrief,
+    ResearchEvidence,
+    ResearchTopicScore,
+    SourceCandidate,
+    SourceDocument,
+    TrendItem,
+)
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
-from fanpage_agent.scraping.web_search import WebSearchClient
-from fanpage_agent.services.product_topic_discovery import ProductAwareTopicDiscovery, ProductTopicCandidate
+from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.services.product_topic_discovery import (
+    ProductAwareTopicDiscovery,
+    ProductTopicCandidate,
+)
 from fanpage_agent.services.research_insights import EvidenceExtractor, ResearchQualityGate
 
 logger = logging.getLogger(__name__)

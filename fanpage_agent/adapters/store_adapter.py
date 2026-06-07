@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fanpage_agent.adapters.store_factory import build_store as _build_store
 from fanpage_agent.adapters.settings import get_settings
+from fanpage_agent.adapters.store_factory import build_store as _build_store
 
 
 class StoreAdapter:

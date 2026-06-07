@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 from fanpage_agent.models import AnalyticsReport, AnalyticsSummary, PostMetric
+
 
 def _parse_date(raw: str) -> datetime:
     try:

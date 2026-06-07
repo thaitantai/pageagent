@@ -11,7 +11,7 @@ from fanpage_agent.adapters.sheet_store import LocalSheetStore
 
 if TYPE_CHECKING:
     from fanpage_agent.adapters.facebook_client import FacebookClient
-    from fanpage_agent.models import BrandProfile, CaptionPackage
+    from fanpage_agent.models import BrandProfile
     from fanpage_agent.services.image_gen import ImageService
     from fanpage_agent.services.verifier import VerifierService
 

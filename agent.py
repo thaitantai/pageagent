@@ -15,17 +15,14 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from fanpage_agent.adapters.llm_client import build_llm_client
-
-from fanpage_agent.config import Settings
 from config import AgentConfig
+from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.config import Settings
 from tools import (
-    TOOL_REGISTRY,
     dispatch_tool,
     get_tool_definitions,
     tool_ops_status,
 )
-
 
 SYSTEM_PROMPT = """Bạn là Fanpage Agent — agent tự động vận hành fanpage Facebook.
 

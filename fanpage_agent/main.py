@@ -12,27 +12,27 @@ import time
 from pathlib import Path
 from typing import Any
 
+from fanpage_agent.agents.analyst import AnalystAgent
+from fanpage_agent.agents.community import CommunityAgent
+from fanpage_agent.agents.designer import DesignerAgent
+from fanpage_agent.agents.orchestrator import OrchestratorAgent
+from fanpage_agent.agents.publisher import PublisherAgent
+from fanpage_agent.agents.researcher import ResearchAgent
+from fanpage_agent.agents.strategist import StrategistAgent
+from fanpage_agent.agents.writer import WriterAgent
 from fanpage_agent.audit.auditor import AuditManager
 from fanpage_agent.core.bus import AgentBus
 from fanpage_agent.core.harness import AgentHarness
-from fanpage_agent.core.types import AgentRole, AgentTask, ActionPriority
-from fanpage_agent.agents.orchestrator import OrchestratorAgent
-from fanpage_agent.agents.strategist import StrategistAgent
-from fanpage_agent.agents.writer import WriterAgent
-from fanpage_agent.agents.designer import DesignerAgent
-from fanpage_agent.agents.community import CommunityAgent
-from fanpage_agent.agents.analyst import AnalystAgent
-from fanpage_agent.agents.publisher import PublisherAgent
-from fanpage_agent.agents.researcher import ResearchAgent
+from fanpage_agent.core.types import ActionPriority, AgentRole, AgentTask
 from fanpage_agent.legacy_cli import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_CAMPAIGN_FILE,
     DEFAULT_COMMENT_FILE,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
-    EXPECTED_HERMES_CRON_JOBS,
-    build_daily_artifacts,
-    build_ops_status_payload,
+)
+from fanpage_agent.legacy_cli import EXPECTED_HERMES_CRON_JOBS as EXPECTED_HERMES_CRON_JOBS
+from fanpage_agent.legacy_cli import (
     main as legacy_cli_main,
 )
 from fanpage_agent.memory.performance import PerformanceMemory
@@ -361,7 +361,7 @@ def _run_backup(data_dir: str, keep: int = 7) -> None:
 
 
 def _run_restore(data_dir: str, backup_idx: int = 1) -> None:
-    from fanpage_agent.memory.performance import PerformanceMemory, BackupError
+    from fanpage_agent.memory.performance import BackupError, PerformanceMemory
     memory = PerformanceMemory(Path(data_dir) / "memory.db")
     try:
         memory.restore(backup_idx=backup_idx)

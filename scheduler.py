@@ -8,11 +8,9 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from agent import AgentConfig, Orchestrator
 from config import Settings
-
 
 # ── Compatibility wrappers for fanpage_cli ─────────────────────
 

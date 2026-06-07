@@ -9,7 +9,7 @@ import uuid
 from typing import Any
 
 from fanpage_agent.core.agent import BaseAgent
-from fanpage_agent.core.types import ActionPriority, AgentRole, AgentResult, AgentTask
+from fanpage_agent.core.types import ActionPriority, AgentResult, AgentRole, AgentTask
 
 
 class DesignerAgent(BaseAgent):

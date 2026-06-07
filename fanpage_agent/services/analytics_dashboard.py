@@ -401,7 +401,6 @@ class AnalyticsDashboardService:
     def _daily_reach(
         metrics: list[PostMetric], days: int
     ) -> list[dict[str, object]]:
-        from collections import OrderedDict
 
         ref = datetime.now(timezone.utc)
         daily: dict[str, int] = {}

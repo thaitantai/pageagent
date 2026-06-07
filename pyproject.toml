@@ -28,3 +28,19 @@ py-modules = ["agent", "config", "tools", "scheduler", "cli"]
 filterwarnings = [
     "ignore:The 'strip_cdata' option.*:DeprecationWarning",
 ]
+
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+    "tests",
+    "scripts",
+    "fanpage_agent.egg-info",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "E501",  # Prefer readability over mechanical line wrapping for copy-heavy prompts.
+]

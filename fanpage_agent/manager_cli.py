@@ -15,11 +15,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -140,8 +137,8 @@ def cmd_config_check(args: argparse.Namespace) -> int:
 def _test_fb() -> list[str]:
     errors: list[str] = []
     try:
-        from fanpage_agent.config import Settings
         from fanpage_agent.adapters.facebook_client import FacebookClient
+        from fanpage_agent.config import Settings
 
         settings = Settings.from_env(root_dir=ROOT_DIR)
         fb = FacebookClient(settings)
@@ -159,8 +156,8 @@ def _test_fb() -> list[str]:
 def _test_telegram() -> list[str]:
     errors: list[str] = []
     try:
-        from fanpage_agent.config import Settings
         from fanpage_agent.adapters.telegram_client import TelegramClient
+        from fanpage_agent.config import Settings
 
         settings = Settings.from_env(root_dir=ROOT_DIR)
         tg = TelegramClient(settings)
@@ -178,8 +175,8 @@ def _test_telegram() -> list[str]:
 def _test_llm() -> list[str]:
     errors: list[str] = []
     try:
-        from fanpage_agent.config import Settings
         from fanpage_agent.adapters.llm_client import build_llm_client
+        from fanpage_agent.config import Settings
         from fanpage_agent.services.planner import PlannerService
 
         settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -207,8 +204,8 @@ def _test_llm() -> list[str]:
 def _test_store() -> list[str]:
     errors: list[str] = []
     try:
-        from fanpage_agent.config import Settings
         from fanpage_agent.adapters.store_factory import build_store
+        from fanpage_agent.config import Settings
 
         settings = Settings.from_env(root_dir=ROOT_DIR)
         store = build_store(settings=settings)

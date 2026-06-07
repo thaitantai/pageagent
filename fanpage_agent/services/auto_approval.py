@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.models import BrandProfile
@@ -127,7 +125,7 @@ class AutoApprovalEngine:
             # Verification check
             if self.config.require_verification_pass:
                 # Build a minimal plan/caption context for the verifier
-                from fanpage_agent.models import PlanDay, WeeklyPlan, CaptionPackage, CaptionVariant
+                from fanpage_agent.models import PlanDay, WeeklyPlan
 
                 day = PlanDay(
                     date=row.get("date", ""),

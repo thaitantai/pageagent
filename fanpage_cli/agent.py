@@ -7,8 +7,8 @@ import json
 import sys
 import time
 
+from fanpage_agent.core.types import ActionPriority, AgentRole, AgentTask
 from fanpage_agent.main import create_pipeline
-from fanpage_agent.core.types import AgentRole, AgentTask, ActionPriority
 
 
 def register_subcommand(subparsers: argparse._SubParsersAction) -> None:

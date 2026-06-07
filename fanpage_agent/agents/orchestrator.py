@@ -18,14 +18,14 @@ from pathlib import Path
 from typing import Any
 
 from fanpage_agent.core.agent import BaseAgent
+from fanpage_agent.core.bus import AgentBus
 from fanpage_agent.core.types import (
     ActionPriority,
-    AgentRole,
     AgentResult,
+    AgentRole,
     AgentTask,
     PipelineState,
 )
-from fanpage_agent.core.bus import AgentBus
 
 
 class OrchestratorAgent(BaseAgent):
@@ -190,8 +190,6 @@ class OrchestratorAgent(BaseAgent):
 
     def _run_pipeline(self, mode: str = "full", page_id: str | None = None) -> AgentResult:
         """Run a specific pipeline phase."""
-        pipeline_state = self._gather_state()
-
         page_id = page_id or self.current_page_id
 
         steps: list[str] = []
@@ -451,7 +449,6 @@ class OrchestratorAgent(BaseAgent):
 
     def _log_content_gen(self) -> None:
         """Log content generation start to stdout (visible in Docker logs)."""
-        import sys
         print(
             f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
             f"🔄 auto-generating content (tick #{self._tick_count})",

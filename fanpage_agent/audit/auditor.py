@@ -19,15 +19,12 @@ Usage:
 
 from __future__ import annotations
 
-import functools
 import json
 import logging
 import os
 import sqlite3
-import threading
 import time
-from contextlib import closing
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 
@@ -154,7 +151,7 @@ class AuditManager:
             params.append(since)
 
         where = " AND ".join(clauses) if clauses else "1"
-        sql = f"SELECT id, timestamp, event_type, source, event_data, success, duration_ms, error "
+        sql = "SELECT id, timestamp, event_type, source, event_data, success, duration_ms, error "
         sql += f"FROM audit_log WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 

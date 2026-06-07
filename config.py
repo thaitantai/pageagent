@@ -13,7 +13,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ── multi-page support ──────────────────────────────────────────
 
 
@@ -153,7 +152,7 @@ class Settings(BaseModel):
                 kwargs[field_name] = _parse_csv_list(raw)
             elif field_info.annotation is Path:
                 kwargs[field_name] = Path(raw)
-            elif field_info.annotation is bool or field_info.annotation == bool:
+            elif field_info.annotation is bool:
                 kwargs[field_name] = raw.lower() in ("true", "1", "yes")
             else:
                 kwargs[field_name] = raw

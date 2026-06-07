@@ -21,9 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.config import Settings
-
 
 # ---------------------------------------------------------------------------
 #  Data models

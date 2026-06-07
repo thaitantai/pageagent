@@ -3,23 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 
-from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
-from fanpage_agent.services.delivery import DeliveryService
-from fanpage_agent.utils import dump_json
 from fanpage_agent.main import (
-    ROOT_DIR,
     DEFAULT_CALENDAR_FILE,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
-    DEFAULT_COMMENT_FILE,
     DEFAULT_TRIAGE_FILE,
-    build_calendar_store_payload,
+    ROOT_DIR,
     build_approval_audit_payload,
+    build_calendar_store_payload,
     build_operator_digest_payload,
-    summarize_calendar_items,
-    summarize_triage_items,
 )
+from fanpage_agent.services.delivery import DeliveryService
+from fanpage_agent.utils import dump_json
 
 
 def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:

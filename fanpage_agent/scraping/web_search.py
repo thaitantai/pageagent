@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
-from fanpage_agent.throttle import TokenBucket
 from fanpage_agent.audit import audit
+from fanpage_agent.throttle import TokenBucket
 
 logger = logging.getLogger(__name__)
 
