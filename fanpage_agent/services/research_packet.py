@@ -11,6 +11,7 @@ from fanpage_agent.models import ResearchPacket
 from fanpage_agent.scraping.source_collector import ScraplingSourceCollector
 from fanpage_agent.services.research import ResearchService
 from fanpage_agent.services.research_sources import SourceRegistry
+from fanpage_agent.services.source_discovery import WebSourceDiscovery
 
 
 DEFAULT_RESEARCH_OUTPUT_DIR = Path("data/research_packets")
@@ -29,6 +30,8 @@ def build_research_packet(
     source_registry_file: str | Path | None = None,
     fetch_source_documents: bool = False,
     source_cache_dir: str | Path | None = None,
+    discover_sources: bool = False,
+    max_discovered_sources: int = 5,
 ) -> ResearchPacket:
     store = LocalSheetStore(
         calendar_csv=calendar_file,
@@ -53,12 +56,24 @@ def build_research_packet(
             page_id=page_id or str(effective_page_context.get("page_id", "")),
             topics=[str(item) for item in topic_focus],
         )
+    source_candidates = []
+    if discover_sources:
+        discovery_queries = [str(item) for item in topic_focus if str(item).strip()]
+        if not discovery_queries:
+            content_pillars = effective_page_context.get("content_pillars", [])
+            discovery_queries = [str(item) for item in content_pillars if str(item).strip()] if isinstance(content_pillars, list) else []
+        source_candidates = (
+            WebSourceDiscovery().discover(queries=discovery_queries, max_candidates=max_discovered_sources)
+            if discovery_queries
+            else []
+        )
     brief = ResearchService().build_brief(
         store=store,
         comment_csv=comment_file,
         campaign_notes_file=campaign_file,
         fetch_external_trends=fetch_external_trends,
         source_documents=registry_documents,
+        source_candidates=source_candidates,
     )
     packet_job_id = job_id or f"research-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     return ResearchPacket(
@@ -75,6 +90,7 @@ def build_research_packet(
             "calendar_file": str(calendar_file),
             "source_registry_file": str(source_registry_file or ""),
             "source_cache_dir": str(source_cache_dir or ""),
+            "discover_sources": str(discover_sources),
         },
         brief=brief,
     )

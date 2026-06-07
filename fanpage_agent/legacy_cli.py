@@ -177,6 +177,8 @@ def build_parser() -> argparse.ArgumentParser:
     daily_parser.add_argument("--source-registry-file")
     daily_parser.add_argument("--fetch-source-documents", action="store_true")
     daily_parser.add_argument("--source-cache-dir", default="data/research_source_cache")
+    daily_parser.add_argument("--discover-sources", action="store_true")
+    daily_parser.add_argument("--max-discovered-sources", type=int, default=5)
     daily_parser.add_argument("--write-calendar", action="store_true")
     daily_parser.add_argument("--save", action="store_true")
     add_store_backend_arg(daily_parser)
@@ -193,6 +195,8 @@ def build_parser() -> argparse.ArgumentParser:
     daily_delivery_parser.add_argument("--source-registry-file")
     daily_delivery_parser.add_argument("--fetch-source-documents", action="store_true")
     daily_delivery_parser.add_argument("--source-cache-dir", default="data/research_source_cache")
+    daily_delivery_parser.add_argument("--discover-sources", action="store_true")
+    daily_delivery_parser.add_argument("--max-discovered-sources", type=int, default=5)
     daily_delivery_parser.add_argument("--write-calendar", action="store_true")
     daily_delivery_parser.add_argument("--save", action="store_true")
     daily_delivery_parser.add_argument("--chat-id")
@@ -1107,6 +1111,8 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
         source_registry_file=args.source_registry_file,
         fetch_source_documents=args.fetch_source_documents,
         source_cache_dir=args.source_cache_dir,
+        discover_sources=args.discover_sources,
+        max_discovered_sources=args.max_discovered_sources,
     )
     research_brief = research_packet.brief
     packet = DailyOpsService(
@@ -1157,6 +1163,8 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
         source_registry_file=args.source_registry_file,
         fetch_source_documents=args.fetch_source_documents,
         source_cache_dir=args.source_cache_dir,
+        discover_sources=args.discover_sources,
+        max_discovered_sources=args.max_discovered_sources,
     )
     research_brief = research_packet.brief
     packet = DailyOpsService(

@@ -244,6 +244,10 @@ def cli() -> None:
                        help="fetch registry URLs with Scrapling and store extracted text")
     parser.add_argument("--source-cache-dir", default="data/research_source_cache",
                        help="cache directory for fetched source documents")
+    parser.add_argument("--discover-sources", action="store_true",
+                       help="discover new web source candidates from page topics")
+    parser.add_argument("--max-discovered-sources", type=int, default=5,
+                       help="maximum dynamic source candidates to include")
     parser.add_argument("--no-external-trends", action="store_true",
                        help="skip external trend fetch for deterministic/offline runs")
 
@@ -288,6 +292,8 @@ def cli() -> None:
             source_registry_file=args.source_registry_file,
             fetch_source_documents=args.fetch_source_documents,
             source_cache_dir=args.source_cache_dir,
+            discover_sources=args.discover_sources,
+            max_discovered_sources=args.max_discovered_sources,
             fetch_external_trends=not args.no_external_trends,
         )
 
@@ -432,6 +438,8 @@ def _run_research_standalone(
     source_registry_file: str | None = None,
     fetch_source_documents: bool = False,
     source_cache_dir: str | None = None,
+    discover_sources: bool = False,
+    max_discovered_sources: int = 5,
     fetch_external_trends: bool = True,
 ) -> None:
     from config import Settings
@@ -451,6 +459,8 @@ def _run_research_standalone(
         source_registry_file=source_registry_file,
         fetch_source_documents=fetch_source_documents,
         source_cache_dir=source_cache_dir,
+        discover_sources=discover_sources,
+        max_discovered_sources=max_discovered_sources,
         fetch_external_trends=fetch_external_trends,
     )
     output_path = save_research_packet(packet, output_dir=output_dir)

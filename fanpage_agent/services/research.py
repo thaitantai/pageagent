@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, ResearchTopicScore, SourceDocument, TrendItem
+from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvidence, ResearchTopicScore, SourceCandidate, SourceDocument, TrendItem
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.web_search import WebSearchClient
@@ -54,6 +54,7 @@ class ResearchService:
         fetch_external_trends: bool = True,
         web_search_queries: list[str] | None = None,
         source_documents: list[SourceDocument] | None = None,
+        source_candidates: list[SourceCandidate] | None = None,
     ) -> ResearchBrief:
         """Build research brief with optional web search + scrape.
 
@@ -125,6 +126,7 @@ class ResearchService:
         trend_keywords: list[str] = []
         trend_clusters: dict[str, list[str]] = {}
         source_documents = source_documents or []
+        source_candidates = source_candidates or []
 
         if fetch_external_trends and self._trend_scraper:
             try:
@@ -187,6 +189,8 @@ class ResearchService:
             recommendations.append(f"Ưu tiên topic có điểm cao nhất: {topic_scores[0].topic}.")
         if quality_warnings:
             recommendations.append("Cần bổ sung nguồn trước khi Writer dùng các claim quan trọng.")
+        if source_candidates:
+            recommendations.append(f"Tìm thấy {len(source_candidates)} nguồn ứng viên mới cần operator duyệt trước khi tin dùng.")
 
         return ResearchBrief(
             top_performing_topics=top_performing_topics,
@@ -205,6 +209,7 @@ class ResearchService:
             quality_warnings=quality_warnings,
             topic_scores=topic_scores,
             source_documents=source_documents,
+            source_candidates=source_candidates,
         )
 
     def _build_search_queries(

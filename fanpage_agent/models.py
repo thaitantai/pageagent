@@ -176,6 +176,18 @@ class SourceDocument(BaseModel):
     metadata: dict[str, object] = Field(default_factory=dict)
 
 
+class SourceCandidate(BaseModel):
+    source_id: str
+    title: str = ""
+    url: str = ""
+    snippet: str = ""
+    discovery_query: str = ""
+    relevance_score: float = 0.0
+    trust_score: float = 0.5
+    status: str = "candidate"
+    reason_codes: List[str] = Field(default_factory=list)
+
+
 class ResearchEvidence(BaseModel):
     claim: str
     source: str
@@ -215,6 +227,7 @@ class ResearchBrief(BaseModel):
     quality_warnings: List[str] = Field(default_factory=list)
     topic_scores: List[ResearchTopicScore] = Field(default_factory=list)
     source_documents: List[SourceDocument] = Field(default_factory=list)
+    source_candidates: List[SourceCandidate] = Field(default_factory=list)
 
 
 class ResearchPacket(BaseModel):
