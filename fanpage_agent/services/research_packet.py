@@ -32,6 +32,8 @@ def build_research_packet(
     source_cache_dir: str | Path | None = None,
     discover_sources: bool = False,
     max_discovered_sources: int = 5,
+    discover_product_topics: bool = False,
+    max_product_topics: int = 8,
 ) -> ResearchPacket:
     store = LocalSheetStore(
         calendar_csv=calendar_file,
@@ -74,6 +76,9 @@ def build_research_packet(
         fetch_external_trends=fetch_external_trends,
         source_documents=registry_documents,
         source_candidates=source_candidates,
+        page_context=effective_page_context,
+        discover_product_topics=discover_product_topics,
+        max_product_topics=max_product_topics,
     )
     packet_job_id = job_id or f"research-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     return ResearchPacket(

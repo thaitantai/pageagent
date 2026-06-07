@@ -11,6 +11,7 @@ from fanpage_agent.models import CommentInboxEntry, ResearchBrief, ResearchEvide
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.web_search import WebSearchClient
+from fanpage_agent.services.product_topic_discovery import ProductAwareTopicDiscovery, ProductTopicCandidate
 from fanpage_agent.services.research_insights import EvidenceExtractor, ResearchQualityGate
 
 logger = logging.getLogger(__name__)
@@ -40,11 +41,13 @@ class ResearchService:
         trend_analyzer: TrendAnalyzer | None = None,
         evidence_extractor: EvidenceExtractor | None = None,
         quality_gate: ResearchQualityGate | None = None,
+        topic_discovery: ProductAwareTopicDiscovery | None = None,
     ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
         self._evidence_extractor = evidence_extractor or EvidenceExtractor()
         self._quality_gate = quality_gate or ResearchQualityGate()
+        self._topic_discovery = topic_discovery or ProductAwareTopicDiscovery()
 
     def build_brief(
         self,
@@ -55,6 +58,9 @@ class ResearchService:
         web_search_queries: list[str] | None = None,
         source_documents: list[SourceDocument] | None = None,
         source_candidates: list[SourceCandidate] | None = None,
+        page_context: dict[str, Any] | None = None,
+        discover_product_topics: bool = False,
+        max_product_topics: int = 8,
     ) -> ResearchBrief:
         """Build research brief with optional web search + scrape.
 
@@ -108,7 +114,11 @@ class ResearchService:
         frequent_questions = [item.message for item in comments[:5]]
         campaign_focus = [item for item in campaign_notes.get("campaign_focus", []) if item]
 
-        next_angles = self._dedupe(campaign_focus + frequent_questions + top_performing_topics)[:5]
+        product_topics: list[ProductTopicCandidate] = []
+        if discover_product_topics:
+            product_topics = self._topic_discovery.discover(page_context or {}, max_topics=max_product_topics)
+        product_topic_titles = [item.topic for item in product_topics]
+        next_angles = self._dedupe(product_topic_titles + campaign_focus + frequent_questions + top_performing_topics)[:5]
 
         recommendations: list[str] = []
         if recommended_objectives:
@@ -184,7 +194,10 @@ class ResearchService:
             overused_topics=overused_topics,
             frequent_questions=frequent_questions,
             evidence=evidence,
+            product_topics=product_topics,
         )
+        if product_topics:
+            recommendations.append(f"Đã đề xuất {len(product_topics)} topic dựa trên sản phẩm/vấn đề khách hàng.")
         if topic_scores:
             recommendations.append(f"Ưu tiên topic có điểm cao nhất: {topic_scores[0].topic}.")
         if quality_warnings:
@@ -317,30 +330,41 @@ class ResearchService:
         overused_topics: list[str],
         frequent_questions: list[str],
         evidence: list[ResearchEvidence],
+        product_topics: list[ProductTopicCandidate] | None = None,
     ) -> list[ResearchTopicScore]:
         scores: list[ResearchTopicScore] = []
+        product_topic_map = {item.topic: item for item in (product_topics or [])}
         for topic in candidates[:12]:
-            brand_relevance = self._keyword_overlap_score(topic, campaign_focus)
+            product_topic = product_topic_map.get(topic)
+            brand_relevance = max(
+                self._keyword_overlap_score(topic, campaign_focus),
+                product_topic.product_relevance if product_topic else 0.0,
+            )
             question_overlap = self._keyword_overlap_score(topic, frequent_questions)
             source_confidence = self._topic_source_confidence(topic, evidence)
             duplication_risk = 0.85 if topic in overused_topics else 0.15
             novelty = 1.0 - duplication_risk
-            content_potential = min(1.0, 0.35 + question_overlap * 0.35 + source_confidence * 0.3)
-            fanpage_fit = min(1.0, 0.45 + brand_relevance * 0.35 + question_overlap * 0.2)
-            total = (
+            customer_value = product_topic.customer_value if product_topic else question_overlap
+            content_potential = min(1.0, 0.30 + customer_value * 0.35 + source_confidence * 0.3)
+            fanpage_fit = min(1.0, 0.40 + brand_relevance * 0.35 + customer_value * 0.2)
+            risk_penalty = 0.08 if product_topic and product_topic.risk_level == "medium" else 0.0
+            total = max(0.0, (
                 brand_relevance * 0.25
-                + novelty * 0.20
-                + content_potential * 0.20
-                + source_confidence * 0.15
-                + fanpage_fit * 0.15
-                + (1.0 - duplication_risk) * 0.05
-            )
+                + novelty * 0.16
+                + content_potential * 0.18
+                + source_confidence * 0.14
+                + fanpage_fit * 0.14
+                + customer_value * 0.10
+                + (1.0 - duplication_risk) * 0.03
+                - risk_penalty
+            ))
             rationale = self._topic_score_rationale(
                 topic=topic,
                 brand_relevance=brand_relevance,
                 novelty=novelty,
                 source_confidence=source_confidence,
                 duplication_risk=duplication_risk,
+                product_topic=product_topic,
             )
             scores.append(ResearchTopicScore(
                 topic=topic,
@@ -351,6 +375,9 @@ class ResearchService:
                 source_confidence=round(source_confidence, 3),
                 fanpage_fit=round(fanpage_fit, 3),
                 duplication_risk=round(duplication_risk, 3),
+                product_relevance=round(product_topic.product_relevance, 3) if product_topic else 0.0,
+                customer_value=round(customer_value, 3),
+                risk_level=product_topic.risk_level if product_topic else "",
                 rationale=rationale,
             ))
         return sorted(scores, key=lambda item: item.total_score, reverse=True)
@@ -387,8 +414,15 @@ class ResearchService:
         novelty: float,
         source_confidence: float,
         duplication_risk: float,
+        product_topic: ProductTopicCandidate | None = None,
     ) -> str:
         signals: list[str] = []
+        if product_topic:
+            signals.append(f"gắn với sản phẩm {product_topic.product_name}")
+            if product_topic.customer_pain:
+                signals.append(f"giải quyết pain point {product_topic.customer_pain}")
+            if product_topic.risk_level == "medium":
+                signals.append("cần guardrail claim")
         if brand_relevance >= 0.5:
             signals.append("sát campaign/brand")
         if novelty >= 0.7:

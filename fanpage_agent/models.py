@@ -207,6 +207,9 @@ class ResearchTopicScore(BaseModel):
     source_confidence: float = 0.0
     fanpage_fit: float = 0.0
     duplication_risk: float = 0.0
+    product_relevance: float = 0.0
+    customer_value: float = 0.0
+    risk_level: str = ""
     rationale: str = ""
 
 

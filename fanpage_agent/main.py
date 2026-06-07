@@ -248,6 +248,10 @@ def cli() -> None:
                        help="discover new web source candidates from page topics")
     parser.add_argument("--max-discovered-sources", type=int, default=5,
                        help="maximum dynamic source candidates to include")
+    parser.add_argument("--discover-product-topics", action="store_true",
+                       help="derive topic candidates from page product/customer context")
+    parser.add_argument("--max-product-topics", type=int, default=8,
+                       help="maximum product-aware topic candidates to include")
     parser.add_argument("--no-external-trends", action="store_true",
                        help="skip external trend fetch for deterministic/offline runs")
 
@@ -294,6 +298,8 @@ def cli() -> None:
             source_cache_dir=args.source_cache_dir,
             discover_sources=args.discover_sources,
             max_discovered_sources=args.max_discovered_sources,
+            discover_product_topics=args.discover_product_topics,
+            max_product_topics=args.max_product_topics,
             fetch_external_trends=not args.no_external_trends,
         )
 
@@ -440,6 +446,8 @@ def _run_research_standalone(
     source_cache_dir: str | None = None,
     discover_sources: bool = False,
     max_discovered_sources: int = 5,
+    discover_product_topics: bool = False,
+    max_product_topics: int = 8,
     fetch_external_trends: bool = True,
 ) -> None:
     from config import Settings
@@ -461,6 +469,8 @@ def _run_research_standalone(
         source_cache_dir=source_cache_dir,
         discover_sources=discover_sources,
         max_discovered_sources=max_discovered_sources,
+        discover_product_topics=discover_product_topics,
+        max_product_topics=max_product_topics,
         fetch_external_trends=fetch_external_trends,
     )
     output_path = save_research_packet(packet, output_dir=output_dir)
