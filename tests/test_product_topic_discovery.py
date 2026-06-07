@@ -1,6 +1,7 @@
 from fanpage_agent.models import ResearchEvidence, SourceDocument
 from fanpage_agent.services.product_topic_discovery import ProductAwareTopicDiscovery
 from fanpage_agent.services.research import ResearchService
+from fanpage_agent.services.research_packet import research_handoff_policy
 
 
 class EmptyStore:
@@ -153,3 +154,24 @@ def test_affiliate_topics_can_score_when_source_evidence_matches():
     assert not any("chưa có evidence đủ mạnh" in warning for warning in brief.quality_warnings)
     assert brief.topic_scores[0].source_confidence >= 0.45
     assert brief.topic_scores[0].risk_level != "high"
+
+
+def test_handoff_policy_blocks_affiliate_topics_without_evidence():
+    service = ResearchService()
+
+    brief = service.build_brief(
+        EmptyStore(),
+        source_documents=[],
+        page_context=_affiliate_context(),
+        discover_product_topics=True,
+        max_product_topics=2,
+        fetch_external_trends=False,
+    )
+
+    status, reasons, policy = research_handoff_policy(brief)
+
+    assert status == "blocked"
+    assert any("high-risk" in reason for reason in reasons)
+    assert policy["allow_writer_claims"] is False
+    assert policy["allow_affiliate_recommendations"] is False
+    assert policy["max_safe_use"] == "draft_questions_only"

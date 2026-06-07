@@ -117,3 +117,4 @@ Viec can lam:
 - 2026-06-06: Da them Evidence & Insight Extractor va Research Quality Gate de bien SourceDocument thanh evidence co `source_id`/`trust_score` va canh bao chat luong.
 - 2026-06-06: Da nang format Research Brief cho operator thay duoc confidence, so nguon, source-backed insights va quality warnings ngay trong digest.
 - 2026-06-06: Da them Community Affiliate context de page uu tien gia tri cong dong, doc `affiliate_offers`, gan disclosure/risk metadata va tao topic buying guide/comparison/checklist thay vi hard-sell.
+- 2026-06-07: Hoan thien ResearchPacket handoff gate voi `status`, `gate_reasons` va `handoff_policy` de downstream biet khi nao chi duoc tao checklist/cau hoi, khi nao can human review va khi nao moi duoc viet claim/recommendation.

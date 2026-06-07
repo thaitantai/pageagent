@@ -240,6 +240,8 @@ class ResearchPacket(BaseModel):
     schema_version: str = "research_packet.v1"
     created_at: str
     status: str = "ready"
+    gate_reasons: List[str] = Field(default_factory=list)
+    handoff_policy: dict[str, object] = Field(default_factory=dict)
     page_id: str = ""
     page_context: dict[str, object] = Field(default_factory=dict)
     source_files: dict[str, str] = Field(default_factory=dict)

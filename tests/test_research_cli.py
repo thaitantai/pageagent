@@ -185,6 +185,10 @@ class ResearchCliTest(unittest.TestCase):
             self.assertEqual(payload["page_id"], "main")
             self.assertEqual(payload["page_context"]["topic_focus"], "cong dong soi da")
             self.assertEqual(saved_payload["packet_id"], payload["packet_id"])
+            self.assertIn(payload["status"], {"ready", "needs_review", "blocked"})
+            self.assertEqual(saved_payload["handoff_policy"], payload["handoff_policy"])
+            self.assertTrue(payload["handoff_policy"]["requires_human_review"])
+            self.assertTrue(payload["gate_reasons"])
             self.assertTrue(payload["brief"]["topic_scores"])
             self.assertGreater(payload["brief"]["confidence_score"], 0)
 
@@ -199,6 +203,8 @@ class ResearchCliTest(unittest.TestCase):
                     "packet_id": "rpkt-1",
                     "job_id": "job-1",
                     "created_at": "2026-06-05T00:00:00+00:00",
+                    "status": "needs_review",
+                    "gate_reasons": ["demo warning"],
                     "page_id": "main",
                     "brief": {
                         "confidence_score": 0.8,
@@ -241,6 +247,8 @@ class ResearchCliTest(unittest.TestCase):
             self.assertEqual(payload["page_filter"], "main")
             self.assertEqual(payload["pages"][0]["page_id"], "main")
             self.assertEqual(payload["research_packets"][0]["packet_id"], "rpkt-1")
+            self.assertEqual(payload["research_packets"][0]["status"], "needs_review")
+            self.assertEqual(payload["research_packets"][0]["gate_reasons"], ["demo warning"])
             self.assertEqual(payload["research_packets"][0]["top_topic"], "soi da")
             self.assertEqual(payload["research_packets"][0]["evidence_count"], 1)
 
