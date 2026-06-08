@@ -19,12 +19,12 @@ from fanpage_agent.main import (
     build_daily_artifacts,
     build_triage_store_payload,
 )
-from fanpage_agent.services.community_triage import CommunityTriageService
-from fanpage_agent.services.daily_ops import DailyOpsService
-from fanpage_agent.services.delivery import DeliveryService
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.research import ResearchService
-from fanpage_agent.services.writer import WriterService
+from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
+from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool
+from fanpage_agent.tools.publishing.delivery import DeliveryTool
+from fanpage_agent.tools.publishing.planner import PlannerTool
+from fanpage_agent.tools.research.research import ResearchTool
+from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.utils import dump_json
 
 
@@ -89,14 +89,14 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings)
     store = build_store(settings=settings, args=args)
-    research_brief = ResearchService().build_brief(
+    research_brief = ResearchTool().build_brief(
         store=store,
         comment_csv=args.comment_file,
         campaign_notes_file=args.campaign_file,
     )
-    packet = DailyOpsService(
-        planner=PlannerService(llm_client=llm_client),
-        writer=WriterService(llm_client=llm_client),
+    packet = DailyOpsTool(
+        planner=PlannerTool(llm_client=llm_client),
+        writer=WriterTool(llm_client=llm_client),
     ).build_packet(
         profile=profile,
         run_date=args.run_date,
@@ -115,7 +115,7 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
                     updated_at=args.run_date,
                 )
             }
-    packet["delivery"] = DeliveryService(settings).deliver_daily_packet(packet, chat_id=args.chat_id)
+    packet["delivery"] = DeliveryTool(settings).deliver_daily_packet(packet, chat_id=args.chat_id)
     print(json.dumps(packet, ensure_ascii=False, indent=2))
     return 0
 
@@ -126,7 +126,7 @@ def cmd_deliver_triage_community(args: argparse.Namespace) -> int:
         payload = build_triage_store_payload(args)
     else:
         profile = load_brand_profile(args.brand_file)
-        batch = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=args.comment_file)
+        batch = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=args.comment_file)
         payload = batch.model_dump(mode="json")
         if args.write_store:
             payload["store"] = {
@@ -134,7 +134,7 @@ def cmd_deliver_triage_community(args: argparse.Namespace) -> int:
             }
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_community_triage(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_community_triage(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -144,17 +144,17 @@ def cmd_deliver_approved_triage_replies(args: argparse.Namespace) -> int:
     payload = build_triage_store_payload(args)
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "approved-triage-replies.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_approved_triage_replies(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approved_triage_replies(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_deliver_dashboard(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.analytics_dashboard import AnalyticsDashboardService
+    from fanpage_agent.tools.analytics.analytics_dashboard import AnalyticsDashboardTool
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     metrics = build_store(settings=settings, args=args).read_post_metrics()
-    svc = AnalyticsDashboardService(settings.artifacts_dir)
+    svc = AnalyticsDashboardTool(settings.artifacts_dir)
     result = svc.generate(metrics, days=args.days)
 
     # Send HTML file via delivery service
@@ -166,7 +166,7 @@ def cmd_deliver_dashboard(args: argparse.Namespace) -> int:
         "total_reach": result["total_reach"],
         "total_engagements": result["total_engagements"],
     }
-    payload["delivery"] = DeliveryService(settings).deliver_analytics_review(
+    payload["delivery"] = DeliveryTool(settings).deliver_analytics_review(
         payload, chat_id=args.chat_id
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))

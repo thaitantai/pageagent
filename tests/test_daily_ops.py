@@ -5,10 +5,10 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.daily_ops import DailyOpsService
+from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool
 
 
-class DailyOpsServiceTest(unittest.TestCase):
+class DailyOpsToolTest(unittest.TestCase):
     def test_build_packet_contains_plan_caption_and_telegram_preview(self) -> None:
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         profile = load_brand_profile(sample)
@@ -19,7 +19,7 @@ class DailyOpsServiceTest(unittest.TestCase):
             history = tmpdir / "history.csv"
             store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
 
-            packet = DailyOpsService().build_packet(
+            packet = DailyOpsTool().build_packet(
                 profile=profile,
                 run_date="2026-06-12",
                 store=store,

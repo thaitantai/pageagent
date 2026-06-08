@@ -18,11 +18,7 @@ from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.scraping.web_search import SearchResult, WebSearchClient
 from fanpage_agent.audit import AuditManager
 from fanpage_agent.core.types import ContentPackage, ContentVariant
-from fanpage_agent.memory.performance import (
-    BackupError,
-    PerformanceMemory,
-    IntegrityError,
-)
+from fanpage_agent.memory import BackupError, IntegrityError, PerformanceMemory
 
 
 def _make_fb_config() -> Mock:

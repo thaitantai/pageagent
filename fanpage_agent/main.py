@@ -28,14 +28,26 @@ from fanpage_agent.legacy_cli import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_CAMPAIGN_FILE,
     DEFAULT_COMMENT_FILE,
+    DEFAULT_HERMES_CRON_JOBS_FILE,
+    DEFAULT_HERMES_SCRIPTS_DIR,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
+    DEFAULT_TRIAGE_FILE,
+    OPS_ARTIFACT_FRESHNESS_HOURS,
+    ROOT_DIR,
+    add_store_backend_arg,
+    build_approval_audit_payload,
+    build_calendar_store_payload,
+    build_daily_artifacts,
+    build_operator_digest_payload,
+    build_research_brief,
+    build_triage_store_payload,
 )
 from fanpage_agent.legacy_cli import EXPECTED_HERMES_CRON_JOBS as EXPECTED_HERMES_CRON_JOBS
 from fanpage_agent.legacy_cli import (
     main as legacy_cli_main,
 )
-from fanpage_agent.memory.performance import PerformanceMemory
+from fanpage_agent.memory import PerformanceMemory
 
 
 def _load_pages() -> list[dict[str, Any]]:
@@ -349,7 +361,7 @@ def cli() -> None:
 
 
 def _run_backup(data_dir: str, keep: int = 7) -> None:
-    from fanpage_agent.memory.performance import PerformanceMemory
+    from fanpage_agent.memory import PerformanceMemory
     memory = PerformanceMemory(Path(data_dir) / "memory.db")
     path = memory.backup(keep=keep)
     print(json.dumps({
@@ -361,7 +373,7 @@ def _run_backup(data_dir: str, keep: int = 7) -> None:
 
 
 def _run_restore(data_dir: str, backup_idx: int = 1) -> None:
-    from fanpage_agent.memory.performance import BackupError, PerformanceMemory
+    from fanpage_agent.memory import BackupError, PerformanceMemory
     memory = PerformanceMemory(Path(data_dir) / "memory.db")
     try:
         memory.restore(backup_idx=backup_idx)
@@ -380,7 +392,7 @@ def _run_restore(data_dir: str, backup_idx: int = 1) -> None:
 
 
 def _run_list_backups(data_dir: str) -> None:
-    from fanpage_agent.memory.performance import PerformanceMemory
+    from fanpage_agent.memory import PerformanceMemory
     memory = PerformanceMemory(Path(data_dir) / "memory.db")
     backups = memory.list_backups()
     print(json.dumps({
@@ -391,7 +403,7 @@ def _run_list_backups(data_dir: str) -> None:
 
 
 def _run_check_db(data_dir: str) -> None:
-    from fanpage_agent.memory.performance import PerformanceMemory
+    from fanpage_agent.memory import PerformanceMemory
     memory = PerformanceMemory(Path(data_dir) / "memory.db")
     errors = memory.integrity_check()
     if errors:
@@ -452,7 +464,7 @@ def _run_research_standalone(
 ) -> None:
     from config import Settings
     from fanpage_agent.adapters.page_registry import PageRegistry
-    from fanpage_agent.services.research_packet import build_research_packet, save_research_packet
+    from fanpage_agent.tools.research.research_packet import build_research_packet, save_research_packet
 
     page_context = PageRegistry(Settings.from_env()).page_context(page_id)
     packet = build_research_packet(

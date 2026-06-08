@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from fanpage_agent.config import Settings
-from fanpage_agent.services.analytics_reviewer import AnalyticsReviewer, _parse_fb_datetime, _parse_int
+from fanpage_agent.tools.analytics.analytics_reviewer import AnalyticsReviewer, _parse_fb_datetime, _parse_int
 
 
 class TestParseHelpers:

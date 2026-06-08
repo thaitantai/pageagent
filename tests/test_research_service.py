@@ -6,10 +6,10 @@ from unittest.mock import MagicMock
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.models import TrendItem
-from fanpage_agent.services.research import ResearchService
+from fanpage_agent.tools.research.research import ResearchTool
 
 
-class ResearchServiceTest(unittest.TestCase):
+class ResearchToolTest(unittest.TestCase):
     def test_build_brief_combines_history_metrics_comments_and_campaign(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
@@ -53,7 +53,7 @@ class ResearchServiceTest(unittest.TestCase):
             )
 
             store = LocalSheetStore(calendar_csv=tmpdir / "calendar.csv", history_csv=history, metrics_csv=metrics)
-            brief = ResearchService().build_brief(
+            brief = ResearchTool().build_brief(
                 store=store,
                 comment_csv=comments,
                 campaign_notes_file=campaign,
@@ -87,7 +87,7 @@ class ResearchServiceTest(unittest.TestCase):
 
         from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 
-        service = ResearchService(trend_scraper=mock_scraper, trend_analyzer=TrendAnalyzer([]))
+        service = ResearchTool(trend_scraper=mock_scraper, trend_analyzer=TrendAnalyzer([]))
         store = MagicMock()
         store.read_post_history.return_value = []
         store.read_post_metrics.return_value = []
@@ -111,7 +111,7 @@ class ResearchServiceTest(unittest.TestCase):
             TrendItem(title="Test title", source="Test"),
         ]
 
-        service = ResearchService(trend_scraper=mock_scraper)
+        service = ResearchTool(trend_scraper=mock_scraper)
         store = MagicMock()
         store.read_post_history.return_value = []
         store.read_post_metrics.return_value = []

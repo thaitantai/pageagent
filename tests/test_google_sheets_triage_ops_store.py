@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from fanpage_agent.adapters.google_sheets_store import GoogleSheetsStore
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.community_triage import CommunityTriageService
+from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
 from tests.test_google_sheets_store import FakeSheetsService
 
 
@@ -21,7 +21,7 @@ class GoogleSheetsTriageOpsStoreTest(unittest.TestCase):
                 ",,2026-06-08,comment,Da thieu nuoc thi nen bat dau tu dau?\n",
                 encoding="utf-8",
             )
-            batch = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=comments)
+            batch = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=comments)
         tables: dict[str, list[list[str]]] = {}
         store = GoogleSheetsStore(
             settings=Settings(artifacts_dir=Path("/tmp"), google_sheets_id="sheet-123", google_service_account_file="/tmp/creds.json"),

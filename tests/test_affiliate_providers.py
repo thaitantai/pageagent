@@ -507,7 +507,7 @@ class TestAffiliateRegistry:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. Pipeline integration (ResearchService)
+# 5. Pipeline integration (ResearchTool)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -525,8 +525,8 @@ class TestAffiliatePipelineIntegration:
         from fanpage_agent.scraping.trend_scraper import (
             TrendScraper,
         )
-        from fanpage_agent.services.research import (
-            ResearchService,
+        from fanpage_agent.tools.research.research import (
+            ResearchTool,
         )
 
         settings = AffiliateSettings(enabled=True)
@@ -536,7 +536,7 @@ class TestAffiliatePipelineIntegration:
 
         registry = AffiliateRegistry(settings)
 
-        service = ResearchService(
+        service = ResearchTool(
             trend_scraper=TrendScraper(),
             trend_analyzer=TrendAnalyzer([]),
             affiliate_registry=registry,
@@ -566,11 +566,11 @@ class TestAffiliatePipelineIntegration:
     ) -> None:
         """Registry parameter in constructor doesn't break
         existing callers."""
-        from fanpage_agent.services.research import (
-            ResearchService,
+        from fanpage_agent.tools.research.research import (
+            ResearchTool,
         )
 
         # No registry passed — auto-creates (but with no providers configured)
-        service = ResearchService()
+        service = ResearchTool()
         assert service._affiliate_registry is not None
         assert not service._affiliate_registry.is_enabled()

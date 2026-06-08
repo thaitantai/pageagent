@@ -1,0 +1,187 @@
+{
+  "brand_id": "skincare_genz",
+  "brand_name": "Skincare GenZ — Chăm sóc da từ A đến GenZ",
+  "industry": "skincare, làm đẹp, chăm sóc da",
+  "business_goal": "Xây dựng lòng tin với GenZ về kiến thức skincare khoa học, tạo lead bán affiliate mỹ phẩm chính hãng",
+  "fanpage_goals": ["reach", "engagement", "lead"],
+  "brand_summary": "Trang chia sẻ kiến thức skincare dành riêng cho GenZ — từ cơ bản đến nâng cao. Không phóng đại, không chém gió. Mỗi bài viết đều dựa trên nghiên cứu và trải nghiệm thực tế. Đồng hành cùng bạn trên hành trình 'skin health first'.",
+  "usp": [
+    "Nội dung dựa trên nghiên cứu khoa học, không phóng đại",
+    "Review sản phẩm thực tế, khách quan từ góc nhìn GenZ",
+    "Cam kết 'skin health first' — không bán hàng mù quáng"
+  ],
+  "target_audiences": [
+    {
+      "segment_name": "Nữ GenZ mới tập skincare 16-22",
+      "pain_points": [
+        "Da mụn, dầu, không biết bắt đầu từ đâu",
+        "Sợ dùng sai sản phẩm — tốn tiền hỏng da",
+        "Bị 'quá tải thông tin' giữa muôn vàn lời khuyên",
+        "Ngân sách có hạn, cần sản phẩm giá phải chăng"
+      ],
+      "desired_outcomes": [
+        "Hiểu rõ làn da và nhu cầu thực sự",
+        "Routine skincare tối giản nhưng hiệu quả",
+        "Có lộ trình cải thiện da rõ ràng"
+      ],
+      "objections": [
+        "Sợ tốn kém",
+        "Sợ dùng sai hỏng da nặng hơn",
+        "Sợ mất thời gian"
+      ],
+      "preferred_content_formats": ["post_short", "carousel"]
+    },
+    {
+      "segment_name": "GenZ quan tâm mỹ phẩm thuần Việt 20-25",
+      "pain_points": [
+        "Da nhạy cảm, dễ kích ứng",
+        "Muốn chọn sản phẩm 'lành' cho da",
+        "Hoang mang giữa hàng nội và hàng ngoại",
+        "Chưa tin tưởng mỹ phẩm Việt"
+      ],
+      "desired_outcomes": [
+        "Có góc nhìn khách quan về mỹ phẩm nội địa",
+        "Tìm được sản phẩm 'lành' phù hợp da nhạy cảm",
+        "Tiết kiệm chi phí nhưng vẫn hiệu quả"
+      ],
+      "objections": [
+        "Nghĩ mỹ phẩm Việt không chất lượng bằng Hàn/Âu",
+        "Không biết thương hiệu nào uy tín"
+      ],
+      "preferred_content_formats": ["post_short", "carousel", "story"]
+    }
+  ],
+  "products_services": [
+    {
+      "name": "Review & tư vấn sản phẩm skincare",
+      "category": "affiliate",
+      "benefits": [
+        "Đánh giá khách quan dựa trên thành phần + trải nghiệm",
+        "Gợi ý sản phẩm theo từng budget — không ép mua mắc",
+        "Link mua chính hãng — không sợ hàng giả"
+      ],
+      "proof_points": [
+        "Thử nghiệm thực tế sản phẩm trước khi review",
+        "Phân tích bảng thành phần (incidecoder)",
+        "So sánh giá cả các kênh mua hàng"
+      ],
+      "do_not_claim": [
+        "Không cam kết hiệu quả 100% với mọi loại da",
+        "Không dùng ngôn từ thần thánh hoá sản phẩm"
+      ]
+    },
+    {
+      "name": "Kiến thức skincare khoa học",
+      "category": "content",
+      "benefits": [
+        "Hiểu cách hoạt động của thành phần",
+        "Phân biệt đúng/sai trong skincare",
+        "Xây dựng routine dựa trên khoa học"
+      ],
+      "proof_points": [
+        "Dẫn nguồn từ nghiên cứu da liễu",
+        "Dịch từ bài báo khoa học quốc tế uy tín"
+      ],
+      "do_not_claim": [
+        "Không tự chẩn đoán hoặc thay thế bác sĩ da liễu",
+        "Không khẳng định tất cả mọi người đều giống nhau"
+      ]
+    }
+  ],
+  "tone_of_voice": {
+    "brand_traits": ["chân thật", "ấm áp", "dễ hiểu", "chuyên môn", "gần gũi"],
+    "writing_rules": [
+      "Ngắn gọn — không quá 200 chữ cho post thường",
+      "Xưng mình/bạn — gần gũi, không xa cách",
+      "Dùng ngôn ngữ GenZ tự nhiên, không gượng ép",
+      "Giải thích thuật ngữ chuyên môn bằng ngôn từ đời thường",
+      "Kết thúc bằng câu hỏi mở hoặc CTA kêu gọi comment",
+      "Mỗi bài chỉ tập trung 1 chủ đề — không tham kiến thức"
+    ],
+    "things_to_avoid": [
+      "Phóng đại kết quả — 'trắng sau 7 ngày', 'hết mụn chỉ sau 1 tuần'",
+      "Hù doạ — 'da bạn sẽ chết nếu không làm điều này'",
+      "Chém gió về thành phần — 'retinol là thần dược'",
+      "Ngôn ngữ quá formal, giáo điều",
+      "Spam link affiliate — phải có giá trị trước, bán hàng sau"
+    ],
+    "sample_phrases": [
+      "Mình từng nghĩ retinol là 'thần dược' cho đến khi hiểu ra sự thật này...",
+      "Có 3 loại da dầu — bạn thuộc loại nào? Cùng mình check nhé!",
+      "Sản phẩm này mình dùng thử 2 tuần — đây là cảm nhận thực tế",
+      "Đừng vội mua kem chống nắng đắt tiền nếu chưa biết 3 điều này",
+      "Một trong những câu hỏi mình nhận nhiều nhất: 'Em bị thâm mụn, phải làm sao?'",
+      "Mỹ phẩm thuần Việt có thực sự đáng tiền? Mình review khách quan từ A đến Z"
+    ]
+  },
+  "content_pillars": [
+    {
+      "pillar_name": "education",
+      "goal": "engagement",
+      "description": "Kiến thức skincare cơ bản và nâng cao — giải thích thành phần, cơ chế hoạt động",
+      "example_angles": ["retinol là gì và hoạt động thế nào?", "pH của da và tẩy trang", "cách đọc bảng thành phần"],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "product_review",
+      "goal": "lead",
+      "description": "Review sản phẩm thực tế — ưu nhược điểm, phù hợp ai, affiliate",
+      "example_angles": ["review serum C sau 4 tuần", "so sánh kem chống nắng vật lý vs hoá học", "sản phẩm giá rẻ đáng mua"],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "myth_busting",
+      "goal": "engagement",
+      "description": "Vạch trần lầm tưởng phổ biến trong skincare giới trẻ",
+      "example_angles": ["thoa kem chống nắng ở nhà không cần thiết?", "nước hoa hồng có thực sự cần?", "rửa mặt nhiều lần tốt cho da dầu?"],
+      "allowed_formats": ["post_short", "carousel"]
+    },
+    {
+      "pillar_name": "routine_guide",
+      "goal": "awareness",
+      "description": "Hướng dẫn xây dựng routine cho từng loại da, từng vấn đề",
+      "example_angles": ["routine cơ bản 3 bước cho người mới", "routine da mụn buổi sáng/tối", "routine tối giản 15 phút"],
+      "allowed_formats": ["post_short", "carousel", "story"]
+    },
+    {
+      "pillar_name": "viet_brand_spotlight",
+      "goal": "awareness",
+      "description": "Giới thiệu thương hiệu mỹ phẩm Việt chất lượng — thành phần, uy tín",
+      "example_angles": ["d'Ave Nusight — review thực tế", "Cocoon — thương hiệu thuần Việt đáng thử", "so sánh mỹ phẩm nội vs ngoại"],
+      "allowed_formats": ["post_short", "carousel"]
+    }
+  ],
+  "approved_cta_patterns": [
+    {"objective": "reach", "cta_text": "Lưu lại để dùng khi cần bạn nha!", "notes": "nhẹ"},
+    {"objective": "engagement", "cta_text": "Bạn đang dùng sản phẩm nào cho da dầu? Comment chia sẻ với mình nhé!", "notes": "mời bình luận"},
+    {"objective": "lead", "cta_text": "Bạn muốn mình review sản phẩm nào tiếp theo? Nhắn tin gợi ý nha!", "notes": "inbox"},
+    {"objective": "awareness", "cta_text": "Bạn đã biết đến thương hiệu này chưa? Để mình phân tích thêm cho bạn!", "notes": "khám phá"}
+  ],
+  "banned_phrases": [
+    "trắng sau 7 ngày",
+    "hết mụn chỉ sau 1 tuần",
+    "thần dược cho da",
+    "ai cũng cần",
+    "duy nhất thị trường",
+    "cam kết hiệu quả 100%"
+  ],
+  "compliance_notes": [
+    "Không claim kết quả tuyệt đối với mọi loại da",
+    "Không thay thế tư vấn bác sĩ da liễu",
+    "Affiliate link phải gắn sau nội dung giá trị, không spam",
+    "Có disclaimer affiliate khi kèm link mua hàng",
+    "Không so sánh trực tiếp với thương hiệu đối thủ"
+  ],
+  "approval_flow": {
+    "content_owner": "Tai",
+    "approver": "Tai (self-approve)",
+    "approval_sla_hours": 24,
+    "public_post_requires_human_approval": false,
+    "comment_reply_requires_human_approval": false,
+    "escalation_rules": [
+      "Khiếu nại về sản phẩm giới thiệu",
+      "Tranh luận sai lệch kiến thức y khoa",
+      "Yêu cầu chẩn đoán cá nhân hoá sâu"
+    ]
+  }
+}

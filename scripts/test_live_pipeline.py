@@ -53,12 +53,12 @@ from fanpage_agent.models import (
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
-from fanpage_agent.services.competitor_page_discovery import (
-    CompetitorPageDiscoveryService,
+from fanpage_agent.tools.research.competitor_page_discovery import (
+    CompetitorPageDiscoveryTool,
 )
-from fanpage_agent.services.offer_evaluator import OfferEvaluator
-from fanpage_agent.services.research import ResearchService
-from fanpage_agent.services.research_insights import (
+from fanpage_agent.tools.research.offer_evaluator import OfferEvaluator
+from fanpage_agent.tools.research.research import ResearchTool
+from fanpage_agent.tools.research.research_insights import (
     EvidenceExtractor,
     ResearchQualityGate,
 )
@@ -383,13 +383,13 @@ def run_test() -> None:
         for name, items in list(clusters.items())[:5]:
             print(f"    📌 {name} ({len(items)} items)")
 
-        # ── Component 4: ResearchService → build_brief ──────────
-        print(_h1("🧠 Component 4 — ResearchService.build_brief() (FULL PIPELINE)"))
+        # ── Component 4: ResearchTool → build_brief ──────────
+        print(_h1("🧠 Component 4 — ResearchTool.build_brief() (FULL PIPELINE)"))
         print(_info("Gồm: post history → web search → OfferDiscovery → "
                     "AffiliateRegistry → QualityGate → OfferEvaluator → scoring"))
         print()
 
-        service = ResearchService(
+        service = ResearchTool(
             trend_scraper=scraper,
             trend_analyzer=analyzer,
             affiliate_registry=registry,

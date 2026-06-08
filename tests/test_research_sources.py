@@ -5,8 +5,8 @@ from pathlib import Path
 
 from fanpage_agent.models import ResearchSource
 from fanpage_agent.scraping.source_collector import ScraplingSourceCollector
-from fanpage_agent.services.research_packet import build_research_packet
-from fanpage_agent.services.research_sources import SourceRegistry
+from fanpage_agent.tools.research.research_packet import build_research_packet
+from fanpage_agent.tools.research.research_sources import SourceRegistry
 
 
 class FakePage:

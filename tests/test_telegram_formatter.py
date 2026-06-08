@@ -1,10 +1,10 @@
 import unittest
 
 from fanpage_agent.models import AnalyticsReport, AnalyticsSummary, CaptionPackage, CaptionVariant, PlanDay, PostMetric, WeeklyPlan
-from fanpage_agent.services.telegram_formatter import TelegramFormatterService
+from fanpage_agent.tools.publishing.telegram_formatter import TelegramFormatterTool
 
 
-class TelegramFormatterServiceTest(unittest.TestCase):
+class TelegramFormatterToolTest(unittest.TestCase):
     def test_format_weekly_plan_contains_header_and_verification(self) -> None:
         plan = WeeklyPlan(
             plan_title="weekly-plan-brand_abc-2026-06-08",
@@ -27,7 +27,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         )
         payload = plan.model_dump(mode="json")
         payload["verification"] = {"passed": True, "issues": []}
-        message = TelegramFormatterService().format_weekly_plan(payload)
+        message = TelegramFormatterTool().format_weekly_plan(payload)
 
         self.assertIn("Weekly Plan", message)
         self.assertIn("Routine cấp ẩm cho da", message)
@@ -51,7 +51,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
         )
         payload = package.model_dump(mode="json")
         payload["verification"] = {"passed": True, "issues": []}
-        message = TelegramFormatterService().format_caption_package(payload)
+        message = TelegramFormatterTool().format_caption_package(payload)
 
         self.assertIn("Caption Package", message)
         self.assertIn("Variant A", message)
@@ -77,7 +77,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             "recommendations": ["Tăng nội dung trust cho nhóm treatment."],
         }
 
-        rendered = TelegramFormatterService().format_weekly_report(payload)
+        rendered = TelegramFormatterTool().format_weekly_report(payload)
 
         self.assertIn("Weekly Report", rendered)
         self.assertIn("Routine phục hồi da sau treatment", rendered)
@@ -120,7 +120,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             ],
         }
 
-        rendered = TelegramFormatterService().format_community_triage(payload)
+        rendered = TelegramFormatterTool().format_community_triage(payload)
 
         self.assertIn("Community Triage", rendered)
         self.assertIn("total items: 3", rendered)
@@ -150,7 +150,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             ],
         }
 
-        rendered = TelegramFormatterService().format_approval_queue(payload)
+        rendered = TelegramFormatterTool().format_approval_queue(payload)
 
         self.assertIn("Approval Queue", rendered)
         self.assertIn("total items: 2", rendered)
@@ -182,7 +182,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             ],
         }
 
-        rendered = TelegramFormatterService().format_approval_audit(payload)
+        rendered = TelegramFormatterTool().format_approval_audit(payload)
 
         self.assertIn("Approval Audit", rendered)
         self.assertIn("overdue pending: 1", rendered)
@@ -212,7 +212,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             ],
         }
 
-        rendered = TelegramFormatterService().format_approval_audit(payload)
+        rendered = TelegramFormatterTool().format_approval_audit(payload)
 
         self.assertLessEqual(len(rendered.splitlines()), 9)
         self.assertIn("Next:", rendered)
@@ -240,7 +240,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             ],
         }
 
-        rendered = TelegramFormatterService().format_approved_triage_replies(payload)
+        rendered = TelegramFormatterTool().format_approved_triage_replies(payload)
 
         self.assertIn("Approved Triage Replies", rendered)
         self.assertIn("triage-1", rendered)
@@ -283,7 +283,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             },
         }
 
-        rendered = TelegramFormatterService().format_operator_digest(payload)
+        rendered = TelegramFormatterTool().format_operator_digest(payload)
 
         self.assertIn("Daily Operator Digest", rendered)
         self.assertIn("Pending captions: 1", rendered)
@@ -322,7 +322,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             },
         }
 
-        rendered = TelegramFormatterService().format_operator_digest(payload)
+        rendered = TelegramFormatterTool().format_operator_digest(payload)
 
         self.assertLessEqual(len(rendered.splitlines()), 12)
         self.assertIn("Next:", rendered)
@@ -356,7 +356,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             ],
         }
 
-        rendered = TelegramFormatterService().format_metrics_backlog(payload)
+        rendered = TelegramFormatterTool().format_metrics_backlog(payload)
 
         self.assertIn("Metrics Backlog", rendered)
         self.assertIn("total items: 1", rendered)
@@ -385,7 +385,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             "quality_warnings": ["Can them nguon doc lap."],
         }
 
-        rendered = TelegramFormatterService().format_research_brief(payload)
+        rendered = TelegramFormatterTool().format_research_brief(payload)
 
         self.assertIn("confidence: 0.82", rendered)
         self.assertIn("sources: 1 | evidence: 1 | warnings: 1", rendered)
@@ -403,7 +403,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             },
         }
 
-        rendered = TelegramFormatterService().format_research_brief(payload)
+        rendered = TelegramFormatterTool().format_research_brief(payload)
 
         self.assertIn("confidence: 0.76", rendered)
         self.assertIn("sources: 1 | evidence: 1 | warnings: 0", rendered)
@@ -419,7 +419,7 @@ class TelegramFormatterServiceTest(unittest.TestCase):
             }
         }
 
-        rendered = TelegramFormatterService().format_research_brief(payload)
+        rendered = TelegramFormatterTool().format_research_brief(payload)
 
         self.assertIn("confidence: 0.82", rendered)
         self.assertIn("sources: 1 | evidence: 1 | warnings: 1", rendered)

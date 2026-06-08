@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.planner import PlannerService
+from fanpage_agent.tools.publishing.planner import PlannerTool
 from tests.test_env import isolated_subprocess_env
 
 
@@ -16,7 +16,7 @@ class ApprovalLifecycleTest(unittest.TestCase):
     def test_approve_and_publish_update_calendar_and_history(self) -> None:
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         profile = load_brand_profile(sample)
-        plan = PlannerService().plan_week(profile=profile, start_date="2026-06-01", days=1)
+        plan = PlannerTool().plan_week(profile=profile, start_date="2026-06-01", days=1)
 
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)

@@ -44,6 +44,7 @@ dữ liệu metrics được thu thập đầy đủ.
 `triage_community` — LLM phân loại comments pending
 `approve_triage_reply` / `reject_triage_reply` — Duyệt/từ chối reply cho comment
 `scheduled_publish` — Publish items đã approved + đến hạn
+`fetch_fb_data` — Fetch full data (posts + metrics + comments) from Facebook → populate store. Dùng để refresh dữ liệu cho ResearchAgent. Parameters: post_limit (default 90), comment_posts (default 20), comment_limit (default 25), skip_comments (default false)
 `fetch_fb_comments` — Fetch comments mới từ Facebook
 `record_post_metrics` — Fetch metrics cho posts đã publish
 `send_telegram_message` — Gửi báo cáo cho operator

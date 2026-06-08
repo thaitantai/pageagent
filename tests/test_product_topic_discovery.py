@@ -1,7 +1,7 @@
 from fanpage_agent.models import ResearchEvidence, SourceDocument
-from fanpage_agent.services.product_topic_discovery import ProductAwareTopicDiscovery
-from fanpage_agent.services.research import ResearchService
-from fanpage_agent.services.research_packet import research_handoff_policy
+from fanpage_agent.tools.research.product_topic_discovery import ProductAwareTopicDiscovery
+from fanpage_agent.tools.research.research import ResearchTool
+from fanpage_agent.tools.research.research_packet import research_handoff_policy
 
 
 class EmptyStore:
@@ -70,7 +70,7 @@ def test_affiliate_topic_discovery_prefers_community_buying_angles():
 
 
 def test_research_service_can_prioritize_product_aware_topics():
-    service = ResearchService()
+    service = ResearchTool()
 
     brief = service.build_brief(
         EmptyStore(),
@@ -92,7 +92,7 @@ def test_research_service_can_prioritize_product_aware_topics():
 
 
 def test_product_topic_scores_use_evidence_confidence_when_available():
-    service = ResearchService()
+    service = ResearchTool()
     product_topics = service._topic_discovery.discover(_product_context(), max_topics=1)
     evidence = [ResearchEvidence(
         claim="Serum phục hồi da hỗ trợ da nhạy cảm sau treatment",
@@ -113,7 +113,7 @@ def test_product_topic_scores_use_evidence_confidence_when_available():
 
 
 def test_affiliate_topics_without_evidence_are_blocked_from_recommendation():
-    service = ResearchService()
+    service = ResearchTool()
 
     brief = service.build_brief(
         EmptyStore(),
@@ -132,7 +132,7 @@ def test_affiliate_topics_without_evidence_are_blocked_from_recommendation():
 
 
 def test_affiliate_topics_can_score_when_source_evidence_matches():
-    service = ResearchService()
+    service = ResearchTool()
 
     brief = service.build_brief(
         EmptyStore(),
@@ -157,7 +157,7 @@ def test_affiliate_topics_can_score_when_source_evidence_matches():
 
 
 def test_handoff_policy_blocks_affiliate_topics_without_evidence():
-    service = ResearchService()
+    service = ResearchTool()
 
     brief = service.build_brief(
         EmptyStore(),

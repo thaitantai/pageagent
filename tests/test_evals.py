@@ -5,12 +5,12 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.evals import EvalService
+from fanpage_agent.tools.analytics.evals import EvalTool
 
 
-class EvalServiceTest(unittest.TestCase):
+class EvalToolTest(unittest.TestCase):
     def test_mentions_campaign_focus_accepts_vietnamese_focus_terms(self) -> None:
-        result = EvalService._mentions_campaign_focus(
+        result = EvalTool._mentions_campaign_focus(
             ["Tuần này tập trung vào soi da và phục hồi da treatment."],
             type("Brief", (), {"campaign_focus": ["soi da"]})(),
         )
@@ -61,7 +61,7 @@ class EvalServiceTest(unittest.TestCase):
             )
 
             store = LocalSheetStore(calendar_csv=tmpdir / "calendar.csv", history_csv=history, metrics_csv=metrics)
-            result = EvalService().run_all(
+            result = EvalTool().run_all(
                 profile=profile,
                 store=store,
                 comment_csv=comments,

@@ -1,4 +1,4 @@
-"""Tests cho CompetitorPageDiscoveryService + FacebookClient cross-page API."""
+"""Tests cho CompetitorPageDiscoveryTool + FacebookClient cross-page API."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 from fanpage_agent.adapters.facebook_client import FacebookClient
 from fanpage_agent.config import Settings
-from fanpage_agent.services.competitor_page_discovery import (
-    CompetitorPageDiscoveryService,
+from fanpage_agent.tools.research.competitor_page_discovery import (
+    CompetitorPageDiscoveryTool,
 )
 
 # ── Helpers ─────────────────────────────────────────────────────
@@ -148,15 +148,15 @@ class FacebookClientCrossPageTest(unittest.TestCase):
         self.assertIn("access_token=test-page-token", req.full_url)
 
 
-# ── CompetitorPageDiscoveryService tests ────────────────────
+# ── CompetitorPageDiscoveryTool tests ────────────────────
 
 
-class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
-    """Unit tests for CompetitorPageDiscoveryService."""
+class CompetitorPageDiscoveryToolTest(unittest.TestCase):
+    """Unit tests for CompetitorPageDiscoveryTool."""
 
     def test_init_no_fb_client(self) -> None:
         """Không có fb_client → discover trả về empty list."""
-        service = CompetitorPageDiscoveryService()
+        service = CompetitorPageDiscoveryTool()
         offers, pages = service.discover(
             competitor_page_ids=["123", "456"]
         )
@@ -166,7 +166,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
     def test_discover_with_empty_page_list(self) -> None:
         """Không có competitor pages → trả về empty."""
         fb_client = MagicMock()
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(competitor_page_ids=[])
         self.assertEqual(offers, [])
         self.assertEqual(pages, [])
@@ -182,7 +182,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
                 "giá tốt nhất thị trường!",
             ),
         ]
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(
             competitor_page_ids=["comp_1"],
             max_posts_per_page=10,
@@ -209,7 +209,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
                 "và được @[666:1:Another Co] review rất kỹ.",
             ),
         ]
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(
             competitor_page_ids=["comp_1"],
             max_posts_per_page=10,
@@ -227,7 +227,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
                 "@[comp_1:1:Existing Page] @[555:1:New Brand]",
             ),
         ]
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(
             competitor_page_ids=["comp_1"],
             max_posts_per_page=10,
@@ -248,7 +248,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
             ]
 
         fb_client.get_public_page_posts.side_effect = side_effect
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(
             competitor_page_ids=["failing", "working"],
             max_posts_per_page=10,
@@ -266,7 +266,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
             _fake_post("p1", "Review kem chống nắng Anessa 2026"),
             _fake_post("p2", "Kem chống nắng nào tốt nhất? So sánh"),
         ]
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(
             competitor_page_ids=["comp_1"],
             existing_offers=["Kem chống nắng"],
@@ -289,7 +289,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
                 "hyaluronic acid tốt nhất!",
             ),
         ]
-        service = CompetitorPageDiscoveryService(fb_client=fb_client)
+        service = CompetitorPageDiscoveryTool(fb_client=fb_client)
         offers, pages = service.discover(
             competitor_page_ids=["comp_1"],
             max_discovered_offers=2,
@@ -302,17 +302,17 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_extract_mentions_empty_text(self) -> None:
-        result = CompetitorPageDiscoveryService._extract_mentions("")
+        result = CompetitorPageDiscoveryTool._extract_mentions("")
         self.assertEqual(result, [])
 
     def test_extract_mentions_no_mentions(self) -> None:
-        result = CompetitorPageDiscoveryService._extract_mentions(
+        result = CompetitorPageDiscoveryTool._extract_mentions(
             "Bài viết thông thường không mention ai"
         )
         self.assertEqual(result, [])
 
     def test_extract_mentions_multiple(self) -> None:
-        result = CompetitorPageDiscoveryService._extract_mentions(
+        result = CompetitorPageDiscoveryTool._extract_mentions(
             "Sản phẩm từ @[111:1:Brand A] và @[222:3:Brand B] rất tốt"
         )
         self.assertEqual(len(result), 2)
@@ -324,25 +324,25 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_detect_angle_comparison(self) -> None:
-        angle = CompetitorPageDiscoveryService._detect_angle(
+        angle = CompetitorPageDiscoveryTool._detect_angle(
             "so sánh hai sản phẩm", 2
         )
         self.assertEqual(angle, "comparison")
 
     def test_detect_angle_buying_guide(self) -> None:
-        angle = CompetitorPageDiscoveryService._detect_angle(
+        angle = CompetitorPageDiscoveryTool._detect_angle(
             "top sản phẩm tốt nhất", 2
         )
         self.assertEqual(angle, "buying_guide")
 
     def test_detect_angle_review(self) -> None:
-        angle = CompetitorPageDiscoveryService._detect_angle(
+        angle = CompetitorPageDiscoveryTool._detect_angle(
             "trải nghiệm thực tế sản phẩm", 4
         )
         self.assertEqual(angle, "review")
 
     def test_detect_angle_education_fallback(self) -> None:
-        angle = CompetitorPageDiscoveryService._detect_angle(
+        angle = CompetitorPageDiscoveryTool._detect_angle(
             "công dụng của retinol", 0
         )
         self.assertEqual(angle, "education")
@@ -352,19 +352,19 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_estimate_customer_value_base(self) -> None:
-        val = CompetitorPageDiscoveryService._estimate_customer_value(
+        val = CompetitorPageDiscoveryTool._estimate_customer_value(
             "thông tin cơ bản", 0
         )
         self.assertEqual(val, 0.4)
 
     def test_estimate_customer_value_with_review(self) -> None:
-        val = CompetitorPageDiscoveryService._estimate_customer_value(
+        val = CompetitorPageDiscoveryTool._estimate_customer_value(
             "review đánh giá sản phẩm kem chống nắng", 3
         )
         self.assertGreater(val, 0.5)
 
     def test_estimate_customer_value_capped(self) -> None:
-        val = CompetitorPageDiscoveryService._estimate_customer_value(
+        val = CompetitorPageDiscoveryTool._estimate_customer_value(
             "review đánh giá trải nghiệm mẹo tip cách chọn "
             "giá rẻ deal coupon sản phẩm tốt nhất",
             5,
@@ -376,14 +376,14 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_scan_text_empty(self) -> None:
-        result = CompetitorPageDiscoveryService(
+        result = CompetitorPageDiscoveryTool(
             fb_client=None
         )._scan_text("", "test")
         self.assertEqual(result, [])
 
     def test_scan_text_no_product_markers(self) -> None:
         """Không có NICHE_PRODUCT_MARKERS → không có candidate."""
-        result = CompetitorPageDiscoveryService(
+        result = CompetitorPageDiscoveryTool(
             fb_client=None
         )._scan_text(
             "Thời tiết hôm nay đẹp quá!", "test"
@@ -392,7 +392,7 @@ class CompetitorPageDiscoveryServiceTest(unittest.TestCase):
 
     def test_scan_text_source_name_in_reason_codes(self) -> None:
         """Mỗi candidate có fb_source trong reason_codes để trace."""
-        result = CompetitorPageDiscoveryService(
+        result = CompetitorPageDiscoveryTool(
             fb_client=None
         )._scan_text(
             "Review kem chống nắng tốt nhất!", "fb_competitor:comp_123"

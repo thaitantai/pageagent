@@ -16,7 +16,7 @@ from fanpage_agent.main import (
     add_store_backend_arg,
     build_triage_store_payload,
 )
-from fanpage_agent.services.community_triage import CommunityTriageService
+from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
 from fanpage_agent.utils import dump_json
 
 
@@ -104,7 +104,7 @@ def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
 def cmd_triage_community(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
-    batch = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=args.comment_file)
+    batch = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=args.comment_file)
     payload = batch.model_dump(mode="json")
     if args.write_store:
         payload["store"] = {

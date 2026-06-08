@@ -6,11 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from fanpage_agent.memory.performance import (
-    BackupError,
-    IntegrityError,
-    PerformanceMemory,
-)
+from fanpage_agent.memory import BackupError, IntegrityError, PerformanceMemory
 from fanpage_agent.core.types import ContentPackage, ContentVariant
 
 

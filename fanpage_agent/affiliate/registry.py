@@ -21,7 +21,7 @@ from fanpage_agent.affiliate.base import (
 )
 from fanpage_agent.affiliate.config import AffiliateSettings
 from fanpage_agent.affiliate.shopee import ShopeeProvider
-from fanpage_agent.services.product_topic_discovery import (
+from fanpage_agent.tools.research.product_topic_discovery import (
     ProductTopicCandidate,
 )
 
@@ -191,7 +191,7 @@ class AffiliateRegistry:
     ) -> list[ProductTopicCandidate]:
         """One-shot: search all providers + convert to topic candidates.
 
-        This is the method used by ResearchService.build_brief().
+        This is the method used by ResearchTool.build_brief().
 
         Parameters
         ----------

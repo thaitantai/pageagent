@@ -508,3 +508,90 @@ class GoogleSheetsStore:
             valueInputOption="USER_ENTERED",
             body={"values": rows},
         ).execute()
+
+    # ── Public API: Tab & Spreadsheet Management ────────────────
+
+    def get_tab_names(self) -> list[str]:
+        """Return list of all tab/sheet names in the spreadsheet."""
+        meta = self.service.spreadsheets().get(
+            spreadsheetId=self.spreadsheet_id,
+        ).execute()
+        return [s["properties"]["title"] for s in meta.get("sheets", [])]
+
+    def ensure_tab(self, tab_name: str) -> bool:
+        """Create tab if it doesn't exist. Returns True if created."""
+        existing = self.get_tab_names()
+        if tab_name in existing:
+            return False
+        body = {"requests": [{"addSheet": {"properties": {"title": tab_name}}}]}
+        self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.spreadsheet_id,
+            body=body,
+        ).execute()
+        return True
+
+    def initialize_standard_tabs(self) -> dict[str, str]:
+        """Create all standard tabs with headers. Returns status per tab."""
+        tabs = {
+            self._tab_name("post_history"): LocalSheetStore.HISTORY_HEADERS,
+            self._tab_name("post_metrics"): GoogleSheetsStore.METRICS_HEADERS,
+            self._tab_name("content_calendar"): LocalSheetStore.HEADERS,
+            self._tab_name("comment_triage"): LocalSheetStore.TRIAGE_HEADERS,
+            self._tab_name("hashtag_performance"): LocalSheetStore.HASHTAG_HEADERS,
+        }
+        status: dict[str, str] = {}
+        for tab_name, headers in tabs.items():
+            created = self.ensure_tab(tab_name)
+            had_headers_before = bool(self._get_values(tab_name))
+            if not had_headers_before:
+                self._append_rows(tab_name, [headers])
+            if created:
+                status[tab_name] = "created+headers"
+            elif not had_headers_before:
+                status[tab_name] = "headers_added"
+            else:
+                status[tab_name] = "already_exists"
+        return status
+
+    def bulk_load_data(
+        self,
+        tab_name: str,
+        headers: list[str],
+        rows: list[list[str]],
+    ) -> int:
+        """Replace all data in a tab with headers + rows. Returns row count."""
+        self.ensure_tab(tab_name)
+        values = [headers] + rows
+        end_col = chr(ord("A") + max(len(headers) - 1, 0))
+        range_name = f"{tab_name}!A1:{end_col}{len(values)}"
+        self.service.spreadsheets().values().update(
+            spreadsheetId=self.spreadsheet_id,
+            range=range_name,
+            valueInputOption="USER_ENTERED",
+            body={"values": values},
+        ).execute()
+        return len(rows)
+
+    def load_csv_to_tab(
+        self,
+        tab_name: str,
+        csv_path: str | Path,
+        headers: list[str] | None = None,
+    ) -> int:
+        """Load a CSV file into a tab. Auto-detects headers from CSV if not provided."""
+        import csv as _csv
+
+        csv_path = Path(csv_path)
+        if not csv_path.exists():
+            raise FileNotFoundError(f"CSV not found: {csv_path}")
+        with csv_path.open("r", encoding="utf-8", newline="") as f:
+            reader = _csv.reader(f)
+            csv_rows = list(reader)
+        if not csv_rows:
+            return 0
+        if headers is None:
+            headers = csv_rows[0]
+            data_rows = csv_rows[1:]
+        else:
+            data_rows = csv_rows
+        return self.bulk_load_data(tab_name, headers, data_rows)

@@ -18,13 +18,13 @@ from fanpage_agent.main import (
     build_daily_artifacts,
     build_research_brief,
 )
-from fanpage_agent.services.analytics import AnalyticsService
-from fanpage_agent.services.daily_ops import DailyOpsService
-from fanpage_agent.services.delivery import DeliveryService
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.research import ResearchService
-from fanpage_agent.services.verifier import VerifierService
-from fanpage_agent.services.writer import WriterService
+from fanpage_agent.tools.analytics.analytics import AnalyticsTool
+from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool
+from fanpage_agent.tools.publishing.delivery import DeliveryTool
+from fanpage_agent.tools.publishing.planner import PlannerTool
+from fanpage_agent.tools.research.research import ResearchTool
+from fanpage_agent.tools.content.verifier import VerifierTool
+from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.utils import dump_json
 
 
@@ -131,14 +131,19 @@ def register_subcommand(subparsers) -> None:
     add_store_backend_arg(p)
     p.set_defaults(_handler=cmd_deliver_analytics_review)
 
+    # ── init-sheets ──
+    p = subparsers.add_parser("init-sheets", help="Create all standard tabs + headers in the Google Sheet")
+    add_store_backend_arg(p)
+    p.set_defaults(_handler=cmd_init_sheets)
+
 
 # ── Command handlers (copied verbatim from fanpage_agent/main.py) ──
 
 def cmd_plan_week(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
-    planner = PlannerService(llm_client=build_llm_client(settings))
-    verifier = VerifierService()
+    planner = PlannerTool(llm_client=build_llm_client(settings))
+    verifier = VerifierTool()
     store = build_store(settings=settings, args=args)
     plan = planner.plan_week(profile, args.start_date, args.days)
     verification = verifier.verify_plan(profile, plan, history=store.read_post_history(limit=30))
@@ -168,7 +173,7 @@ def cmd_deliver_research_brief(args: argparse.Namespace) -> int:
     payload = brief.model_dump(mode="json")
     if args.save:
         dump_json(settings.artifacts_dir / "research" / "research-brief.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_research_brief(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_research_brief(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -178,14 +183,14 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings)
     store = build_store(settings=settings, args=args)
-    research_brief = ResearchService().build_brief(
+    research_brief = ResearchTool().build_brief(
         store=store,
         comment_csv=args.comment_file,
         campaign_notes_file=args.campaign_file,
     )
-    packet = DailyOpsService(
-        planner=PlannerService(llm_client=llm_client),
-        writer=WriterService(llm_client=llm_client),
+    packet = DailyOpsTool(
+        planner=PlannerTool(llm_client=llm_client),
+        writer=WriterTool(llm_client=llm_client),
     ).build_packet(
         profile=profile,
         run_date=args.run_date,
@@ -208,11 +213,24 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_init_sheets(args: argparse.Namespace) -> int:
+    """Create all standard tabs + headers in the configured Google Sheet."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    if not hasattr(store, "initialize_standard_tabs"):
+        print("init-sheets only works with --store-backend google")
+        return 1
+    status = store.initialize_standard_tabs()
+    print(json.dumps(status, ensure_ascii=False, indent=2))
+    print(f"\n✅ {len(status)} tabs ready.")
+    return 0
+
+
 def cmd_weekly_report(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     _ = load_brand_profile(args.brand_file)
     metrics = build_store(settings=settings, args=args).read_post_metrics()
-    report = AnalyticsService().build_weekly_report(metrics)
+    report = AnalyticsTool().build_weekly_report(metrics)
     payload = report.model_dump(mode="json")
     if args.save:
         dump_json(settings.artifacts_dir / "reports" / "weekly-report.json", payload)
@@ -224,16 +242,16 @@ def cmd_deliver_weekly_report(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     _ = load_brand_profile(args.brand_file)
     metrics = build_store(settings=settings, args=args).read_post_metrics()
-    payload = AnalyticsService().build_weekly_report(metrics).model_dump(mode="json")
+    payload = AnalyticsTool().build_weekly_report(metrics).model_dump(mode="json")
     if args.save:
         dump_json(settings.artifacts_dir / "reports" / "weekly-report.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_weekly_report(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_weekly_report(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_analytics_review(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.analytics_reviewer import AnalyticsReviewer
+    from fanpage_agent.tools.analytics.analytics_reviewer import AnalyticsReviewer
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     _ = load_brand_profile(args.brand_file)
@@ -248,7 +266,7 @@ def cmd_analytics_review(args: argparse.Namespace) -> int:
 
 
 def cmd_deliver_analytics_review(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.analytics_reviewer import AnalyticsReviewer
+    from fanpage_agent.tools.analytics.analytics_reviewer import AnalyticsReviewer
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     _ = load_brand_profile(args.brand_file)
@@ -258,6 +276,6 @@ def cmd_deliver_analytics_review(args: argparse.Namespace) -> int:
     payload = reviewer.run_review(store=store, days=args.days, record=args.record)
     if args.save:
         dump_json(settings.artifacts_dir / "reports" / "analytics-review.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_analytics_review(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_analytics_review(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0

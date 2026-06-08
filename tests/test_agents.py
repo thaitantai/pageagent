@@ -636,12 +636,12 @@ class TestResearchAgent:
 class TestPerformanceMemory:
     @pytest.fixture
     def memory(self, tmp_path):
-        from fanpage_agent.memory.performance import PerformanceMemory
+        from fanpage_agent.memory import PerformanceMemory
         return PerformanceMemory(db_path=tmp_path / "test_memory.db")
 
     def test_init_creates_tables(self, memory):
         """DB tables created on init."""
-        from fanpage_agent.memory.performance import PerformanceMemory
+        from fanpage_agent.memory import PerformanceMemory
         import sqlite3
         # Just verify we can query
         rows = memory.get_top_patterns()

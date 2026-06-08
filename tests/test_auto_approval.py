@@ -6,13 +6,13 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.auto_approval import (
+from fanpage_agent.tools.content.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
     AutoApprovalResult,
 )
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.verifier import VerifierService
+from fanpage_agent.tools.publishing.planner import PlannerTool
+from fanpage_agent.tools.content.verifier import VerifierTool
 
 
 class AutoApprovalEngineTest(unittest.TestCase):
@@ -21,7 +21,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
     def setUp(self):
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         self.profile = load_brand_profile(sample)
-        self.plan = PlannerService().plan_week(profile=self.profile, start_date="2026-06-01", days=2)
+        self.plan = PlannerTool().plan_week(profile=self.profile, start_date="2026-06-01", days=2)
         self.calendar_id_1 = f"{self.plan.plan_title}-1"
         self.calendar_id_2 = f"{self.plan.plan_title}-2"
 
@@ -45,7 +45,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
             engine = AutoApprovalEngine(
                 brand_profile=self.profile,
                 store=store,
-                verifier=VerifierService(),
+                verifier=VerifierTool(),
                 config=AutoApprovalConfig(require_verification_pass=False),
             )
             result = engine.process_pending()
@@ -68,7 +68,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
             engine = AutoApprovalEngine(
                 brand_profile=self.profile,
                 store=store,
-                verifier=VerifierService(),
+                verifier=VerifierTool(),
                 config=AutoApprovalConfig(
                     skip_banned_phrases=True,
                     require_verification_pass=False,
@@ -95,7 +95,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
             engine = AutoApprovalEngine(
                 brand_profile=self.profile,
                 store=store,
-                verifier=VerifierService(),
+                verifier=VerifierTool(),
                 config=AutoApprovalConfig(require_verification_pass=False),
             )
             result = engine.process_pending()
@@ -117,7 +117,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
             engine = AutoApprovalEngine(
                 brand_profile=self.profile,
                 store=store,
-                verifier=VerifierService(),
+                verifier=VerifierTool(),
                 config=AutoApprovalConfig(require_verification_pass=True),
             )
             result = engine.process_pending()
@@ -148,7 +148,7 @@ class AutoApprovalEngineTest(unittest.TestCase):
             engine = AutoApprovalEngine(
                 brand_profile=self.profile,
                 store=store,
-                verifier=VerifierService(),
+                verifier=VerifierTool(),
                 config=AutoApprovalConfig(
                     skip_duplicate_topics=True,
                     require_verification_pass=False,

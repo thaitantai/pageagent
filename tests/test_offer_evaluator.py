@@ -7,12 +7,12 @@ from dataclasses import dataclass
 import pytest
 
 from fanpage_agent.models import ResearchEvidence
-from fanpage_agent.services.offer_evaluator import (
+from fanpage_agent.tools.research.offer_evaluator import (
     EvaluationCriterion,
     OfferEvaluationResult,
     OfferEvaluator,
 )
-from fanpage_agent.services.product_topic_discovery import ProductTopicCandidate
+from fanpage_agent.tools.research.product_topic_discovery import ProductTopicCandidate
 
 # ──────────────────────────────────────────────
 # Fixtures

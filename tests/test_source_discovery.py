@@ -5,8 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fanpage_agent.scraping.web_search import SearchResult
-from fanpage_agent.services.research_packet import build_research_packet
-from fanpage_agent.services.source_discovery import WebSourceDiscovery
+from fanpage_agent.tools.research.research_packet import build_research_packet
+from fanpage_agent.tools.research.source_discovery import WebSourceDiscovery
 
 
 class FakeSearchClient:
@@ -51,7 +51,7 @@ class SourceDiscoveryTest(unittest.TestCase):
             campaign.write_text(json.dumps({"campaign_focus": ["skin analysis"]}), encoding="utf-8")
             calendar.write_text("date,topic,pillar,objective,status\n", encoding="utf-8")
 
-            with patch("fanpage_agent.services.source_discovery.WebSearchClient", return_value=FakeSearchClient()):
+            with patch("fanpage_agent.tools.research.source_discovery.WebSearchClient", return_value=FakeSearchClient()):
                 packet = build_research_packet(
                     history_file=history,
                     metrics_file=metrics,

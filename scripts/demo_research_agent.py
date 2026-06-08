@@ -23,15 +23,15 @@ from fanpage_agent.models import (
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
-from fanpage_agent.services.competitor_page_discovery import (
-    CompetitorPageDiscoveryService,
+from fanpage_agent.tools.research.competitor_page_discovery import (
+    CompetitorPageDiscoveryTool,
     FacebookPageClient,
 )
-from fanpage_agent.services.offer_discovery import OfferDiscoveryService
-from fanpage_agent.services.offer_evaluator import OfferEvaluator, SearchClient
-from fanpage_agent.services.product_topic_discovery import ProductTopicCandidate
-from fanpage_agent.services.research import ResearchService
-from fanpage_agent.services.research_insights import EvidenceExtractor, ResearchQualityGate
+from fanpage_agent.tools.research.offer_discovery import OfferDiscoveryTool
+from fanpage_agent.tools.research.offer_evaluator import OfferEvaluator, SearchClient
+from fanpage_agent.tools.research.product_topic_discovery import ProductTopicCandidate
+from fanpage_agent.tools.research.research import ResearchTool
+from fanpage_agent.tools.research.research_insights import EvidenceExtractor, ResearchQualityGate
 
 # ────────────────────────────────────────
 # Style helpers
@@ -345,11 +345,11 @@ def run_demo():
         mock_fb_client = create_mock_fb_client()
         mock_evaluator_search = create_mock_evaluator_search()
 
-        # ─── ResearchService với tất cả mocks ───
-        service = ResearchService(
+        # ─── ResearchTool với tất cả mocks ───
+        service = ResearchTool(
             trend_scraper=mock_scraper,
             trend_analyzer=TrendAnalyzer([]),  # sẽ reset bên trong build_brief
-            competitor_discovery=CompetitorPageDiscoveryService(
+            competitor_discovery=CompetitorPageDiscoveryTool(
                 fb_client=mock_fb_client,
             ),
             offer_evaluator=OfferEvaluator(
@@ -428,7 +428,7 @@ def run_demo():
             print(f"    📄 {t.source}: {t.title}")
 
         print(_header("📦 Bước 3: OfferDiscovery — phát hiện offer từ web crawl"))
-        discoverer = OfferDiscoveryService()
+        discoverer = OfferDiscoveryTool()
         discovered = discoverer.discover(
             source_documents=source_docs,
             external_trends=mock_scraper.search_trends.return_value,
@@ -442,7 +442,7 @@ def run_demo():
 
         print(_header("📱 Bước 4: CompetitorPageDiscovery — scan Facebook đối thủ"))
         print(_chip("Seed pages", "['skincare_vn', 'beauty_tips_asia']"))
-        fb_offers, new_pages = CompetitorPageDiscoveryService(
+        fb_offers, new_pages = CompetitorPageDiscoveryTool(
             fb_client=mock_fb_client,
         ).discover(
             competitor_page_ids=["skincare_vn", "beauty_tips_asia"],
@@ -457,7 +457,7 @@ def run_demo():
                 print(f"    ➕ {p}")
 
         print(_header("🏆 Bước 5: build_brief() — pipeline hoàn chỉnh"))
-        print("  Gọi ResearchService.build_brief() với tất cả flags...\n")
+        print("  Gọi ResearchTool.build_brief() với tất cả flags...\n")
 
         brief = service.build_brief(
             store=store,

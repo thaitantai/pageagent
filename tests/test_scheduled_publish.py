@@ -6,22 +6,22 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.auto_approval import (
+from fanpage_agent.tools.content.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
 )
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.scheduled_publish import ScheduledPublishResult, ScheduledPublishService
-from fanpage_agent.services.verifier import VerifierService
+from fanpage_agent.tools.publishing.planner import PlannerTool
+from fanpage_agent.tools.publishing.scheduled_publish import ScheduledPublishResult, ScheduledPublishTool
+from fanpage_agent.tools.content.verifier import VerifierTool
 
 
-class ScheduledPublishServiceTest(unittest.TestCase):
+class ScheduledPublishToolTest(unittest.TestCase):
     """Test publishing approved items that are due."""
 
     def setUp(self):
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         self.profile = load_brand_profile(sample)
-        self.plan = PlannerService().plan_week(profile=self.profile, start_date="2026-06-01", days=2)
+        self.plan = PlannerTool().plan_week(profile=self.profile, start_date="2026-06-01", days=2)
 
     def _make_store_with_approved_items(self, tmpdir: Path) -> LocalSheetStore:
         calendar = tmpdir / "content_calendar.csv"
@@ -38,7 +38,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
         engine = AutoApprovalEngine(
             brand_profile=self.profile,
             store=store,
-            verifier=VerifierService(),
+            verifier=VerifierTool(),
             config=AutoApprovalConfig(require_verification_pass=False),
         )
         engine.process_pending()
@@ -49,7 +49,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = self._make_store_with_approved_items(Path(tmp))
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
             )
@@ -70,7 +70,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
             rows[1]["date"] = "2099-01-02"
             store._write_calendar_rows(rows)
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
             )
@@ -87,7 +87,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
             rows[1]["date"] = "2099-01-02"  # day 2 is future
             store._write_calendar_rows(rows)
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
             )
@@ -106,7 +106,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
                 permalink="https://example.com/post-1",
             )
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
             )
@@ -120,7 +120,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = self._make_store_with_approved_items(Path(tmp))
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
             )
@@ -143,7 +143,7 @@ class ScheduledPublishServiceTest(unittest.TestCase):
             rows[1]["final_caption_ref"] = ""
             store._write_calendar_rows(rows)
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
             )
@@ -176,7 +176,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
         mock_fb = MockFacebookClient()
 
         # Create store with approved items
-        planner = PlannerService()
+        planner = PlannerTool()
         plan = planner.plan_week(profile=self.profile, start_date="2026-06-01", days=1)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -210,7 +210,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
             rows[0]["final_caption_ref"] = str(caption)
             store._write_calendar_rows(rows)
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
                 fb_client=mock_fb,  # type: ignore[arg-type]
@@ -227,7 +227,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
 
     def test_publishes_without_facebook_when_no_client(self):
         """Without fb_client, it falls back to old behaviour (no API call)."""
-        planner = PlannerService()
+        planner = PlannerTool()
         plan = planner.plan_week(profile=self.profile, start_date="2026-06-01", days=1)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -243,7 +243,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
             rows[0]["final_caption_ref"] = str(tmpdir / "caption.json")
             store._write_calendar_rows(rows)
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
                 # no fb_client — should fall back silently
@@ -268,7 +268,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
                 msg = "Facebook API error 400: (#200) Permission error"
                 raise RuntimeError(msg)
 
-        planner = PlannerService()
+        planner = PlannerTool()
         plan = planner.plan_week(profile=self.profile, start_date="2026-06-01", days=1)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -284,7 +284,7 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
             rows[0]["final_caption_ref"] = str(tmpdir / "caption.json")
             store._write_calendar_rows(rows)
 
-            service = ScheduledPublishService(
+            service = ScheduledPublishTool(
                 store=store,
                 brand_id=self.profile.brand_id,
                 fb_client=FailingFacebookClient(),  # type: ignore[arg-type]

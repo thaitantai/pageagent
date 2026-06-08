@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.planner import PlannerService
+from fanpage_agent.tools.publishing.planner import PlannerTool
 from tests.test_env import isolated_subprocess_env
 
 
@@ -30,7 +30,7 @@ class ProcessPendingCliTest(unittest.TestCase):
             brand_file.write_text(profile.model_dump_json(), encoding="utf-8")
 
             # Plan and save to calendar
-            plan = PlannerService().plan_week(profile=profile, start_date="2026-06-01", days=2)
+            plan = PlannerTool().plan_week(profile=profile, start_date="2026-06-01", days=2)
             store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
             store.append_plan(profile.brand_id, plan)
 
@@ -69,7 +69,7 @@ class ProcessPendingCliTest(unittest.TestCase):
             profile.banned_phrases = ["cấm"]
             brand_file.write_text(profile.model_dump_json(), encoding="utf-8")
 
-            plan = PlannerService().plan_week(profile=profile, start_date="2026-06-01", days=2)
+            plan = PlannerTool().plan_week(profile=profile, start_date="2026-06-01", days=2)
             store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
             store.append_plan(profile.brand_id, plan)
             rows = store._read_calendar_rows()
@@ -112,7 +112,7 @@ class ScheduledPublishCliTest(unittest.TestCase):
         profile.banned_phrases = []
         brand_file.write_text(profile.model_dump_json(), encoding="utf-8")
 
-        plan = PlannerService().plan_week(profile=profile, start_date="2026-06-01", days=2)
+        plan = PlannerTool().plan_week(profile=profile, start_date="2026-06-01", days=2)
         store = LocalSheetStore(calendar_csv=calendar, history_csv=history)
         store.append_plan(profile.brand_id, plan)
         rows = store._read_calendar_rows()

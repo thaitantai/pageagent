@@ -17,15 +17,15 @@ from fanpage_agent.main import (
     DEFAULT_METRICS_FILE,
     ROOT_DIR,
 )
-from fanpage_agent.services.auto_approval import (
+from fanpage_agent.tools.content.auto_approval import (
     AutoApprovalConfig,
     AutoApprovalEngine,
 )
-from fanpage_agent.services.calendar_gap_service import CalendarGapService
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.scheduled_publish import ScheduledPublishService
-from fanpage_agent.services.verifier import VerifierService
-from fanpage_agent.services.writer import WriterService
+from fanpage_agent.tools.publishing.calendar_gap_service import CalendarGapTool
+from fanpage_agent.tools.publishing.planner import PlannerTool
+from fanpage_agent.tools.publishing.scheduled_publish import ScheduledPublishTool
+from fanpage_agent.tools.content.verifier import VerifierTool
+from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.utils import dump_json
 
 
@@ -175,8 +175,8 @@ def register_subcommand(subparsers) -> None:
 def cmd_write_caption(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
-    writer = WriterService(llm_client=build_llm_client(settings))
-    verifier = VerifierService()
+    writer = WriterTool(llm_client=build_llm_client(settings))
+    verifier = VerifierTool()
     package = writer.write_caption(profile, args.topic, args.pillar, args.objective, args.format)
     verification = verifier.verify_caption_package(profile, package)
     payload = package.model_dump(mode="json")
@@ -230,7 +230,7 @@ def cmd_process_pending(args: argparse.Namespace) -> int:
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
     )
-    verifier = VerifierService()
+    verifier = VerifierTool()
 
     config = AutoApprovalConfig(
         skip_banned_phrases=not args.skip_ban,
@@ -264,13 +264,13 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
         fb_client = FacebookClient(settings)
 
     # Build image service (generates images from visual_brief)
-    from fanpage_agent.services.image_gen import build_image_service
+    from fanpage_agent.tools.content.image_gen import build_image_service
     image_service = build_image_service(settings)
 
-    service = ScheduledPublishService(
+    service = ScheduledPublishTool(
         store=store,
         brand_id=profile.brand_id,
-        verifier=VerifierService(),
+        verifier=VerifierTool(),
         brand_profile=profile,
         fb_client=fb_client,
         image_service=image_service,
@@ -285,7 +285,7 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
 def cmd_generate_image(args: argparse.Namespace) -> int:
     """Generate an image from a visual brief prompt."""
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    from fanpage_agent.services.image_gen import build_image_service
+    from fanpage_agent.tools.content.image_gen import build_image_service
 
     prompt = args.prompt
     if not prompt:
@@ -399,7 +399,7 @@ def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
     import json as _json
 
     from fanpage_agent.adapters.sheet_store import LocalSheetStore
-    from fanpage_agent.services.writer import WriterService
+    from fanpage_agent.tools.content.writer import WriterTool
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
@@ -408,9 +408,9 @@ def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
         calendar_csv=args.calendar_file,
         history_csv=args.history_file,
     )
-    gap_svc = CalendarGapService(
-        planner=PlannerService(llm_client=llm_client),
-        writer=WriterService(llm_client=llm_client),
+    gap_svc = CalendarGapTool(
+        planner=PlannerTool(llm_client=llm_client),
+        writer=WriterTool(llm_client=llm_client),
         artifacts_dir=ROOT_DIR / "artifacts" / "captions",
     )
     result = gap_svc.fill_gaps(

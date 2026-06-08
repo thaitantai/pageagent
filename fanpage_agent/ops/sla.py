@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fanpage_agent.audit import AuditManager
-from fanpage_agent.memory.performance import PerformanceMemory
+from fanpage_agent.memory import PerformanceMemory
 
 logger = logging.getLogger(__name__)
 

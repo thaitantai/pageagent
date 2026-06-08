@@ -28,11 +28,11 @@ from fanpage_agent.main import (
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
-from fanpage_agent.services.analytics_dashboard import AnalyticsDashboardService
-from fanpage_agent.services.evals import EvalService
-from fanpage_agent.services.hashtag import HashtagService
-from fanpage_agent.services.metrics_auto_fetch import MetricsAutoFetchService
-from fanpage_agent.services.telegram_formatter import TelegramFormatterService
+from fanpage_agent.tools.analytics.analytics_dashboard import AnalyticsDashboardTool
+from fanpage_agent.tools.analytics.evals import EvalTool
+from fanpage_agent.tools.content.hashtag import HashtagTool
+from fanpage_agent.tools.data.metrics_auto_fetch import MetricsAutoFetchTool
+from fanpage_agent.tools.publishing.telegram_formatter import TelegramFormatterTool
 from fanpage_agent.utils import dump_json
 
 
@@ -397,7 +397,7 @@ def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expecte
 
 def render_telegram_preview(artifact_type: str, input_file: str) -> str:
     payload = json.loads(Path(input_file).read_text(encoding="utf-8"))
-    formatter = TelegramFormatterService()
+    formatter = TelegramFormatterTool()
     if artifact_type == "plan":
         return formatter.format_weekly_plan(payload)
     if artifact_type == "caption":
@@ -520,7 +520,7 @@ def cmd_generate_hashtags(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
     llm_client = build_llm_client(settings) if settings.llm_provider != "mock-local" or not args.no_llm else None
-    service = HashtagService(llm_client=llm_client, settings=settings)
+    service = HashtagTool(llm_client=llm_client, settings=settings)
 
     result = service.generate(
         topic=args.topic,
@@ -546,7 +546,7 @@ def cmd_generate_hashtags(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(output, ensure_ascii=False, indent=2))
     else:
-        formatter = TelegramFormatterService()
+        formatter = TelegramFormatterTool()
         print(formatter.format_hashtag_set(output))
 
     return 0
@@ -555,13 +555,13 @@ def cmd_generate_hashtags(args: argparse.Namespace) -> int:
 def cmd_auto_fetch_metrics(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=args)
-    service = MetricsAutoFetchService(settings=settings)
+    service = MetricsAutoFetchTool(settings=settings)
     result = service.auto_fetch(store=store, days_back=args.days_back)
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     else:
-        formatter = TelegramFormatterService()
+        formatter = TelegramFormatterTool()
         print(formatter.format_metrics_auto_fetch(result))
 
     return 0
@@ -661,7 +661,7 @@ def cmd_eval_all(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
     store = build_store(settings=settings, args=args)
-    payload = EvalService(llm_client=build_llm_client(settings)).run_all(
+    payload = EvalTool(llm_client=build_llm_client(settings)).run_all(
         profile=profile,
         store=store,
         comment_csv=args.comment_file,
@@ -678,7 +678,7 @@ def cmd_generate_dashboard(args: argparse.Namespace) -> int:
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     metrics = build_store(settings=settings, args=args).read_post_metrics()
-    svc = AnalyticsDashboardService(settings.artifacts_dir)
+    svc = AnalyticsDashboardTool(settings.artifacts_dir)
     result = svc.generate(metrics, days=args.days)
     if args.save:
         pass  # already saved in generate()

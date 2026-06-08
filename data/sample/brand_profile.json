@@ -1,0 +1,129 @@
+{
+  "brand_id": "brand_abc",
+  "brand_name": "ABC Clinic",
+  "industry": "skincare",
+  "business_goal": "affiliate",
+  "fanpage_goals": [
+    "education",
+    "engagement",
+    "trust"
+  ],
+  "brand_summary": "A luxury aesthetic medical clinic brand",
+  "usp": [
+    "Medical-grade active ingredients",
+    "Led by board-certified dermatologists"
+  ],
+  "target_audiences": [
+    {
+      "segment_name": "GenZ skincare enthusiasts",
+      "pain_points": [
+        "acne",
+        "dark spots",
+        "dryness"
+      ],
+      "desired_outcomes": [
+        "clear skin",
+        "glow"
+      ],
+      "objections": [
+        "too expensive",
+        "too complicated"
+      ],
+      "preferred_content_formats": [
+        "video",
+        "carousel"
+      ]
+    }
+  ],
+  "products_services": [
+    {
+      "name": "Vitamin C Serum",
+      "category": "serum",
+      "benefits": [
+        "brightening",
+        "antioxidant"
+      ],
+      "proof_points": [
+        "15% L-Ascorbic Acid",
+        "clinical study"
+      ],
+      "do_not_claim": [
+        "permanent results",
+        "cure"
+      ]
+    }
+  ],
+  "tone_of_voice": {
+    "brand_traits": [
+      "trustworthy",
+      "warm",
+      "expert"
+    ],
+    "writing_rules": [
+      "use simple Vietnamese",
+      "avoid exaggeration"
+    ],
+    "things_to_avoid": [
+      "claims of 100% efficacy",
+      "promising overnight results"
+    ],
+    "sample_phrases": [
+      "Mình hiểu da bạn đang gặp vấn đề gì",
+      "Hãy để mình giúp bạn"
+    ]
+  },
+  "content_pillars": [
+    {
+      "pillar_name": "education",
+      "goal": "inform",
+      "description": "Chia sẻ kiến thức skincare",
+      "example_angles": [
+        "how to layer products",
+        "ingredient deep dive"
+      ],
+      "allowed_formats": [
+        "carousel",
+        "video"
+      ]
+    },
+    {
+      "pillar_name": "trust",
+      "goal": "build credibility",
+      "description": "Xây dựng niềm tin thương hiệu",
+      "example_angles": [
+        "before-after",
+        "doctor advice"
+      ],
+      "allowed_formats": [
+        "image",
+        "video"
+      ]
+    }
+  ],
+  "approved_cta_patterns": [
+    {
+      "objective": "traffic",
+      "cta_text": "Đọc thêm tại link bio",
+      "notes": null
+    }
+  ],
+  "banned_phrases": [
+    "trị dứt điểm",
+    "khỏi sau 1 tuần",
+    "hiệu quả tức thì"
+  ],
+  "compliance_notes": [
+    "Không hứa hẹn kết quả nhanh",
+    "Luôn gắn hashtag #thamkhaoyte"
+  ],
+  "approval_flow": {
+    "content_owner": "social media manager",
+    "approver": "brand manager",
+    "approval_sla_hours": 24,
+    "public_post_requires_human_approval": true,
+    "comment_reply_requires_human_approval": false,
+    "escalation_rules": [
+      "If no response in 6 hours, escalate to director"
+    ]
+  }
+}

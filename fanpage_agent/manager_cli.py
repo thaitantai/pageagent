@@ -177,7 +177,7 @@ def _test_llm() -> list[str]:
     try:
         from fanpage_agent.adapters.llm_client import build_llm_client
         from fanpage_agent.config import Settings
-        from fanpage_agent.services.planner import PlannerService
+        from fanpage_agent.tools.publishing.planner import PlannerTool
 
         settings = Settings.from_env(root_dir=ROOT_DIR)
         llm = build_llm_client(settings)
@@ -191,7 +191,7 @@ def _test_llm() -> list[str]:
             brand_file = ROOT_DIR / "data" / "brand_profile.json"
         if brand_file.exists():
             profile = load_brand_profile(str(brand_file))
-            planner = PlannerService(llm_client=llm)
+            planner = PlannerTool(llm_client=llm)
             plan = planner.plan_week(profile, start_date="2030-01-01", days=1)
             print(f"    ✓ LLM generated plan OK — {plan.plan_title}")
     except Exception as e:

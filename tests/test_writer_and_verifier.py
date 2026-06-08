@@ -2,8 +2,8 @@ from pathlib import Path
 import unittest
 
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.writer import WriterService
-from fanpage_agent.services.verifier import VerifierService
+from fanpage_agent.tools.content.writer import WriterTool
+from fanpage_agent.tools.content.verifier import VerifierTool
 
 
 class WriterAndVerifierTest(unittest.TestCase):
@@ -11,8 +11,8 @@ class WriterAndVerifierTest(unittest.TestCase):
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         profile = load_brand_profile(sample)
 
-        writer = WriterService()
-        verifier = VerifierService()
+        writer = WriterTool()
+        verifier = VerifierTool()
 
         package = writer.write_caption(
             profile=profile,

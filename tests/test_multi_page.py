@@ -188,7 +188,7 @@ class TestPublisherAgentPageId:
     @pytest.fixture
     def agent(self, mock_fb, tmp_path):
         from fanpage_agent.agents.publisher import PublisherAgent
-        from fanpage_agent.memory.performance import PerformanceMemory
+        from fanpage_agent.memory import PerformanceMemory
         mem = PerformanceMemory(db_path=tmp_path / "pub_test.db")
         agent = PublisherAgent(
             config={},
@@ -284,7 +284,7 @@ class TestCommunityAgentPageId:
 class TestPerformanceMemoryPageId:
     @pytest.fixture
     def memory(self, tmp_path):
-        from fanpage_agent.memory.performance import PerformanceMemory
+        from fanpage_agent.memory import PerformanceMemory
         return PerformanceMemory(db_path=tmp_path / "multi_page.db")
 
     def test_record_with_page_id(self, memory):
@@ -438,7 +438,7 @@ class TestSlaDashboardPageId:
 
     def test_published_posts_has_page_id_column(self, tmp_path):
         """Verify DB schema includes page_id column."""
-        from fanpage_agent.memory.performance import PerformanceMemory
+        from fanpage_agent.memory import PerformanceMemory
         mem = PerformanceMemory(db_path=tmp_path / "schema_test.db")
 
         import sqlite3

@@ -14,7 +14,7 @@ from fanpage_agent.main import (
     build_calendar_store_payload,
     build_operator_digest_payload,
 )
-from fanpage_agent.services.delivery import DeliveryService
+from fanpage_agent.tools.publishing.delivery import DeliveryTool
 from fanpage_agent.utils import dump_json
 
 
@@ -125,7 +125,7 @@ def cmd_deliver_approval_audit(args: argparse.Namespace) -> int:
     payload = build_approval_audit_payload(args)
     if args.save:
         dump_json(settings.artifacts_dir / "approvals" / "approval-audit.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_approval_audit(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approval_audit(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -135,7 +135,7 @@ def cmd_deliver_approval_queue(args: argparse.Namespace) -> int:
     payload = build_calendar_store_payload(args)
     if args.save:
         dump_json(settings.artifacts_dir / "approvals" / "approval-queue.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_approval_queue(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approval_queue(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -145,7 +145,7 @@ def cmd_deliver_metrics_backlog(args: argparse.Namespace) -> int:
     payload = build_calendar_store_payload(args)
     if args.save:
         dump_json(settings.artifacts_dir / "metrics" / "metrics-backlog.json", payload)
-    payload["delivery"] = DeliveryService(settings).deliver_metrics_backlog(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_metrics_backlog(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -163,7 +163,7 @@ def cmd_deliver_operator_digest(args: argparse.Namespace) -> int:
             "reason": "empty_digest",
         }
     else:
-        payload["delivery"] = DeliveryService(settings).deliver_operator_digest(payload, chat_id=args.chat_id)
+        payload["delivery"] = DeliveryTool(settings).deliver_operator_digest(payload, chat_id=args.chat_id)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

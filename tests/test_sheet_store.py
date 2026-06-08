@@ -5,14 +5,14 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.planner import PlannerService
+from fanpage_agent.tools.publishing.planner import PlannerTool
 
 
 class LocalSheetStoreTest(unittest.TestCase):
     def test_append_plan_writes_rows_to_calendar_csv(self) -> None:
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         profile = load_brand_profile(sample)
-        plan = PlannerService().plan_week(profile=profile, start_date="2026-06-01", days=2)
+        plan = PlannerTool().plan_week(profile=profile, start_date="2026-06-01", days=2)
 
         with tempfile.TemporaryDirectory() as tmp:
             calendar = Path(tmp) / "content_calendar.csv"

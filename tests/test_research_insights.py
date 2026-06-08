@@ -1,7 +1,7 @@
 import unittest
 
 from fanpage_agent.models import SourceDocument
-from fanpage_agent.services.research_insights import EvidenceExtractor, ResearchQualityGate
+from fanpage_agent.tools.research.research_insights import EvidenceExtractor, ResearchQualityGate
 
 
 class ResearchInsightsTest(unittest.TestCase):

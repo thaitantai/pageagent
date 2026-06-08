@@ -1,16 +1,16 @@
-"""Tests cho OfferDiscoveryService — phát hiện offer từ web crawl."""
+"""Tests cho OfferDiscoveryTool — phát hiện offer từ web crawl."""
 
 from __future__ import annotations
 
 import pytest
 
 from fanpage_agent.models import SourceDocument, TrendItem
-from fanpage_agent.services.offer_discovery import OfferDiscoveryService
+from fanpage_agent.tools.research.offer_discovery import OfferDiscoveryTool
 
 
 @pytest.fixture
-def discovery() -> OfferDiscoveryService:
-    return OfferDiscoveryService()
+def discovery() -> OfferDiscoveryTool:
+    return OfferDiscoveryTool()
 
 
 @pytest.fixture
@@ -43,21 +43,21 @@ def trending_article() -> TrendItem:
     )
 
 
-class TestOfferDiscoveryService:
-    def test_discover_from_review_doc(self, discovery: OfferDiscoveryService, skincare_review_doc: SourceDocument) -> None:
+class TestOfferDiscoveryTool:
+    def test_discover_from_review_doc(self, discovery: OfferDiscoveryTool, skincare_review_doc: SourceDocument) -> None:
         """Phát hiện sản phẩm từ bài review."""
         offers = discovery.discover(source_documents=[skincare_review_doc])
         assert len(offers) >= 1
         product_names = {o.product_name.lower() for o in offers}
         assert "serum vitamin c" in product_names or "kem chống nắng" in product_names
 
-    def test_discover_from_trending_article(self, discovery: OfferDiscoveryService, trending_article: TrendItem) -> None:
+    def test_discover_from_trending_article(self, discovery: OfferDiscoveryTool, trending_article: TrendItem) -> None:
         """Phát hiện sản phẩm từ external trend."""
         offers = discovery.discover(external_trends=[trending_article])
         assert len(offers) >= 1
         assert any("retinol" in o.product_name.lower() for o in offers)
 
-    def test_discover_no_matches_returns_empty(self, discovery: OfferDiscoveryService) -> None:
+    def test_discover_no_matches_returns_empty(self, discovery: OfferDiscoveryTool) -> None:
         """Text không liên quan → không phát hiện offer."""
         doc = SourceDocument(
             source_name="news.com",
@@ -73,7 +73,7 @@ class TestOfferDiscoveryService:
         offers = discovery.discover(source_documents=[doc])
         assert len(offers) == 0
 
-    def test_discover_from_both_sources(self, discovery: OfferDiscoveryService, skincare_review_doc: SourceDocument, trending_article: TrendItem) -> None:
+    def test_discover_from_both_sources(self, discovery: OfferDiscoveryTool, skincare_review_doc: SourceDocument, trending_article: TrendItem) -> None:
         """Gom từ cả source documents + external trends."""
         offers = discovery.discover(
             source_documents=[skincare_review_doc],
@@ -81,7 +81,7 @@ class TestOfferDiscoveryService:
         )
         assert len(offers) >= 2  # Ít nhất 1 từ doc + 1 từ trend
 
-    def test_discover_dedup_same_product(self, discovery: OfferDiscoveryService) -> None:
+    def test_discover_dedup_same_product(self, discovery: OfferDiscoveryTool) -> None:
         """Cùng sản phẩm từ nhiều nguồn → chỉ giữ 1 candidate."""
         doc1 = SourceDocument(
             source_name="healthline.com",
@@ -113,7 +113,7 @@ class TestOfferDiscoveryService:
         sunscreen_offers = [o for o in offers if "kem chống nắng" in o.product_name.lower()]
         assert len(sunscreen_offers) == 1
 
-    def test_discover_respects_existing_offers(self, discovery: OfferDiscoveryService, skincare_review_doc: SourceDocument) -> None:
+    def test_discover_respects_existing_offers(self, discovery: OfferDiscoveryTool, skincare_review_doc: SourceDocument) -> None:
         """Offer đã có trong existing_offers → không thêm lại."""
         offers = discovery.discover(
             source_documents=[skincare_review_doc],
@@ -124,23 +124,23 @@ class TestOfferDiscoveryService:
         assert sunscreen_count == 0
         assert len(offers) >= 1
 
-    def test_detect_angle_buying_guide(self, discovery: OfferDiscoveryService) -> None:
+    def test_detect_angle_buying_guide(self, discovery: OfferDiscoveryTool) -> None:
         assert discovery._detect_angle("top best kem chống nắng nên mua", 4) == "buying_guide"
 
-    def test_detect_angle_comparison(self, discovery: OfferDiscoveryService) -> None:
+    def test_detect_angle_comparison(self, discovery: OfferDiscoveryTool) -> None:
         assert discovery._detect_angle("so sánh kem chống nắng vs kem dưỡng", 2) == "comparison"
 
-    def test_detect_angle_education(self, discovery: OfferDiscoveryService) -> None:
+    def test_detect_angle_education(self, discovery: OfferDiscoveryTool) -> None:
         assert discovery._detect_angle("công dụng của retinol", 0) == "education"
 
-    def test_scan_text_empty(self, discovery: OfferDiscoveryService) -> None:
+    def test_scan_text_empty(self, discovery: OfferDiscoveryTool) -> None:
         assert discovery._scan_text("", "", "", "") == []
 
-    def test_scan_text_no_marker(self, discovery: OfferDiscoveryService) -> None:
+    def test_scan_text_no_marker(self, discovery: OfferDiscoveryTool) -> None:
         assert discovery._scan_text("thời tiết hôm nay đẹp", "", "", "") == []
 
-    def test_merge_candidates_dedup(self, discovery: OfferDiscoveryService) -> None:
-        from fanpage_agent.services.product_topic_discovery import ProductTopicCandidate
+    def test_merge_candidates_dedup(self, discovery: OfferDiscoveryTool) -> None:
+        from fanpage_agent.tools.research.product_topic_discovery import ProductTopicCandidate
         c1 = ProductTopicCandidate(
             topic="A", angle="review", product_name="Kem chống nắng",
             customer_pain="da dầu", research_query="test",
@@ -155,6 +155,6 @@ class TestOfferDiscoveryService:
         assert len(merged) == 1
         assert merged[0].product_relevance == 0.9  # Giữ score cao nhất
 
-    def test_estimate_customer_value_review_context(self, discovery: OfferDiscoveryService) -> None:
+    def test_estimate_customer_value_review_context(self, discovery: OfferDiscoveryTool) -> None:
         value = discovery._estimate_customer_value("review đánh giá kem chống nắng trải nghiệm", 3)
         assert value >= 0.7

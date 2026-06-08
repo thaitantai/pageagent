@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from fanpage_agent.core.types import ContentPackage, ContentVariant
-from fanpage_agent.memory.performance import PerformanceMemory
-from fanpage_agent.services.variant_scorer import VariantScorer
+from fanpage_agent.memory import PerformanceMemory
+from fanpage_agent.tools.research.variant_scorer import VariantScorer
 
 
 def _record_pattern(memory: PerformanceMemory, package_id: str, variant: ContentVariant, engagements: int) -> None:

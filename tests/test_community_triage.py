@@ -3,10 +3,10 @@ import unittest
 from pathlib import Path
 
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.community_triage import CommunityTriageService
+from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
 
 
-class CommunityTriageServiceTest(unittest.TestCase):
+class CommunityTriageToolTest(unittest.TestCase):
     def test_triage_comments_classifies_priority_escalation_and_draft_reply(self) -> None:
         root = Path(__file__).resolve().parents[1]
         profile = load_brand_profile(root / "data" / "sample" / "brand_profile.json")
@@ -22,7 +22,7 @@ class CommunityTriageServiceTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            payload = CommunityTriageService().triage_from_csv(profile=profile, comment_csv=comment_file)
+            payload = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=comment_file)
 
         self.assertEqual(payload.summary["total_items"], 4)
         self.assertEqual(payload.summary["by_category"]["question"], 1)

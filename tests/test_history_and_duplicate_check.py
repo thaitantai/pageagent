@@ -5,15 +5,15 @@ from pathlib import Path
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.services.planner import PlannerService
-from fanpage_agent.services.verifier import VerifierService
+from fanpage_agent.tools.publishing.planner import PlannerTool
+from fanpage_agent.tools.content.verifier import VerifierTool
 
 
 class HistoryAndDuplicateCheckTest(unittest.TestCase):
     def test_read_post_history_and_flag_duplicate_plan_topic(self) -> None:
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
         profile = load_brand_profile(sample)
-        plan = PlannerService().plan_week(profile=profile, start_date="2026-06-01", days=2)
+        plan = PlannerTool().plan_week(profile=profile, start_date="2026-06-01", days=2)
 
         with tempfile.TemporaryDirectory() as tmp:
             history_csv = Path(tmp) / "post_history.csv"
@@ -38,7 +38,7 @@ class HistoryAndDuplicateCheckTest(unittest.TestCase):
 
             store = LocalSheetStore(calendar_csv=Path(tmp) / "calendar.csv", history_csv=history_csv)
             history = store.read_post_history(limit=10)
-            result = VerifierService().verify_plan(profile, plan, history=history)
+            result = VerifierTool().verify_plan(profile, plan, history=history)
 
         self.assertEqual(len(history), 1)
         self.assertFalse(result.passed)

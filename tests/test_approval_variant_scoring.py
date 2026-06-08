@@ -3,8 +3,8 @@ from pathlib import Path
 
 from fanpage_agent.core.types import ContentPackage, ContentVariant
 from fanpage_agent.legacy_cli import enrich_items_with_variant_scores
-from fanpage_agent.memory.performance import PerformanceMemory
-from fanpage_agent.services.telegram_formatter import TelegramFormatterService
+from fanpage_agent.memory import PerformanceMemory
+from fanpage_agent.tools.publishing.telegram_formatter import TelegramFormatterTool
 
 
 def _record_pattern(memory_db: Path, pillar: str, variant_id: str, engagements: int) -> None:
@@ -87,7 +87,7 @@ def test_enrich_items_with_variant_scores_recommends_best_caption_variant(tmp_pa
 
 
 def test_approval_queue_formatter_shows_variant_scores():
-    message = TelegramFormatterService().format_approval_queue(
+    message = TelegramFormatterTool().format_approval_queue(
         {
             "summary": {"total_items": 1},
             "items": [
