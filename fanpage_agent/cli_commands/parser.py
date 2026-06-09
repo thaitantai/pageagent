@@ -610,8 +610,9 @@ def build_parser() -> argparse.ArgumentParser:
     learn_parser.add_argument("--optimize", action="store_true", help="Adjust scoring weights")
     learn_parser.add_argument("--calibrate", action="store_true", help="Calibrate confidence thresholds")
     learn_parser.add_argument("--decay", action="store_true", help="Apply time-decay to topic scores")
+    learn_parser.add_argument("--predict", action="store_true", help="Train/evaluate performance predictor")
     learn_parser.add_argument("--all", action="store_true", help="Run optimize + calibrate + decay (default)")
-    learn_parser.add_argument("--status", action="store_true", help="Show current weights + recent runs (no changes)")
+    learn_parser.add_argument("--status", action="store_true", help="Show current weights + predictor quality + recent runs (no changes)")
     learn_parser.add_argument("--history", type=int, nargs="?", const=10, default=0,
                               help="Show last N learning runs")
 

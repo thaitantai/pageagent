@@ -19,6 +19,7 @@ from fanpage_agent.adapters.sqlite_store import UnifiedStore
 from fanpage_agent.tools.research.learning_optimizer import (
     ConfidenceCalibrator,
     DecayModel,
+    PerformancePredictor,
     WeightOptimizer,
     _exp_decay,
 )
@@ -321,6 +322,170 @@ class UnifiedStoreLearningExtrasTest(unittest.TestCase):
         self.assertIn("engagement_baseline", weights)
         self.assertEqual(weights["evidence_confidence_floor"], 0.45)
         self.assertEqual(weights["engagement_baseline"], 50.0)
+
+
+class PerformancePredictorTest(unittest.TestCase):
+    """PerformancePredictor: linear regression from total_score → engagement."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp()
+        self.db_path = Path(self.tmp) / "test_predict.db"
+        self.store = UnifiedStore(db_path=self.db_path)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def seed_briefs(self, count: int = 10) -> None:
+        """Seed briefs with clear score→engagement correlation."""
+        now = "2026-06-07T12:00:00+00:00"
+        published_at = "2026-06-07T10:00:00+00:00"
+        for i in range(count):
+            cal_id = f"cal_p_{i}"
+            score = min(1.0, max(0.1, 0.25 + i * 0.07))
+            eng = int(score * 80)
+            with self.store._conn() as conn:
+                conn.execute(
+                    """INSERT OR IGNORE INTO calendar
+                       (calendar_id, brand_id, date, pillar, objective, topic, angle,
+                        status, published_at)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (cal_id, "test", "2026-06-07", "education", "engagement",
+                     f"pred_topic_{i}", "test", "published", published_at),
+                )
+            self.store.save_research_brief(
+                generated_at=now, brand_id="test", topic=f"pred_topic_{i}",
+                total_score=score, brand_relevance=score, novelty=score * 0.8,
+                content_potential=score, source_confidence=score,
+                fanpage_fit=score * 0.9, customer_value=score * 0.7,
+            )
+            self.store.mark_brief_published(i + 1, cal_id)
+            self.store.record_post_metrics(
+                calendar_id=cal_id, reach=1000, engagements=eng,
+                leads=eng // 5, recorded_at=now,
+            )
+
+    def test_predictor_skips_without_enough_data(self) -> None:
+        """Fewer than 5 briefs → skipped."""
+        predictor = PerformancePredictor(self.store)
+        result = predictor.train()
+        self.assertEqual(result["status"], "skipped")
+
+    def test_predictor_trains_with_enough_data(self) -> None:
+        """≥5 briefs → train returns model params."""
+        self.seed_briefs(10)
+        predictor = PerformancePredictor(self.store)
+        result = predictor.train()
+        self.assertEqual(result["status"], "ok")
+        self.assertIn("params", result)
+        self.assertIn("metrics", result)
+        self.assertIn("slope", result["params"])
+        self.assertIn("intercept", result["params"])
+        self.assertIn("r2", result["metrics"])
+        self.assertIn("mae", result["metrics"])
+        self.assertIn("mape", result["metrics"])
+
+    def test_predictor_metrics_are_reasonable(self) -> None:
+        """R² should be positive, MAE finite, MAPE < 100%."""
+        self.seed_briefs(10)
+        predictor = PerformancePredictor(self.store)
+        result = predictor.train()
+        self.assertGreater(result["metrics"]["r2"], -1.0,
+                           "R² shouldn't be terribly negative")
+        self.assertLess(result["metrics"]["mae"], 1000,
+                        "MAE shouldn't be huge")
+        self.assertGreaterEqual(result["metrics"]["mape"], 0.0)
+        self.assertLess(result["metrics"]["mape"], 2.0,
+                        "MAPE under 200% is reasonable")
+
+    def test_predictor_predicts_reasonable_values(self) -> None:
+        """Predict should return engagement within bounds."""
+        self.seed_briefs(10)
+        predictor = PerformancePredictor(self.store)
+        predictor.train()
+        result = predictor.predict(total_score=0.7)
+        self.assertIn("predicted_engagement", result)
+        self.assertIn("confidence", result)
+        self.assertGreaterEqual(result["predicted_engagement"], 0)
+        self.assertLessEqual(result["predicted_engagement"], 500)
+        self.assertGreaterEqual(result["confidence"], 0.1)
+        self.assertLessEqual(result["confidence"], 1.0)
+
+    def test_predictor_predicts_lower_for_low_scores(self) -> None:
+        """Lower score → lower predicted engagement."""
+        self.seed_briefs(10)
+        predictor = PerformancePredictor(self.store)
+        predictor.train()
+        high = predictor.predict(total_score=0.8)["predicted_engagement"]
+        low = predictor.predict(total_score=0.2)["predicted_engagement"]
+        self.assertGreaterEqual(high, low,
+                                "Higher score should predict >= lower score")
+
+    def test_predictor_state_survives_reinit(self) -> None:
+        """Trained state persists in store and can be loaded by new instance."""
+        self.seed_briefs(10)
+        p1 = PerformancePredictor(self.store)
+        p1.train()
+        p2 = PerformancePredictor(self.store)
+        quality = p2.get_quality()
+        self.assertEqual(quality["status"], "trained")
+        self.assertIsNotNone(quality["mae"])
+        self.assertIsNotNone(quality["r2"])
+
+    def test_predictor_logs_learning_run(self) -> None:
+        """Training creates predictor_training audit log."""
+        self.seed_briefs(10)
+        PerformancePredictor(self.store).train()
+        runs = self.store.get_learning_runs(run_type="predictor_training")
+        self.assertGreaterEqual(len(runs), 1)
+
+    def test_predictor_untrained_quality(self) -> None:
+        """Untrained predictor returns status=untrained."""
+        p = PerformancePredictor(self.store)
+        q = p.get_quality()
+        self.assertEqual(q["status"], "untrained")
+        self.assertIsNone(q["mae"])
+
+    def test_predictor_save_predictor_state(self) -> None:
+        """save_predictor_state/get_predictor_state roundtrip."""
+        state = {"params": {"slope": 0.5, "intercept": 0.3}, "metrics": {"mae": 5.0}}
+        self.store.save_predictor_state(state)
+        loaded = self.store.get_predictor_state()
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["params"]["slope"], 0.5)
+        self.assertEqual(loaded["params"]["intercept"], 0.3)
+        self.assertEqual(loaded["metrics"]["mae"], 5.0)
+
+    def test_get_predictor_state_returns_none_when_empty(self) -> None:
+        """No predictor_state in DB → returns None."""
+        self.assertIsNone(self.store.get_predictor_state())
+
+    def test_predictor_detect_drift(self) -> None:
+        """detect_concept_drift returns False when untrained."""
+        p = PerformancePredictor(self.store)
+        self.assertFalse(p.detect_concept_drift())
+
+    def test_predictor_handles_score_bounds(self) -> None:
+        """Predict clamps score to [0, 1]."""
+        self.seed_briefs(10)
+        p = PerformancePredictor(self.store)
+        p.train()
+        r1 = p.predict(total_score=-0.5)
+        r2 = p.predict(total_score=1.5)
+        self.assertGreaterEqual(r1["predicted_engagement"], 0)
+        self.assertGreaterEqual(r2["predicted_engagement"], 0)
+
+    def test_predictor_does_not_mutate_store_on_predict_alone(self) -> None:
+        """predict() without train() should read, not write."""
+        self.seed_briefs(10)
+        p = PerformancePredictor(self.store)
+        # Predict without training first — uses defaults, no write
+        r = p.predict(total_score=0.5)
+        self.assertIn("predicted_engagement", r)
+        # No predictor_state should exist
+        self.assertIsNone(self.store.get_predictor_state())
+        # No predictor_training run either
+        runs = self.store.get_learning_runs(run_type="predictor_training")
+        self.assertEqual(len(runs), 0)
 
 
 if __name__ == "__main__":

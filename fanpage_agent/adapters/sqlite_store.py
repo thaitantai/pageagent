@@ -1191,6 +1191,31 @@ class UnifiedStore:
             result.append(entry)
         return result
 
+    def save_predictor_state(self, state: dict[str, Any]) -> None:
+        """Save or update predictor trained state (stored in learning_runs)."""
+        with self._conn() as conn:
+            # Remove previous predictor_state runs
+            conn.execute(
+                "DELETE FROM learning_runs WHERE run_type = 'predictor_state'"
+            )
+            conn.execute(
+                "INSERT INTO learning_runs (run_type, summary) VALUES (?, ?)",
+                ("predictor_state", json.dumps(state, ensure_ascii=False)),
+            )
+
+    def get_predictor_state(self) -> dict[str, Any] | None:
+        """Get latest predictor trained state."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT summary FROM learning_runs WHERE run_type='predictor_state' ORDER BY executed_at DESC LIMIT 1"
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["summary"])
+        except (json.JSONDecodeError, TypeError):
+            return None
+
     # ═══════════════════════════════════════════════════════════════
     # Topic performance (for DecayModel)
     # ═══════════════════════════════════════════════════════════════

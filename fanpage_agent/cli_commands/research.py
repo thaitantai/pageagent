@@ -206,6 +206,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
     from fanpage_agent.tools.research.learning_optimizer import (
         ConfidenceCalibrator,
         DecayModel,
+        PerformancePredictor,
         WeightOptimizer,
     )
 
@@ -216,6 +217,24 @@ def cmd_learn(args: argparse.Namespace) -> int:
         print("=== ⚖ Current Weights ===")
         for name, value in weights.items():
             print(f"  {name:30s} {value}")
+
+        # Show predictor quality
+        predictor = PerformancePredictor(store)
+        pq = predictor.get_quality()
+        if pq["status"] == "trained":
+            drift_warn = " ⚠️ DRIFT DETECTED" if pq["drift"] else ""
+            print(f"\n=== 🔮 Performance Predictor{drift_warn} ===")
+            print(f"  MAE: {pq['mae']} engagements")
+            print(f"  MAPE: {pq['mape']:.1%}")
+            print(f"  R²: {pq['r2']}")
+            print(f"  Samples: {pq['sample_count']}")
+            print(f"  Trained at: {pq['trained_at'][:19]}")
+            if pq.get("drift_message"):
+                print(f"  ⚠ {pq['drift_message']}")
+        else:
+            print(f"\n=== 🔮 Performance Predictor ===")
+            print(f"  {pq.get('message', 'Not trained yet.')}")
+
         runs = store.get_learning_runs(limit=5)
         if runs:
             print(f"\n=== 🧠 Recent Learning Runs ({len(runs)}) ===")
@@ -260,6 +279,10 @@ def cmd_learn(args: argparse.Namespace) -> int:
         decay = DecayModel(store)
         results["decay"] = decay.run()
 
+    if args.predict:
+        predictor = PerformancePredictor(store)
+        results["predict"] = predictor.train()
+
     print("=== 🧠 Self-Learning Cycle ===\n")
 
     if "optimize" in results:
@@ -290,5 +313,18 @@ def cmd_learn(args: argparse.Namespace) -> int:
         if dc.get("details"):
             for d_ in dc["details"][:10]:
                 print(f"   {d_['topic'][:35]:35s} {d_['days_since_update']:3d}d ago → factor {d_['decay_factor']}")
+
+    if "predict" in results:
+        pr = results["predict"]
+        if pr["status"] == "ok":
+            drift_warn = " ⚠️ DRIFT DETECTED" if pr.get("drift") else ""
+            print(f"✅ PerformancePredictor: trained ✓{drift_warn}")
+            print(f"   Model: log(eng+1) = {pr['params']['slope']} × score + {pr['params']['intercept']}")
+            print(f"   MAE: {pr['metrics']['mae']} eng  |  MAPE: {pr['metrics']['mape']:.1%}  |  R²: {pr['metrics']['r2']}")
+            print(f"   Samples: {pr['sample_count']}")
+            if pr.get("drift_message"):
+                print(f"   ⚠ {pr['drift_message']}")
+        else:
+            print(f"⏭ PerformancePredictor: {pr.get('reason', 'skipped')}")
 
     return 0
