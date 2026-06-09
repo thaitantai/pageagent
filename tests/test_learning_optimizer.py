@@ -19,6 +19,7 @@ from fanpage_agent.adapters.sqlite_store import UnifiedStore
 from fanpage_agent.tools.research.learning_optimizer import (
     ConfidenceCalibrator,
     DecayModel,
+    GoalWeightOptimizer,
     PerformancePredictor,
     WeightOptimizer,
     _exp_decay,
@@ -486,6 +487,166 @@ class PerformancePredictorTest(unittest.TestCase):
         # No predictor_training run either
         runs = self.store.get_learning_runs(run_type="predictor_training")
         self.assertEqual(len(runs), 0)
+
+
+class GoalWeightOptimizerTest(unittest.TestCase):
+    """GoalWeightOptimizer: per-goal weight adjustment based on variance."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp()
+        self.db_path = Path(self.tmp) / "test_goal_opt.db"
+        self.store = UnifiedStore(db_path=self.db_path)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def seed_goal_briefs(
+        self, goal_type: str, count: int = 5, high_eng: bool = True,
+    ) -> None:
+        """Seed briefs for a specific goal type with calendar + metrics."""
+        now = "2026-06-07T12:00:00+00:00"
+        published_at = "2026-06-07T10:00:00+00:00"
+        for i in range(count):
+            cal_id = f"gcal_{goal_type}_{i}"
+            topic = f"gtopic_{goal_type}_{i}"
+            # Assign topic to goal
+            self.store.set_topic_goal(topic, goal_type)
+            # Create calendar entry with matching topic
+            with self.store._conn() as conn:
+                conn.execute(
+                    """INSERT OR IGNORE INTO calendar
+                       (calendar_id, brand_id, date, pillar, objective, topic, angle,
+                        status, published_at)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (cal_id, "test", "2026-06-07", "education", goal_type, topic, "test",
+                     "published", published_at),
+                )
+            # Create brief with topic assigned to goal
+            score = 0.8 if high_eng else 0.3
+            self.store.save_research_brief(
+                generated_at=now, brand_id="test", topic=topic,
+                total_score=score, brand_relevance=score, novelty=score * 0.8,
+                content_potential=score, source_confidence=score,
+                fanpage_fit=score * 0.9, customer_value=score * 0.7,
+            )
+            # Mark published — find brief by topic
+            with self.store._conn() as conn:
+                brief_row = conn.execute(
+                    "SELECT id FROM research_briefs WHERE topic=? ORDER BY id DESC LIMIT 1",
+                    (topic,),
+                ).fetchone()
+            if brief_row:
+                self.store.mark_brief_published(brief_row["id"], cal_id)
+            # Record metrics
+            eng = 40 if high_eng else 5
+            self.store.record_post_metrics(
+                calendar_id=cal_id, reach=1000, engagements=eng,
+                leads=eng // 5, recorded_at=now,
+            )
+
+    def test_goal_optimizer_accepts_valid_goal_types(self) -> None:
+        """Goal types from store.GOAL_TYPES are accepted."""
+        optimizer = GoalWeightOptimizer(self.store)
+        for gt in ("reach", "engagement", "conversion", "balanced"):
+            result = optimizer.run(gt)
+            self.assertIn(result["status"], ("skipped", "ok", "no_change"))
+
+    def test_goal_optimizer_rejects_invalid_goal(self) -> None:
+        """Unknown goal type => skipped."""
+        result = GoalWeightOptimizer(self.store).run("invalid")
+        self.assertEqual(result["status"], "skipped")
+
+    def test_goal_optimizer_skips_without_data(self) -> None:
+        """No briefs for a goal type => skipped."""
+        result = GoalWeightOptimizer(self.store).run("reach")
+        self.assertEqual(result["status"], "skipped")
+        self.assertIn("insufficient data", result.get("reason", ""))
+
+    def test_goal_optimizer_generates_changes(self) -> None:
+        """With enough briefs, optimizer produces changes or no_change."""
+        self.seed_goal_briefs("reach", count=8, high_eng=True)
+        result = GoalWeightOptimizer(self.store).run("reach")
+        self.assertIn(result["status"], ("ok", "no_change"))
+
+    def test_goal_optimizer_does_not_affect_other_goals(self) -> None:
+        """Optimizing one goal leaves other goals' weights unchanged."""
+        self.seed_goal_briefs("conversion", count=8, high_eng=True)
+        w_before = self.store.get_weights_for_goal("balanced")
+        GoalWeightOptimizer(self.store).run("conversion")
+        w_after = self.store.get_weights_for_goal("balanced")
+        self.assertEqual(w_before, w_after,
+                         "Balanced weights changed after optimizing conversion")
+
+    def test_goal_optimizer_logs_to_learning_runs(self) -> None:
+        """Per-goal optimization creates an audit log."""
+        self.seed_goal_briefs("engagement", count=8, high_eng=True)
+        GoalWeightOptimizer(self.store).run("engagement")
+        runs = self.store.get_learning_runs(run_type="goal_weight_optimization_engagement")
+        self.assertGreaterEqual(len(runs), 1)
+        self.assertEqual(runs[0]["summary"].get("goal_type"), "engagement")
+
+    def test_goal_weight_limits_per_goal(self) -> None:
+        """Reach weights have higher novelty limit than conversion."""
+        from fanpage_agent.tools.research.learning_optimizer import _GOAL_WEIGHT_LIMITS
+        reach_limits = _GOAL_WEIGHT_LIMITS["reach"]
+        conv_limits = _GOAL_WEIGHT_LIMITS["conversion"]
+        # Reach has higher novelty max
+        self.assertGreater(reach_limits["novelty"][1], conv_limits["novelty"][1])
+        # Conversion has higher customer_value max
+        self.assertGreater(conv_limits["customer_value"][1], reach_limits["customer_value"][1])
+
+    def test_goal_weights_independent_in_store(self) -> None:
+        """Each goal type has its own weight set in the DB."""
+        # Change a weight for 'reach'
+        self.store.update_goal_weight("reach", "novelty", 0.25)
+        # Verify 'balanced' unchanged
+        bw = self.store.get_weights_for_goal("balanced")
+        self.assertNotAlmostEqual(bw.get("novelty", 0), 0.25, places=4)
+
+
+class GoalWeightStoreTest(unittest.TestCase):
+    """UnifiedStore methods for per-goal weight management."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp()
+        self.db_path = Path(self.tmp) / "test_goal_store.db"
+        self.store = UnifiedStore(db_path=self.db_path)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def test_get_goal_types_returns_all(self) -> None:
+        types = self.store.get_goal_types()
+        self.assertCountEqual(types, ["reach", "engagement", "conversion", "balanced"])
+
+    def test_get_weights_for_goal_returns_dict(self) -> None:
+        w = self.store.get_weights_for_goal("reach")
+        self.assertIn("brand_relevance", w)
+        self.assertIn("novelty", w)
+        self.assertGreater(w["novelty"], 0)
+
+    def test_update_goal_weight_persists(self) -> None:
+        self.store.update_goal_weight("reach", "novelty", 0.30)
+        w = self.store.get_weights_for_goal("reach")
+        self.assertAlmostEqual(w["novelty"], 0.30, places=4)
+
+    def test_set_and_get_topic_goal(self) -> None:
+        self.store.set_topic_goal("retinoid cho da dầu", "conversion")
+        goal = self.store.get_topic_goal("retinoid cho da dầu")
+        self.assertEqual(goal, "conversion")
+
+    def test_get_topic_goal_default(self) -> None:
+        goal = self.store.get_topic_goal("unknown_topic")
+        self.assertEqual(goal, "balanced")
+
+    def test_get_all_topic_goals(self) -> None:
+        self.store.set_topic_goal("topic_a", "reach")
+        self.store.set_topic_goal("topic_b", "engagement")
+        goals = self.store.get_all_topic_goals()
+        self.assertEqual(len(goals), 2)
+        goal_map = {g["topic"]: g["goal_type"] for g in goals}
+        self.assertEqual(goal_map["topic_a"], "reach")
+        self.assertEqual(goal_map["topic_b"], "engagement")
 
 
 if __name__ == "__main__":

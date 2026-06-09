@@ -206,6 +206,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
     from fanpage_agent.tools.research.learning_optimizer import (
         ConfidenceCalibrator,
         DecayModel,
+        GoalWeightOptimizer,
         PerformancePredictor,
         WeightOptimizer,
     )
@@ -214,9 +215,20 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     if args.status:
         weights = store.get_weights()
-        print("=== ⚖ Current Weights ===")
+        print("=== ⚖ Global Weights ===")
         for name, value in weights.items():
             print(f"  {name:30s} {value}")
+
+        # Show per-goal weight summaries
+        goal_types = store.get_goal_types()
+        print(f"\n=== 🎯 Per-Goal Weights ({len(goal_types)} goals) ===")
+        for gt in goal_types:
+            gw = store.get_weights_for_goal(gt)
+            print(f"  [{gt}]")
+            for name in ("brand_relevance", "novelty", "content_potential",
+                         "source_confidence", "fanpage_fit", "customer_value"):
+                print(f"    {name:30s} {gw.get(name, 0):.4f}")
+            print(f"    {'evidence_confidence_floor':30s} {gw.get('evidence_confidence_floor', 0.45)}")
 
         # Show predictor quality
         predictor = PerformancePredictor(store)
@@ -240,6 +252,34 @@ def cmd_learn(args: argparse.Namespace) -> int:
             print(f"\n=== 🧠 Recent Learning Runs ({len(runs)}) ===")
             for r in runs:
                 print(f"  [{r['run_type']}] {r['executed_at'][:19]}")
+        return 0
+
+    if args.goal_types:
+        goal_types = store.get_goal_types()
+        print(f"=== 🎯 Registered Goal Types ({len(goal_types)}) ===")
+        for gt in goal_types:
+            gw = store.get_weights_for_goal(gt)
+            print(f"  [{gt}] novelty={gw.get('novelty', 0):.2f} brand={gw.get('brand_relevance', 0):.2f} "
+                  f"content={gw.get('content_potential', 0):.2f} conv={gw.get('customer_value', 0):.2f}")
+        return 0
+
+    if args.list_goals:
+        goals = store.get_all_topic_goals()
+        if not goals:
+            print("No topic → goal assignments yet.")
+            return 0
+        print(f"=== 🎯 Topic → Goal Assignments ({len(goals)}) ===")
+        for g in goals:
+            print(f"  {g['topic'][:40]:40s} → {g['goal_type']:15s} (updated {g['updated_at'][:19]})")
+        return 0
+
+    if args.set_goal:
+        topic, goal_type = args.set_goal
+        if goal_type not in store.GOAL_TYPES:
+            print(f"❌ Invalid goal type '{goal_type}'. Valid: {', '.join(store.GOAL_TYPES)}")
+            return 1
+        store.set_topic_goal(topic, goal_type)
+        print(f"✅ Topic '{topic}' assigned to goal '{goal_type}'")
         return 0
 
     if args.history:
@@ -267,9 +307,19 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     results: dict[str, Any] = {}
 
-    if args.optimize or args.all:
-        optimizer = WeightOptimizer(store)
-        results["optimize"] = optimizer.run()
+    if args.optimize or args.all or args.goal:
+        if args.goal:
+            # Per-goal optimization
+            optimizer = GoalWeightOptimizer(store)
+            results["optimize"] = optimizer.run(args.goal)
+        else:
+            # Global optimization
+            optimizer = WeightOptimizer(store)
+            results["optimize"] = optimizer.run()
+
+    # If --goal was used alone (without --optimize), make sure we print results
+    if args.goal and not args.optimize and not args.all and not args.calibrate and not args.decay and not args.predict:
+        pass  # results will be printed below
 
     if args.calibrate or args.all:
         calibrator = ConfidenceCalibrator(store)
@@ -287,8 +337,9 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     if "optimize" in results:
         opt = results["optimize"]
+        goal_label = f" [{opt.get('goal_type', 'global')}]" if opt.get("goal_type") else ""
         status_icon = "✅" if opt["status"] == "ok" else ("⏭" if opt["status"] == "no_change" else "⚠")
-        print(f"{status_icon} WeightOptimizer: {opt['status']}")
+        print(f"{status_icon} WeightOptimizer{goal_label}: {opt['status']}")
         if opt.get("changes"):
             for c in opt["changes"]:
                 d = c.get("delta", 0)

@@ -184,6 +184,25 @@ CREATE TABLE IF NOT EXISTS learning_runs (
     executed_at TEXT NOT NULL DEFAULT (datetime('now')),
     summary TEXT NOT NULL DEFAULT '{}'
 );
+
+-- Per-goal weights (multi-objective optimization)
+CREATE TABLE IF NOT EXISTS goal_weights (
+    goal_type TEXT NOT NULL,
+    weight_name TEXT NOT NULL,
+    current_weight REAL NOT NULL,
+    correlation_7d REAL NOT NULL DEFAULT 0,
+    correlation_30d REAL NOT NULL DEFAULT 0,
+    sample_since TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (goal_type, weight_name)
+);
+
+-- Topic → goal type assignment
+CREATE TABLE IF NOT EXISTS topic_goals (
+    topic TEXT PRIMARY KEY,
+    goal_type TEXT NOT NULL DEFAULT 'balanced',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -274,6 +293,47 @@ class UnifiedStore:
                        (weight_name, current_weight, correlation_7d, sample_since, updated_at)
                        VALUES (?, ?, 0, ?, ?)""",
                     (name, weight, now, now),
+                )
+            # Seed per-goal default weights
+            self._seed_goal_weights(conn, now)
+
+    @staticmethod
+    def _GOAL_WEIGHT_DEFAULTS() -> dict[str, dict[str, float]]:
+        return {
+            "reach": {
+                "brand_relevance": 0.22, "novelty": 0.20, "content_potential": 0.16,
+                "source_confidence": 0.12, "fanpage_fit": 0.14, "customer_value": 0.08,
+                "duplication_risk_penalty": 0.02, "evidence_confidence_floor": 0.45,
+                "engagement_baseline": 50.0,
+            },
+            "engagement": {
+                "brand_relevance": 0.26, "novelty": 0.14, "content_potential": 0.22,
+                "source_confidence": 0.16, "fanpage_fit": 0.16, "customer_value": 0.12,
+                "duplication_risk_penalty": 0.04, "evidence_confidence_floor": 0.45,
+                "engagement_baseline": 50.0,
+            },
+            "conversion": {
+                "brand_relevance": 0.26, "novelty": 0.10, "content_potential": 0.16,
+                "source_confidence": 0.18, "fanpage_fit": 0.16, "customer_value": 0.18,
+                "duplication_risk_penalty": 0.06, "evidence_confidence_floor": 0.50,
+                "engagement_baseline": 50.0,
+            },
+            "balanced": {
+                "brand_relevance": 0.25, "novelty": 0.16, "content_potential": 0.18,
+                "source_confidence": 0.14, "fanpage_fit": 0.14, "customer_value": 0.10,
+                "duplication_risk_penalty": 0.03, "evidence_confidence_floor": 0.45,
+                "engagement_baseline": 50.0,
+            },
+        }
+
+    def _seed_goal_weights(self, conn: sqlite3.Connection, now: str) -> None:
+        for goal_type, weights in self._GOAL_WEIGHT_DEFAULTS().items():
+            for name, weight in weights.items():
+                conn.execute(
+                    """INSERT OR IGNORE INTO goal_weights
+                       (goal_type, weight_name, current_weight, correlation_7d, sample_since, updated_at)
+                       VALUES (?, ?, ?, 0, ?, ?)""",
+                    (goal_type, name, weight, now, now),
                 )
 
     # ═══════════════════════════════════════════════════════════════
@@ -1152,6 +1212,155 @@ class UnifiedStore:
                 ),
             })
         return sorted(result, key=lambda x: abs(x["correlation"]), reverse=True)
+
+    # ═══════════════════════════════════════════════════════════════
+    # Per-goal weights (multi-objective optimization)
+    # ═══════════════════════════════════════════════════════════════
+
+    GOAL_TYPES = ("reach", "engagement", "conversion", "balanced")
+
+    def get_goal_types(self) -> list[str]:
+        """List registered goal types."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT goal_type FROM goal_weights ORDER BY goal_type"
+            ).fetchall()
+        return [r["goal_type"] for r in rows]
+
+    def get_weights_for_goal(self, goal_type: str) -> dict[str, float]:
+        """Get all weights for a specific goal type."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT weight_name, current_weight FROM goal_weights WHERE goal_type=?",
+                (goal_type,),
+            ).fetchall()
+        return {r["weight_name"]: r["current_weight"] for r in rows}
+
+    def update_goal_weight(
+        self, goal_type: str, weight_name: str, new_weight: float,
+        correlation_7d: float | None = None,
+        correlation_30d: float | None = None,
+    ) -> None:
+        """Update a single weight for a specific goal type."""
+        with self._conn() as conn:
+            sets = ["current_weight=?", "updated_at=?"]
+            params: list[Any] = [new_weight, datetime.now(timezone.utc).isoformat()]
+            if correlation_7d is not None:
+                sets.append("correlation_7d=?")
+                params.append(correlation_7d)
+            if correlation_30d is not None:
+                sets.append("correlation_30d=?")
+                params.append(correlation_30d)
+            params.extend([goal_type, weight_name])
+            conn.execute(
+                f"UPDATE goal_weights SET {', '.join(sets)} WHERE goal_type=? AND weight_name=?",
+                params,
+            )
+
+    def get_goal_weight_variance_analysis(self, goal_type: str) -> list[dict[str, Any]]:
+        """Analyze which weights need tuning for a specific goal type.
+
+        Filters briefs by topics assigned to the given goal.
+        """
+        briefs = self.get_brief_feedback_by_goal(goal_type, since_days=30)
+        if not briefs or len(briefs) < 3:
+            return []
+
+        weights = self.get_weights_for_goal(goal_type)
+        result = []
+        for weight_name in [
+            "brand_relevance", "novelty", "content_potential",
+            "source_confidence", "fanpage_fit", "customer_value",
+        ]:
+            scores = []
+            actuals: list[float] = []
+            for b in briefs:
+                sub = b.get(weight_name, 0)
+                act = b.get("engagements")
+                if act is None or act <= 0:
+                    continue
+                if sub > 0 and act > 0:
+                    scores.append(sub)
+                    actuals.append(float(act))
+            if len(scores) < 3:
+                continue
+            n = len(scores)
+            mean_s = sum(scores) / n
+            mean_a = sum(actuals) / n
+            num = sum((s - mean_s) * (a - mean_a) for s, a in zip(scores, actuals))
+            den = (
+                sum((s - mean_s) ** 2 for s in scores) ** 0.5
+                * sum((a - mean_a) ** 2 for a in actuals) ** 0.5
+            )
+            corr = round(num / den, 4) if den > 0 else 0
+            current_w = weights.get(weight_name, 0.15)
+            result.append({
+                "weight_name": weight_name,
+                "current_weight": current_w,
+                "correlation": corr,
+                "sample_size": n,
+                "goal_type": goal_type,
+                "suggested_adjustment": (
+                    "increase" if corr > 0.3 else
+                    "decrease" if corr < -0.05 else
+                    "stable"
+                ),
+            })
+        return sorted(result, key=lambda x: abs(x["correlation"]), reverse=True)
+
+    def get_brief_feedback_by_goal(
+        self, goal_type: str, since_days: int = 30,
+    ) -> list[dict[str, Any]]:
+        """Get scored briefs + actual performance for topics in a specific goal."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT rb.id, rb.topic, rb.total_score as brief_score,
+                          rb.brand_relevance, rb.novelty, rb.content_potential,
+                          rb.source_confidence, rb.fanpage_fit, rb.customer_value,
+                          pm.reach, pm.engagements,
+                          (CASE WHEN pm.reach > 0
+                                THEN CAST(pm.engagements AS REAL) / pm.reach
+                                ELSE 0 END) as actual_engagement_rate,
+                          rb.generated_at
+                   FROM research_briefs rb
+                   JOIN calendar c ON c.calendar_id = rb.calendar_id
+                   JOIN post_metrics pm ON pm.published_at = c.published_at
+                   JOIN topic_goals tg ON tg.topic = rb.topic
+                   WHERE rb.was_published = 1
+                     AND tg.goal_type = ?
+                     AND rb.generated_at >= datetime('now', ?)
+                   ORDER BY rb.generated_at DESC""",
+                (goal_type, f"-{since_days} days"),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def set_topic_goal(self, topic: str, goal_type: str) -> None:
+        """Assign a goal type to a topic."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO topic_goals
+                   (topic, goal_type, updated_at)
+                   VALUES (?, ?, ?)""",
+                (topic, goal_type, now),
+            )
+
+    def get_topic_goal(self, topic: str) -> str:
+        """Get a topic's goal type (default: 'balanced')."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT goal_type FROM topic_goals WHERE topic=?",
+                (topic,),
+            ).fetchone()
+        return row["goal_type"] if row else "balanced"
+
+    def get_all_topic_goals(self) -> list[dict[str, str]]:
+        """Get all topic → goal assignments."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT topic, goal_type, updated_at FROM topic_goals ORDER BY topic"
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # ═══════════════════════════════════════════════════════════════
     # Learning runs (self-learning audit)

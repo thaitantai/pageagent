@@ -607,7 +607,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── learn: self-learning cycle ─────────────────────────┬─
     learn_parser = subparsers.add_parser("learn", help="Run or inspect the self-learning cycle")
-    learn_parser.add_argument("--optimize", action="store_true", help="Adjust scoring weights")
+    learn_parser.add_argument("--optimize", action="store_true", help="Adjust scoring weights (global)")
+    learn_parser.add_argument("--goal", help="Optimize a specific goal type: reach, engagement, conversion, balanced")
+    learn_parser.add_argument("--set-goal", nargs=2, metavar=("TOPIC", "GOAL_TYPE"),
+                              help="Assign a goal type to a topic, e.g. --set-goal retinoid conversion")
+    learn_parser.add_argument("--list-goals", action="store_true", help="Show all topic → goal assignments")
+    learn_parser.add_argument("--goal-types", action="store_true", help="List registered goal types")
     learn_parser.add_argument("--calibrate", action="store_true", help="Calibrate confidence thresholds")
     learn_parser.add_argument("--decay", action="store_true", help="Apply time-decay to topic scores")
     learn_parser.add_argument("--predict", action="store_true", help="Train/evaluate performance predictor")

@@ -497,16 +497,28 @@ class ResearchTool:
             if affiliate_without_evidence:
                 risk_penalty += 0.18
                 content_potential = min(content_potential, 0.45)
-            # Load dynamic weights from UnifiedStore (fallback to defaults)
+            # Load dynamic weights from UnifiedStore — per-goal if available
             if self._unified_store is not None:
-                w = self._unified_store.get_weights()
-                w_brand = w.get("brand_relevance", 0.25)
-                w_novelty = w.get("novelty", 0.16)
-                w_content = w.get("content_potential", 0.18)
-                w_source = w.get("source_confidence", 0.14)
-                w_fit = w.get("fanpage_fit", 0.14)
-                w_customer = w.get("customer_value", 0.10)
-                w_dup = w.get("duplication_risk_penalty", 0.03)
+                # Determine topic's goal type and load corresponding weights
+                topic_goal = self._unified_store.get_topic_goal(topic)
+                if topic_goal != "balanced":
+                    goal_w = self._unified_store.get_weights_for_goal(topic_goal)
+                    w_brand = goal_w.get("brand_relevance", 0.25)
+                    w_novelty = goal_w.get("novelty", 0.16)
+                    w_content = goal_w.get("content_potential", 0.18)
+                    w_source = goal_w.get("source_confidence", 0.14)
+                    w_fit = goal_w.get("fanpage_fit", 0.14)
+                    w_customer = goal_w.get("customer_value", 0.10)
+                    w_dup = goal_w.get("duplication_risk_penalty", 0.03)
+                else:
+                    w = self._unified_store.get_weights()
+                    w_brand = w.get("brand_relevance", 0.25)
+                    w_novelty = w.get("novelty", 0.16)
+                    w_content = w.get("content_potential", 0.18)
+                    w_source = w.get("source_confidence", 0.14)
+                    w_fit = w.get("fanpage_fit", 0.14)
+                    w_customer = w.get("customer_value", 0.10)
+                    w_dup = w.get("duplication_risk_penalty", 0.03)
             else:
                 w_brand, w_novelty, w_content = 0.25, 0.16, 0.18
                 w_source, w_fit, w_customer = 0.14, 0.14, 0.10
