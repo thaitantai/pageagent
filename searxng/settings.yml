@@ -1,0 +1,50 @@
+# SearXNG settings for Fanpage Agent
+# Region: Vietnam / Language: Vietnamese
+use_default_settings: true
+
+general:
+  instance_name: "fanpage-searxng"
+  debug: false
+  privacypolicy_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "vi"
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "fanpage-searxng"  # Chỉ dùng local
+  limiter: false
+  image_proxy: false
+  # method: "GET"  # API-only
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  default_locale: vi
+  query_in_title: false
+
+engines:
+  # Google (tốt cho VN content)
+  - name: google
+    disabled: false
+
+  # DuckDuckGo (fallback)
+  - name: duckduckgo
+    disabled: false
+
+  # Bing (bổ sung - không gán language vì không hỗ trỡ 'vi')
+  - name: bing
+    disabled: false
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+  useragent_suffix: ""

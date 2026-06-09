@@ -1,6 +1,25 @@
 version: "3.9"
 
 services:
+  # ── SearXNG (meta search engine, self-hosted) ────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: fanpage-searxng
+    ports:
+      - "8899:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml
+      - ./searxng/limiter:/etc/searxng/limiter:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8899/
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+
   # ── Agent daemon (multi-agent, performance memory) ───────
   agent:
     image: fanpage-agent:latest
@@ -20,5 +39,7 @@ services:
     entrypoint: ["python", "-m", "fanpage_agent.main"]
     command: ["daemon", "--interval", "600"]
     restart: unless-stopped
+    depends_on:
+      - searxng
     profiles:
       - agent

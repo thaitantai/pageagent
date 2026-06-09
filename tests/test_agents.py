@@ -427,6 +427,7 @@ class TestResearchAgent:
         assert "crawl_source" in agent.capabilities
         assert "get_source_list" in agent.capabilities
 
+    @pytest.mark.slow
     def test_research_trends_returns_brief(self, agent):
         """Should return a structured brief even without Scrapling."""
         task = AgentTask(id="r1", target=AgentRole.RESEARCHER, action="research_trends",
@@ -437,6 +438,7 @@ class TestResearchAgent:
         assert "source_count" in result.data
         assert "finding_count" in result.data
 
+    @pytest.mark.slow
     def test_research_trends_with_specific_pillars(self, agent):
         """Should filter research to requested pillars."""
         task = AgentTask(id="r2", target=AgentRole.RESEARCHER, action="research_trends",
@@ -471,6 +473,7 @@ class TestResearchAgent:
         result = agent.process(task)
         assert not result.success
 
+    @pytest.mark.slow
     def test_brief_structure(self, agent):
         """Verify the brief has the expected schema (mocked fetch)."""
         with patch.object(agent, '_fetch_text', return_value="Vitamin C là một thành phần chống oxy hóa mạnh. "
@@ -488,6 +491,7 @@ class TestResearchAgent:
         # With mocked content, should find ingredient mentions
         assert len(brief["findings"]) > 0
 
+    @pytest.mark.slow
     def test_brief_includes_scrapling_lifecycle(self, agent):
         """Verify fetch attempts and graceful fallback."""
         # Mock fetch to sometimes succeed, sometimes fail
@@ -570,6 +574,7 @@ class TestResearchAgent:
 
     # ── Discovery + seen-articles tests ───────────────────────────
 
+    @pytest.mark.slow
     def test_seen_articles_tracker_accumulates(self, agent):
         """seen_articles should grow after research_trends calls."""
         task = AgentTask(id="seen1", target=AgentRole.RESEARCHER, action="research_trends",

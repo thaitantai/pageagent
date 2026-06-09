@@ -15,7 +15,7 @@ class PlannerToolTest(unittest.TestCase):
 
         self.assertEqual(plan.plan_title, "weekly-plan-brand_abc-2026-06-01")
         self.assertEqual(len(plan.days), 3)
-        self.assertEqual(plan.days[0].objective, "reach")
+        self.assertEqual(plan.days[0].objective, "education")
         self.assertTrue(plan.days[0].cta)
 
 

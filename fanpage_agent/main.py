@@ -553,7 +553,7 @@ def _run_roadmap_status() -> None:
                 section = "phase"
             elif line == "Viec can lam:":
                 section = "phase_tasks"
-            elif line == "## Uu tien thuc thi ngay":
+            elif line == "## Ưu tiên thực thi ngay":
                 current_phase = None
                 section = "priority"
             elif line == "## Tien do thuc thi":

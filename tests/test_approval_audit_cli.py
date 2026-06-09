@@ -109,7 +109,7 @@ class ApprovalAuditCliTest(unittest.TestCase):
             )
 
         payload = json.loads(completed.stdout)
-        self.assertEqual(payload["summary"]["total_items"], 4)
+        self.assertEqual(payload["summary"]["total_audited"], 4)
         self.assertEqual(payload["summary"]["pending"], 2)
         self.assertEqual(payload["summary"]["overdue_pending"], 1)
         self.assertEqual(payload["summary"]["approved"], 1)

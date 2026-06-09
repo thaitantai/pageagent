@@ -76,7 +76,9 @@ class Settings(BaseModel):
     llm_max_tokens: int = 1200
     llm_base_url: str = ""
     llm_api_key: str = ""
-    store_backend: str = "local"
+    store_backend: str = "sqlite"
+    # DEPRECATED: Google Sheets fields. Will be removed in a future release.
+    # Use backend='sqlite' (default) or 'local' instead.
     google_sheets_id: str = ""
     google_service_account_file: str = ""
     google_sheets_tabs_prefix: str = ""

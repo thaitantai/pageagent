@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import date, datetime, timezone
+
 from typing import Any, cast
 
 from fanpage_agent.adapters.store_factory import build_store
@@ -25,10 +25,9 @@ def build_calendar_store_payload(args: argparse.Namespace) -> dict:
         status=getattr(args, "status", None),
         approval_status=getattr(args, "approval_status", None),
         date=getattr(args, "date", None),
+        metrics_pending=getattr(args, "metrics_pending", False),
         limit=getattr(args, "limit", None),
     )
-    if getattr(args, "metrics_pending", False):
-        items = [i for i in items if not i.get("metrics_recorded", False)]
     if getattr(args, "score_variants", False):
         items = enrich_items_with_variant_scores(items, memory_db=args.memory_db)
     return {
@@ -39,35 +38,41 @@ def build_calendar_store_payload(args: argparse.Namespace) -> dict:
 
 def build_approval_audit_payload(args: argparse.Namespace) -> dict:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    store = build_store(settings=settings, args=args)
-    cutoff = datetime.fromisoformat(args.as_of).replace(tzinfo=timezone.utc).timestamp()
-    items = store.list_calendar_items(status="published", limit=args.limit)
-    audit_items = []
-    breached = 0
-    sla_seconds = args.sla_days * 86400
-    for item in items:
-        approved_at = cast(float, item.get("approved_at", 0))
-        published_at = cast(float, item.get("published_at", 0))
-        if not approved_at or not published_at:
-            continue
-        if published_at > cutoff:
-            continue
-        lag = published_at - approved_at
-        item = dict(item)
-        item["approval_lag_hours"] = round(lag / 3600, 1)
-        item["approval_lag_breach"] = lag > sla_seconds
-        if lag > sla_seconds:
-            breached += 1
-        audit_items.append(item)
+    rows = build_store(settings=settings, args=args).list_calendar_items()
+    as_of = date.fromisoformat(args.as_of)
+    pending: list[dict] = []
+    approved: list[dict] = []
+    rejected: list[dict] = []
+    overdue: list[dict] = []
+    for row in rows:
+        approval_status = row.get("approval_status", "") or "unknown"
+        if approval_status == "pending":
+            pending_item = dict(row)
+            basis = pending_item.get("last_updated") or pending_item.get("date") or args.as_of
+            days_pending = max((as_of - date.fromisoformat(basis[:10])).days, 0)
+            pending_item["days_pending"] = days_pending
+            pending.append(pending_item)
+            if days_pending > args.sla_days:
+                overdue.append(pending_item)
+        elif approval_status == "approved":
+            approved.append(row)
+        elif approval_status == "rejected":
+            rejected.append(row)
+    overdue.sort(key=lambda item: item.get("days_pending", 0), reverse=True)
+    if args.limit is not None:
+        overdue = overdue[: args.limit]
     return {
-        "audit_items": audit_items,
         "summary": {
-            "total_audited": len(audit_items),
-            "breached": breached,
-            "breach_rate": round(breached / max(len(audit_items), 1), 3),
+            "total_audited": len(rows),
+            "pending": len(pending),
+            "overdue_pending": len([item for item in pending if item.get("days_pending", 0) > args.sla_days]),
+            "approved": len(approved),
+            "rejected": len(rejected),
             "sla_days": args.sla_days,
             "as_of": args.as_of,
         },
+        "overdue_items": overdue,
+        "recent_rejections": rejected[-(args.limit or 5) :],
     }
 
 
@@ -77,7 +82,7 @@ def _publish_blockers_for_operator(calendar_items: list[dict]) -> list[dict]:
     for item in calendar_items:
         issues: list[str] = []
         if item.get("status") != "approved":
-            issues.append("not_approved")
+            issues.append("approval_status_not_approved")
         if float(item.get("scheduled_time", 0)) > now + 86400:
             issues.append("too_far_in_future")
         if not item.get("approved_by"):
@@ -87,7 +92,7 @@ def _publish_blockers_for_operator(calendar_items: list[dict]) -> list[dict]:
                 "calendar_id": item.get("calendar_id"),
                 "date": item.get("date"),
                 "pillar": item.get("pillar"),
-                "blockers": issues,
+                "reason_codes": issues,
             })
     return blockers
 
@@ -108,51 +113,71 @@ def build_operator_digest_payload(args: argparse.Namespace) -> dict:
     )
     metrics_items = store.list_calendar_items(
         status=getattr(args, "metrics_status", "published"),
+        metrics_pending=True,
         limit=getattr(args, "limit", None),
     )
-    metrics_pending = [i for i in metrics_items if not i.get("metrics_recorded", False)]
+    metrics_pending = metrics_items
 
     payload: dict[str, Any] = {
-        "calendar_pending": calendar_items,
-        "calendar_pending_count": len(calendar_items),
-        "triage_approved": triage_items,
-        "triage_approved_count": len(triage_items),
-        "metrics_pending": metrics_pending,
-        "metrics_pending_count": len(metrics_pending),
-        "publish_blockers": _publish_blockers_for_operator(calendar_items),
+        "summary": {
+            "pending_captions": len(calendar_items),
+            "approved_replies": len(triage_items),
+            "metrics_backlog": len(metrics_pending),
+            "publish_blockers": len(_publish_blockers_for_operator(calendar_items)),
+        },
+        "approval_queue": {"items": calendar_items},
+        "approved_replies": {"items": triage_items},
+        "metrics_backlog": {"items": metrics_pending},
+        "publish_blockers": {"items": _publish_blockers_for_operator(calendar_items)},
     }
     return payload
 
 
-# ── triage community ──────────────────────────────
-
 def cmd_triage_community(args: argparse.Namespace) -> int:
-    from fanpage_agent.tools.community_triage import CommunityTriageTool
-
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
-    tool = CommunityTriageTool(profile=profile, settings=settings)
-    result = tool.triage(comment_csv=args.comment_file, triage_csv=args.triage_file, write_store=args.write_store)
+
+    from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
+
+    result = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=args.comment_file)
     payload = result.model_dump(mode="json")
+
+    # Write to store (handles both local CSV and Google Sheets backends)
+    store = build_store(settings=settings, args=with_default_store_backend(args))
+    store.upsert_triage_items(brand_id=profile.brand_id, items=result.items)
+
     if args.save:
-        dump_json(settings.artifacts_dir / "community" / f"community-triage-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json", payload)
+        dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_deliver_triage_community(args: argparse.Namespace) -> int:
+    from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
+
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    store = build_store(settings=settings, args=args)
-    items = store.list_triage_items(
-        status=getattr(args, "status", None),
-        priority=getattr(args, "priority", None),
-        assigned_to=getattr(args, "assigned_to", None),
-        limit=getattr(args, "limit", None),
-    )
-    payload: dict[str, Any] = {"items": items, "summary": summarize_triage_items(items)}
+
+    if getattr(args, "from_store", False):
+        # Read from store directly (test path)
+        store = build_store(settings=settings, args=with_default_store_backend(args))
+        items = store.list_triage_items(
+            status=getattr(args, "status", None),
+            priority=getattr(args, "priority", None),
+            assigned_to=getattr(args, "assigned_to", None),
+            limit=getattr(args, "limit", None),
+        )
+        payload = {"items": items, "summary": summarize_triage_items(items)}
+    else:
+        # Triage comments first, write to store, then deliver
+        profile = load_brand_profile(args.brand_file)
+        result = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=args.comment_file)
+        payload = result.model_dump(mode="json")
+        store = build_store(settings=settings, args=with_default_store_backend(args))
+        store.upsert_triage_items(brand_id=profile.brand_id, items=result.items)
+
     payload["delivery"] = DeliveryTool(settings).deliver_community_triage(payload, chat_id=args.chat_id)
     if args.save:
-        dump_json(settings.artifacts_dir / "community" / "community-triage-delivered.json", payload)
+        dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -165,10 +190,10 @@ def cmd_deliver_approved_triage_replies(args: argparse.Namespace) -> int:
         assigned_to=getattr(args, "assigned_to", None),
         limit=getattr(args, "limit", None),
     )
-    payload = {"items": items}
+    payload = {"items": items, "summary": {"total_items": len(items)}}
     payload["delivery"] = DeliveryTool(settings).deliver_approved_triage_replies(payload, chat_id=args.chat_id)
     if args.save:
-        dump_json(settings.artifacts_dir / "community" / f"approved-triage-replies-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json", payload)
+        dump_json(settings.artifacts_dir / "community" / "approved-triage-replies.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -232,10 +257,9 @@ def cmd_deliver_metrics_backlog(args: argparse.Namespace) -> int:
         status=getattr(args, "status", "published"),
         approval_status=getattr(args, "approval_status", None),
         date=getattr(args, "date", None),
+        metrics_pending=getattr(args, "metrics_pending", False),
         limit=getattr(args, "limit", None),
     )
-    if getattr(args, "metrics_pending", False):
-        items = [i for i in items if not i.get("metrics_recorded", False)]
     payload: dict[str, Any] = {"items": items, "summary": summarize_calendar_items(items)}
     payload["delivery"] = DeliveryTool(settings).deliver_metrics_backlog(payload, chat_id=args.chat_id)
     if args.save:
@@ -247,18 +271,25 @@ def cmd_deliver_metrics_backlog(args: argparse.Namespace) -> int:
 def cmd_deliver_operator_digest(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     if getattr(args, "skip_empty", False):
-        items = build_store(settings=settings, args=with_default_store_backend(args)).list_calendar_items(
+        store = build_store(settings=settings, args=with_default_store_backend(args))
+        items = store.list_calendar_items(
             status=getattr(args, "calendar_status", "planned"),
             approval_status=getattr(args, "approval_status", "pending"),
             date=getattr(args, "date", None),
             limit=getattr(args, "limit", None),
         )
-        triage_items = build_store(settings=settings, args=with_default_store_backend(args)).list_triage_items(
+        triage_items = store.list_triage_items(
             status=getattr(args, "triage_status", "approved"),
             limit=getattr(args, "limit", None),
         )
         if not items and not triage_items:
-            print("ℹ️ No pending action items — skipping digest.")
+            payload = {
+                "summary": {"pending_captions": 0, "approved_replies": 0, "metrics_backlog": 0},
+                "delivery": {"sent_count": 0, "skipped": True, "reason": "empty_digest"},
+            }
+            if args.save:
+                dump_json(settings.artifacts_dir / "ops" / "operator-digest.json", payload)
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 0
     payload = build_operator_digest_payload(args)
     payload["delivery"] = DeliveryTool(settings).deliver_operator_digest(payload, chat_id=args.chat_id)
@@ -271,68 +302,53 @@ def cmd_deliver_operator_digest(args: argparse.Namespace) -> int:
 # ── resolve / reopen / approve / reject ─────────────
 
 def cmd_resolve_triage_item(args: argparse.Namespace) -> int:
-    payload = build_triage_store_payload(args)
-    items = payload["items"]
     resolved = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).resolve_triage_item(
         triage_id=args.triage_id,
         resolved_at=args.resolved_at,
         assigned_to=args.assigned_to,
-        items=items,
     )
     print(json.dumps(resolved, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_reopen_triage_item(args: argparse.Namespace) -> int:
-    payload = build_triage_store_payload(args)
-    items = payload["items"]
     reopened = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).reopen_triage_item(
         triage_id=args.triage_id,
         reopened_at=args.reopened_at,
         assigned_to=args.assigned_to,
-        items=items,
     )
     print(json.dumps(reopened, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_approve_triage_reply(args: argparse.Namespace) -> int:
-    payload = build_triage_store_payload(args)
-    items = payload["items"]
     approved = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).approve_triage_reply(
         triage_id=args.triage_id,
         approved_by=args.approved_by,
         approved_at=args.approved_at,
         assigned_to=args.assigned_to,
-        items=items,
     )
     print(json.dumps(approved, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_reject_triage_reply(args: argparse.Namespace) -> int:
-    payload = build_triage_store_payload(args)
-    items = payload["items"]
     rejected = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).reject_triage_reply(
         triage_id=args.triage_id,
         reason=args.reason,
         rejected_at=args.rejected_at,
         assigned_to=args.assigned_to,
-        items=items,
     )
     print(json.dumps(rejected, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_mark_triage_reply_sent(args: argparse.Namespace) -> int:
-    payload = build_triage_store_payload(args)
-    items = payload["items"]
     sent = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).mark_triage_reply_sent(
         triage_id=args.triage_id,
         sent_at=args.sent_at,
         reply_permalink=args.reply_permalink,
         assigned_to=args.assigned_to,
-        items=items,
     )
     print(json.dumps(sent, ensure_ascii=False, indent=2))
     return 0
@@ -341,13 +357,11 @@ def cmd_mark_triage_reply_sent(args: argparse.Namespace) -> int:
 def cmd_approve_caption(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=with_default_store_backend(args))
-    caption_path = Path(args.caption_file)
-    caption_payload = json.loads(caption_path.read_text(encoding="utf-8"))
-    updated = store.approve_caption(
+    updated = store.approve_calendar_item(
         calendar_id=args.calendar_id,
         approved_by=args.approved_by,
+        final_caption_ref=args.caption_file,
         approved_at=args.approved_at,
-        caption_payload=caption_payload,
     )
     print(json.dumps(updated, ensure_ascii=False, indent=2))
     return 0
@@ -356,7 +370,7 @@ def cmd_approve_caption(args: argparse.Namespace) -> int:
 def cmd_reject_caption(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=with_default_store_backend(args))
-    updated = store.reject_caption(
+    updated = store.reject_calendar_item(
         calendar_id=args.calendar_id,
         reason=args.reason,
         rejected_at=args.rejected_at,

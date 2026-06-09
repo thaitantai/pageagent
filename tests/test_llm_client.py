@@ -24,7 +24,7 @@ class MockLlmClientTest(unittest.TestCase):
 
     def test_factory_returns_mock_client_for_mock_provider(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        settings = Settings.from_env(env={}, root_dir=root, load_dotenv=False)
+        settings = Settings.from_env(env={"LLM_PROVIDER": "mock-local"}, root_dir=root, load_dotenv=False)
         client = build_llm_client(settings)
         self.assertIsInstance(client, MockLLMClient)
 
@@ -126,7 +126,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertNotIn("days", top_level_without_requirements)
         self.assertIn("array", prompt["requirements"]["days_output_must_be_array"].lower())
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_generates_weekly_plan_from_chat_completion(self, mock_urlopen) -> None:
         mock_urlopen.return_value = FakeHttpResponse(
             {
@@ -174,7 +174,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(body["response_format"]["type"], "json_object")
         self.assertTrue(request.full_url.endswith("/chat/completions"))
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_falls_back_to_next_candidate_after_no_endpoint_error(self, mock_urlopen) -> None:
         mock_urlopen.side_effect = [
             build_http_error(404, '{"error":{"message":"No endpoints found for gpt-test"}}'),
@@ -222,7 +222,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(first_body["model"], "gpt-test")
         self.assertEqual(second_body["model"], "fallback-a")
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_extracts_content_from_sse_chat_completion_chunks(self, mock_urlopen) -> None:
         content = json.dumps(
             {
@@ -268,7 +268,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(package.topic, "Da thiếu nước")
         self.assertEqual(package.variants[0].label, "A")
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_extracts_content_from_json_line_stream_chunks(self, mock_urlopen) -> None:
         first = '{"topic":"Da thiếu nước","variants":[{"label":"A","hook":"Hook A",'
         second = '"caption":"Caption A","cta":"Nhắn tin để được tư vấn routine phù hợp","tone_tags":["thực tế"],"visual_brief":"Brief A"}],"dos":["Do"],"donts":["Dont"]}'
@@ -293,7 +293,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(package.topic, "Da thiếu nước")
         self.assertEqual(package.variants[0].caption, "Caption A")
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_coerces_weekly_plan_string_notes_to_lists(self, mock_urlopen) -> None:
         mock_urlopen.return_value = FakeHttpResponse(
             {
@@ -335,7 +335,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(plan.strategy_notes, ["Giữ tone thực tế."])
         self.assertEqual(plan.gaps_or_assumptions, ["Giả định người đọc là khách hàng mới."])
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_retries_weekly_plan_after_invalid_days_shape(self, mock_urlopen) -> None:
         mock_urlopen.side_effect = [
             FakeHttpResponse(
@@ -398,7 +398,7 @@ class OpenAICompatibleClientTest(unittest.TestCase):
         self.assertEqual(plan.days[0].risk_notes, ["Không hứa hẹn kết quả tuyệt đối."])
         self.assertEqual(mock_urlopen.call_count, 2)
 
-    @patch("fanpage_agent.adapters.llm_client.urlopen")
+    @patch("fanpage_agent.adapters.llm.openai.urlopen")
     def test_openai_client_retries_caption_generation_after_invalid_json(self, mock_urlopen) -> None:
         mock_urlopen.side_effect = [
             FakeHttpResponse({"choices": [{"message": {"content": "not-json"}}]}),

@@ -5,7 +5,7 @@ import logging
 from scrapling.fetchers import Fetcher
 
 from fanpage_agent.models import TrendItem
-from fanpage_agent.scraping.web_search import WebSearchClient
+from fanpage_agent.scraping.multi_source_search import MultiSourceSearchClient
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +66,11 @@ class TrendScraper:
         self,
         sources: list[dict[str, str]] | None = None,
         timeout: int = 15,
-        web_search: WebSearchClient | None = None,
+        web_search: MultiSourceSearchClient | None = None,
     ):
         self.sources = sources or DEFAULT_TREND_SOURCES
         self.timeout = timeout
-        self._web_search = web_search or WebSearchClient()
+        self._web_search = web_search or MultiSourceSearchClient()
 
     # ------------------------------------------------------------------
     # Existing API (kế thừa)

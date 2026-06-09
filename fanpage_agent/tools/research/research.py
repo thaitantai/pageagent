@@ -4,6 +4,7 @@ import csv
 import json
 import logging
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +32,7 @@ from fanpage_agent.tools.research.product_topic_discovery import (
     ProductTopicCandidate,
 )
 from fanpage_agent.tools.research.research_insights import EvidenceExtractor, ResearchQualityGate
+from fanpage_agent.tools.research.search_query_builder import build_search_queries as _build_queries_smart
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,7 @@ class ResearchTool:
         offer_evaluator: OfferEvaluator | None = None,
         competitor_discovery: CompetitorPageDiscoveryTool | None = None,
         affiliate_registry: AffiliateRegistry | None = None,
+        topic_performance_store=None,
     ):
         self._trend_scraper = trend_scraper
         self._trend_analyzer = trend_analyzer
@@ -65,6 +68,20 @@ class ResearchTool:
                 self._affiliate_registry = _AffiliateRegistry()
             except Exception:
                 self._affiliate_registry = None
+        # Feedback loop: topic performance store (lazy init — UnifiedStore preferred)
+        self._topic_performance = topic_performance_store
+        self._unified_store = None
+        if self._topic_performance is None:
+            try:
+                from fanpage_agent.adapters.sqlite_store import UnifiedStore
+                self._unified_store = UnifiedStore()
+                self._topic_performance = self._unified_store
+            except Exception:
+                try:
+                    from fanpage_agent.tools.research.topic_performance import TopicPerformanceStore
+                    self._topic_performance = TopicPerformanceStore()
+                except Exception:
+                    self._topic_performance = None
 
     def build_brief(
         self,
@@ -158,10 +175,15 @@ class ResearchTool:
 
         if fetch_external_trends and self._trend_scraper:
             try:
-                # --- Bước 1: Web Search (nếu có WebSearchClient) ---
-                search_queries = self._build_search_queries(
-                    campaign_focus, top_performing_topics, web_search_queries,
+                # --- Bước 1: Web Search — sinh query thông minh từ mọi nguồn ---
+                search_queries = _build_queries_smart(
+                    campaign_focus=campaign_focus,
+                    top_performing_topics=top_performing_topics,
+                    override_queries=web_search_queries,
+                    product_topics=product_topics,
+                    frequent_questions=frequent_questions,
                     page_context=page_context,
+                    industry_focus=page_context.get("industry_focus") if page_context else None,
                 )
                 web_trends = self._trend_scraper.search_trends(
                     queries=search_queries,
@@ -332,6 +354,25 @@ class ResearchTool:
             recommendations.append(f"Đã đề xuất {len(product_topics)} topic dựa trên sản phẩm/vấn đề khách hàng.")
         if topic_scores:
             recommendations.append(f"Ưu tiên topic có điểm cao nhất: {topic_scores[0].topic}.")
+
+        # ── Feedback loop: save topic scores for later variance analysis ──
+        if self._unified_store is not None and topic_scores:
+            generated_at = datetime.now(timezone.utc).isoformat()
+            brand_id = (page_context or {}).get("brand_id", "")
+            for ts in topic_scores[:10]:
+                self._unified_store.save_research_brief(
+                    generated_at=generated_at,
+                    brand_id=brand_id,
+                    topic=ts.topic,
+                    total_score=ts.total_score,
+                    brand_relevance=ts.brand_relevance,
+                    novelty=ts.novelty,
+                    content_potential=ts.content_potential,
+                    source_confidence=ts.source_confidence,
+                    fanpage_fit=ts.fanpage_fit,
+                    customer_value=ts.customer_value,
+                )
+
         if quality_warnings:
             recommendations.append("Cần bổ sung nguồn trước khi Writer dùng các claim quan trọng.")
         if source_candidates:
@@ -356,55 +397,6 @@ class ResearchTool:
             source_documents=source_documents,
             source_candidates=source_candidates,
         )
-
-    def _build_search_queries(
-        self,
-        campaign_focus: list[str],
-        top_performing_topics: list[str],
-        override_queries: list[str] | None,
-        page_context: dict[str, Any] | None = None,
-    ) -> list[str]:
-        """Tự sinh search queries từ campaign focus + performance data.
-
-        Ưu tiên: override → campaign → top topics → fallback (theo niche).
-        Nếu không có dữ liệu và không biết niche → trả về [] để tránh search lạc đề.
-        """
-        if override_queries:
-            return override_queries
-
-        queries: list[str] = []
-        # Từ campaign focus
-        for cf in campaign_focus:
-            queries.append(f"xu hướng {cf} 2026")
-            queries.append(f"{cf} skincare review")
-            queries.append(f"{cf} mẹo làm đẹp")
-
-        # Từ top performing topics
-        for topic in top_performing_topics:
-            queries.append(f"{topic} mới nhất")
-            queries.append(f"{topic} xu hướng")
-
-        # Dedup
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for q in queries:
-            ql = q.lower().strip()
-            if ql not in seen:
-                seen.add(ql)
-                deduped.append(q)
-
-        # Fallback chỉ khi hoàn toàn không có query nào + biết niche
-        if not deduped:
-            industry = (page_context or {}).get("industry_focus", "").strip()
-            if industry:
-                deduped = [
-                    f"xu hướng {industry} 2026",
-                    f"{industry} mới nhất",
-                    f"mẹo {industry} hiệu quả",
-                ]
-            # Nếu không biết niche → trả về [] — search lạc đề còn tệ hơn không search
-
-        return deduped[:8]
 
     def _build_evidence(
         self,
@@ -505,18 +497,48 @@ class ResearchTool:
             if affiliate_without_evidence:
                 risk_penalty += 0.18
                 content_potential = min(content_potential, 0.45)
+            # Load dynamic weights from UnifiedStore (fallback to defaults)
+            if self._unified_store is not None:
+                w = self._unified_store.get_weights()
+                w_brand = w.get("brand_relevance", 0.25)
+                w_novelty = w.get("novelty", 0.16)
+                w_content = w.get("content_potential", 0.18)
+                w_source = w.get("source_confidence", 0.14)
+                w_fit = w.get("fanpage_fit", 0.14)
+                w_customer = w.get("customer_value", 0.10)
+                w_dup = w.get("duplication_risk_penalty", 0.03)
+            else:
+                w_brand, w_novelty, w_content = 0.25, 0.16, 0.18
+                w_source, w_fit, w_customer = 0.14, 0.14, 0.10
+                w_dup = 0.03
+
             total = max(0.0, (
-                brand_relevance * 0.25
-                + novelty * 0.16
-                + content_potential * 0.18
-                + source_confidence * 0.14
-                + fanpage_fit * 0.14
-                + customer_value * 0.10
-                + (1.0 - duplication_risk) * 0.03
+                brand_relevance * w_brand
+                + novelty * w_novelty
+                + content_potential * w_content
+                + source_confidence * w_source
+                + fanpage_fit * w_fit
+                + customer_value * w_customer
+                + (1.0 - duplication_risk) * w_dup
                 - risk_penalty
             ))
             if affiliate_without_evidence:
                 total = min(total, 0.49)
+
+            # Feedback loop: boost/penalty dựa vào variance (dự đoán vs thực tế)
+            if self._topic_performance is not None:
+                perf_boost = self._topic_performance.get_topic_boost(topic, default=0.0)
+                # Nếu có UnifiedStore, dùng variance analysis để điều chỉnh boost
+                if self._unified_store is not None:
+                    variance = self._unified_store.get_variance_summary()
+                    if variance["avg_variance"] > 0:
+                        # Model đang lạc quan thái quá → giảm boost
+                        perf_boost = max(0, perf_boost - variance["avg_variance"] * 0.3)
+                    elif variance["avg_variance"] < -0.05:
+                        # Model đang bi quan → tăng boost
+                        perf_boost = min(0.15, perf_boost + abs(variance["avg_variance"]) * 0.2)
+                total = min(1.0, total + perf_boost)
+
             rationale = self._topic_score_rationale(
                 topic=topic,
                 brand_relevance=brand_relevance,
@@ -543,28 +565,76 @@ class ResearchTool:
 
     @staticmethod
     def _keyword_overlap_score(topic: str, references: list[str]) -> float:
-        topic_words = {word for word in topic.lower().split() if len(word) >= 3}
-        if not topic_words or not references:
+        """Semantic overlap score using fuzzy string matching.
+
+        Uses difflib.SequenceMatcher for character-based similarity,
+        which handles partial matches, word order, and Vietnamese text
+        better than simple word-set overlap.
+
+        If rapidfuzz is installed, uses it for faster/better results.
+        """
+        if not topic or not references:
             return 0.0
-        best = 0.0
-        for reference in references:
-            ref_words = {word for word in reference.lower().split() if len(word) >= 3}
-            if ref_words:
-                best = max(best, len(topic_words & ref_words) / len(topic_words))
-        return min(1.0, best)
+        topic_lower = topic.lower().strip()
+        try:
+            from rapidfuzz import fuzz
+            scores = [
+                fuzz.token_sort_ratio(topic_lower, ref.lower()) / 100.0
+                for ref in references
+            ]
+        except ImportError:
+            from difflib import SequenceMatcher
+            scores = [
+                SequenceMatcher(None, topic_lower, ref.lower()).ratio()
+                for ref in references
+            ]
+        return min(1.0, max(scores))
 
     def _topic_source_confidence(self, topic: str, evidence: list[ResearchEvidence]) -> float:
-        topic_words = {word for word in topic.lower().split() if len(word) >= 3}
-        if not topic_words:
+        """Confidence score: semantic overlap between topic and evidence claims.
+
+        Uses rapidfuzz/difflib for fuzzy matching (handles word variations,
+        partial matches, and Vietnamese text better than word-set overlap).
+        """
+        if not topic or not evidence:
             return 0.0
-        matches = []
-        for item in evidence:
-            claim_words = {word for word in item.claim.lower().split() if len(word) >= 3}
-            if topic_words & claim_words:
-                matches.append(item.confidence)
-        if not matches:
+        topic_lower = topic.lower().strip()
+
+        # Use fuzzy matching like _keyword_overlap_score
+        try:
+            from rapidfuzz import fuzz
+            match_scores = [
+                fuzz.token_sort_ratio(topic_lower, item.claim.lower()) / 100.0
+                for item in evidence
+                if item.claim
+            ]
+        except ImportError:
+            from difflib import SequenceMatcher
+            match_scores = [
+                SequenceMatcher(None, topic_lower, item.claim.lower()).ratio()
+                for item in evidence
+                if item.claim
+            ]
+
+        if not match_scores:
             return 0.0
-        return min(1.0, sum(matches) / len(matches))
+
+        # Weight: higher fuzzy matches get more confidence
+        best = max(match_scores)
+        avg = sum(match_scores) / len(match_scores)
+
+        # Blend: 60% best match × evidence confidence, 40% average
+        # Only count evidence items that have at least some semantic overlap
+        meaningful = [
+            item.confidence
+            for i, item in enumerate(evidence)
+            if item.claim and match_scores[i] > 0.25
+        ]
+        if not meaningful:
+            meaningful = [0.0]
+
+        avg_confidence = sum(meaningful) / len(meaningful)
+        return min(1.0, best * 0.6 * avg_confidence + avg * 0.4)
 
     @staticmethod
     def _topic_score_rationale(

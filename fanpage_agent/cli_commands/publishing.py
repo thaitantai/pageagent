@@ -47,26 +47,39 @@ from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
 
 def _find_calendar_item_for_publish(store, calendar_id: str) -> dict | None:
     """Find a calendar item by ID."""
-    items = store.list_calendar_items(calendar_id=calendar_id)
+    items = store.list_calendar_items()
     if isinstance(items, list):
-        return items[0] if items else None
+        for item in items:
+            if item.get("calendar_id") == calendar_id:
+                return item
+        return None
     if isinstance(items, dict):
         return items
     return None
 
 
 def _build_publish_block_payload(calendar_id: str, row: dict | None) -> dict:
-    block_reasons: list[str] = []
+    approval_status = str((row or {}).get("approval_status", "missing") or "missing")
+    status = str((row or {}).get("status", "missing") or "missing")
+    final_caption_ref = str((row or {}).get("final_caption_ref", "") or "")
+    reason_codes: list[str] = []
     if row is None:
-        block_reasons.append("not_found")
-    else:
-        if row.get("approval_status") != "approved":
-            block_reasons.append("not_approved")
-        if not row.get("final_caption_ref"):
-            block_reasons.append("no_final_caption")
-        if row.get("status") in {"published", "posted"}:
-            block_reasons.append("already_published")
-    return {"calendar_id": calendar_id, "blocked": True, "reasons": block_reasons}
+        reason_codes.append("calendar_item_not_found")
+    if approval_status != "approved":
+        reason_codes.append("approval_status_not_approved")
+    if status in {"published", "posted"}:
+        reason_codes.append("already_published")
+    if not final_caption_ref:
+        reason_codes.append("missing_final_caption_ref")
+    return {
+        "blocked": True,
+        "action": "publish-post",
+        "calendar_id": calendar_id,
+        "reason_codes": reason_codes,
+        "approval_status": approval_status,
+        "status": status,
+        "next_step": "Run approve-caption first, then retry publish-post. Use --allow-unapproved only for manual recovery.",
+    }
 
 
 # ── research helpers ────────────────────────────────────────────────────
@@ -115,8 +128,8 @@ def cmd_deliver_research_brief(args: argparse.Namespace) -> int:
 
 
 def cmd_auto_content_cycle(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.auto_content import AutoContentOrchestrator
-    from fanpage_agent.services.writer import WriterService
+    from fanpage_agent.tools.content.auto_content import AutoContentOrchestrator
+    from fanpage_agent.tools.content.writer import WriterTool as WriterService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=args)
@@ -165,14 +178,14 @@ def cmd_auto_content_cycle(args: argparse.Namespace) -> int:
 
 
 def cmd_run_daily(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.daily_ops import DailyOpsService
-    from fanpage_agent.services.planner import PlannerService
-    from fanpage_agent.services.research_packet import (
+    from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool as DailyOpsService
+    from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
+    from fanpage_agent.tools.research.research_packet import (
         build_research_packet,
         packet_to_brief_payload,
         save_research_packet,
     )
-    from fanpage_agent.services.writer import WriterService
+    from fanpage_agent.tools.content.writer import WriterTool as WriterService
     from .research import build_daily_artifacts
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -229,14 +242,14 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
 
 
 def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.daily_ops import DailyOpsService
-    from fanpage_agent.services.planner import PlannerService
-    from fanpage_agent.services.research_packet import (
+    from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool as DailyOpsService
+    from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
+    from fanpage_agent.tools.research.research_packet import (
         build_research_packet,
         packet_to_brief_payload,
         save_research_packet,
     )
-    from fanpage_agent.services.writer import WriterService
+    from fanpage_agent.tools.content.writer import WriterTool as WriterService
     from .research import build_daily_artifacts
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -320,8 +333,8 @@ def cmd_publish_post(args: argparse.Namespace) -> int:
 
 
 def cmd_process_pending(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.auto_approval import AutoApprovalConfig, AutoApprovalEngine
-    from fanpage_agent.services.verifier import VerifierService
+    from fanpage_agent.tools.content.auto_approval import AutoApprovalConfig, AutoApprovalEngine
+    from fanpage_agent.tools.content.verifier import VerifierTool as VerifierService
 
     profile = load_brand_profile(args.brand_file)
     store = LocalSheetStore(
@@ -348,8 +361,8 @@ def cmd_process_pending(args: argparse.Namespace) -> int:
 
 
 def cmd_scheduled_publish(args: argparse.Namespace) -> int:
-    from fanpage_agent.services.scheduled_publish import ScheduledPublishService
-    from fanpage_agent.services.verifier import VerifierService
+    from fanpage_agent.tools.publishing.scheduled_publish import ScheduledPublishTool as ScheduledPublishService
+    from fanpage_agent.tools.content.verifier import VerifierTool as VerifierService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
@@ -363,7 +376,7 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
     if settings.fb_page_id and settings.fb_page_token:
         fb_client = FacebookClient(settings)
 
-    from fanpage_agent.tools.content.image_gen import ImageGenTool
+    from fanpage_agent.tools.content.image_gen import build_image_service as ImageGenTool
 
     image_service = ImageGenTool(settings)
 
@@ -384,7 +397,7 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
 
 def cmd_generate_image(args: argparse.Namespace) -> int:
     """Generate an image from a visual brief prompt."""
-    from fanpage_agent.tools.content.image_gen import ImageGenTool
+    from fanpage_agent.tools.content.image_gen import build_image_service as ImageGenTool
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
 
@@ -494,9 +507,9 @@ def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
 
 def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
     """Auto-detect and fill gaps in the content calendar."""
-    from fanpage_agent.services.calendar_gap_service import CalendarGapService
-    from fanpage_agent.services.planner import PlannerService
-    from fanpage_agent.services.writer import WriterService
+    from fanpage_agent.tools.publishing.calendar_gap_service import CalendarGapTool as CalendarGapService
+    from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
+    from fanpage_agent.tools.content.writer import WriterTool as WriterService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from fanpage_agent.core.types import ContentPackage, ContentVariant
-from fanpage_agent.legacy_cli import enrich_items_with_variant_scores
+from fanpage_agent.cli_commands.content import enrich_items_with_variant_scores
 from fanpage_agent.memory import PerformanceMemory
 from fanpage_agent.tools.publishing.telegram_formatter import TelegramFormatterTool
 

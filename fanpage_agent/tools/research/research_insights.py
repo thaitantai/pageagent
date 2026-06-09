@@ -188,28 +188,27 @@ class ResearchQualityGate:
         corroborated_claims = [item for item in sourced_claims if item.support_count >= 2]
         failed_fetches = [doc for doc in source_documents if doc.metadata.get("fetch_status") == "error"]
         dominant_source = self._dominant_source(evidence)
+        diverse_source_names = {item.source for item in evidence if item.evidence_type in {"source_claim", "external_source"}}
 
         if not external_trends and not source_documents:
             warnings.append("Không có external_trends hoặc source_documents; Research chỉ dựa vào dữ liệu nội bộ/operator.")
-        checkable_sources = {
-            item.source for item in evidence if item.source and item.evidence_type in {"source_claim", "external_source"}
-        }
-        if len(checkable_sources or source_names) < 2:
-            warnings.append("Evidence chưa đủ đa nguồn; cần thêm ít nhất 2 nguồn độc lập.")
-        if url_count == 0:
-            warnings.append("Evidence chưa có URL nguồn để Writer trích dẫn hoặc kiểm chứng.")
+        if len(diverse_source_names) < 2:
+            warnings.append("Chưa đủ nguồn độc lập; cần ít nhất 2 nguồn ngoài cho evidence claim.")
         if len(sourced_claims) < 2:
             warnings.append("Chưa có đủ claim cụ thể từ nguồn đã thu thập.")
-        if len(checkable_sources) >= 2 and not corroborated_claims:
+        if diverse_source_names and not corroborated_claims:
             warnings.append("Chưa có claim nào được corroborate bởi nguồn độc lập khác.")
+        if url_count < 2:
+            warnings.append("Cần ít nhất 2 URL nguồn để Writer trích dẫn hoặc kiểm chứng.")
         if failed_fetches:
             warnings.append(f"Có {len(failed_fetches)} nguồn fetch thất bại; đang dùng fallback metadata.")
         if dominant_source:
             warnings.append(f"Evidence phụ thuộc nhiều vào một nguồn: {dominant_source}.")
 
         confidence = self._confidence_score(evidence)
+        # Penalty: mỗi warning giảm 0.05 confidence
         if warnings:
-            confidence = round(max(0.0, confidence - min(0.2, len(warnings) * 0.04)), 3)
+            confidence = round(max(0.0, confidence - min(0.3, len(warnings) * 0.05)), 3)
         return ResearchQualityReport(confidence_score=confidence, warnings=warnings)
 
     @staticmethod
@@ -218,8 +217,9 @@ class ResearchQualityGate:
             return 0.0
         base_score = sum(item.confidence for item in evidence) / len(evidence)
         corroborated_count = sum(1 for item in evidence if item.support_count >= 2)
-        corroboration_bonus = min(0.08, corroborated_count * 0.01)
-        return round(min(1.0, base_score + corroboration_bonus), 3)
+        corroboration_bonus = min(0.06, corroborated_count * 0.008)
+        url_bonus = min(0.04, sum(1 for item in evidence if item.url) * 0.005)
+        return round(min(0.85, base_score + corroboration_bonus + url_bonus), 3)
 
     @staticmethod
     def _dominant_source(evidence: list[ResearchEvidence]) -> str:
@@ -227,6 +227,6 @@ class ResearchQualityGate:
         if len(checkable) < 3:
             return ""
         source, count = Counter(checkable).most_common(1)[0]
-        if count / len(checkable) >= 0.75:
+        if count / len(checkable) >= 0.6:
             return source
         return ""

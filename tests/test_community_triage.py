@@ -34,8 +34,9 @@ class CommunityTriageToolTest(unittest.TestCase):
         self.assertEqual(question_item.category, "question")
         self.assertEqual(question_item.priority, "normal")
         self.assertFalse(question_item.escalation_required)
-        self.assertTrue(question_item.requires_human_approval)
-        self.assertIn("không thay thế tư vấn chuyên môn", question_item.draft_reply.lower())
+        # Profile has comment_reply_requires_human_approval=false
+        self.assertFalse(question_item.requires_human_approval)
+        self.assertIn("#thamkhaoyte", question_item.draft_reply.lower())
 
         lead_item = payload.items[1]
         self.assertEqual(lead_item.category, "lead")

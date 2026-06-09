@@ -27,11 +27,11 @@ def _content_package_from_caption_item(
       topic, pillar, objective, brand_id, format, variants
     """
     package_data = {
-        "topic": item.get("topic", ""),
-        "pillar": item.get("pillar", ""),
-        "objective": item.get("objective", ""),
+        "package_id": item.get("calendar_id", item.get("package_id", "")),
         "brand_id": item.get("brand_id", "skincare_genz"),
-        "format": item.get("format", "post_short"),
+        "topic": item.get("topic", ""),
+        "scheduled_date": item.get("date", item.get("scheduled_date", "")),
+        "page_context": {"pillar": item.get("pillar", ""), "objective": item.get("objective", ""), "format": item.get("format", "post_short")},
     }
     # Extract variants from caption_ideas if present (CaptionItem)
     variants_data = item.get("variants", [])
@@ -44,6 +44,10 @@ def _content_package_from_caption_item(
             loaded_variants = json.load(f)
             if isinstance(loaded_variants, list):
                 variants_data = loaded_variants
+            elif isinstance(loaded_variants, dict):
+                file_variants = loaded_variants.get("variants") or loaded_variants.get("caption_ideas") or []
+                if file_variants:
+                    variants_data = file_variants
 
     variants = []
     for i, v in enumerate(variants_data):
@@ -51,14 +55,15 @@ def _content_package_from_caption_item(
             variants.append(v)
             continue
         variant_data = {
-            "variant_id": v.get("variant_id", f"v{i}"),
-            "caption_text": v.get("caption_text", v.get("text", v.get("caption", ""))),
-            "hashtags": v.get("hashtags", []),
+            "variant_id": v.get("variant_id") or v.get("label", f"v{i}"),
+            "topic": v.get("topic") or item.get("topic", ""),
+            "pillar": v.get("pillar") or item.get("pillar", ""),
+            "caption": v.get("caption_text") or v.get("caption", ""),
+            "hook": v.get("hook", ""),
+            "cta": v.get("cta", ""),
+            "format": v.get("format") or item.get("format", "post_short"),
+            "tone_tags": v.get("tone_tags", []),
             "visual_brief": v.get("visual_brief", ""),
-            "relevance_score": v.get("relevance_score", None),
-            "variant_scores": v.get("variant_scores", None),
-            "style": v.get("style", "casual"),
-            "tone": v.get("tone", "friendly"),
         }
         variants.append(ContentVariant(**variant_data))
     package_data["variants"] = variants
@@ -68,10 +73,11 @@ def _content_package_from_caption_item(
 def enrich_items_with_variant_scores(
     items: list[dict],
     memory_db: str | Path | None = None,
-) -> list[dict]:
-    """Calculate variant quality scores and attach to each item's variants."""
+) -> dict:
+    """Calculate variant quality scores and attach to each item's variants.
+    Mutates items in-place and returns a summary dict."""
     if not items:
-        return items
+        return {"scored_items": 0, "skipped_items": 0}
 
     from fanpage_agent.memory import PerformanceMemory
     from fanpage_agent.tools.research.variant_scorer import VariantScorer
@@ -79,20 +85,22 @@ def enrich_items_with_variant_scores(
     memory = PerformanceMemory(Path(memory_db) if memory_db else None)
     scorer = VariantScorer(memory)
 
-    enriched = []
+    scored = 0
     for item in items:
-        package = _content_package_from_caption_item(item)
-        scored_variants = scorer.score_variants(package)
+        caption_ref = item.get("draft_caption_ref") or item.get("caption_file")
+        package = _content_package_from_caption_item(item, variants_json_path=caption_ref)
+        if not package.variants:
+            continue
+        scored_variants = scorer.score_package(package)
         score_map = {
             sv.variant_id: {
                 "variant_id": sv.variant_id,
                 "score": sv.score,
-                "grade": sv.grade,
-                "explanation": sv.explanation,
+                "matched_patterns": len(sv.matched_patterns),
             }
             for sv in scored_variants
         }
-        item = dict(item)
+        item["variant_scores"] = list(score_map.values())
         new_variants = []
         for v in (item.get("variants") or item.get("caption_ideas") or []):
             v = dict(v) if isinstance(v, dict) else {"text": str(v)}
@@ -104,9 +112,14 @@ def enrich_items_with_variant_scores(
             item["variants"] = new_variants
         elif "caption_ideas" in item:
             item["caption_ideas"] = new_variants
-        enriched.append(item)
+        if package.winning_variant:
+            item["recommended_variant"] = {
+                "variant_id": package.winning_variant.variant_id,
+                "score": next((s.score for s in scored_variants if s.variant_id == package.winning_variant.variant_id), None),
+            }
+        scored += 1
 
-    return enriched
+    return {"scored_items": scored, "skipped_items": len(items) - scored}
 
 
 def cmd_write_caption(args: argparse.Namespace) -> int:

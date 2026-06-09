@@ -46,7 +46,7 @@ class ResearchInsightsTest(unittest.TestCase):
         report = ResearchQualityGate().evaluate(evidence=evidence, source_documents=[document])
 
         self.assertLess(report.confidence_score, evidence[0].confidence)
-        self.assertTrue(any("đa nguồn" in item for item in report.warnings))
+        self.assertTrue(any("nguồn độc lập" in item for item in report.warnings))
         self.assertTrue(any("fetch thất bại" in item for item in report.warnings))
 
     def test_marks_claims_corroborated_by_independent_sources(self) -> None:

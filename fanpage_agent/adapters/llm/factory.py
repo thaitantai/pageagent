@@ -8,7 +8,7 @@ from fanpage_agent.adapters.llm.openai import OpenAICompatibleClient
 
 def build_llm_client(settings):
     """Build an LLM client based on provider config."""
-    if settings.llm_provider == "mock-local":
+    if settings.llm_provider in ("mock", "mock-local"):
         return MockLLMClient()
     if settings.llm_provider == "openai-compatible":
         return OpenAICompatibleClient(settings)

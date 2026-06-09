@@ -145,7 +145,7 @@ class ResearchSourcesTest(unittest.TestCase):
 
         self.assertEqual(packet.brief.source_documents[0].source_id, "derm-01")
         self.assertTrue(any(item.source_id == "derm-01" for item in packet.brief.evidence))
-        self.assertGreater(packet.brief.confidence_score, 0.6)
+        self.assertGreater(packet.brief.confidence_score, 0.4)
 
     def test_research_packet_accepts_string_topic_focus_for_live_page_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,12 +1,23 @@
+"""Store factory — build the right store backend.
+
+Supports:
+- local  → LocalSheetStore (CSV files, legacy)
+- sqlite → UnifiedStore (SQLite, recommended)
+- google → GoogleSheetsStore (deprecated, will be removed)
+"""
 from __future__ import annotations
 
-from fanpage_agent.adapters.google_sheets_store import GoogleSheetsStore
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
+from fanpage_agent.adapters.sqlite_store import UnifiedStore
 from fanpage_agent.config import Settings
 
 
 def build_store(settings: Settings, args=None):
     backend = getattr(args, "store_backend", None) or settings.store_backend
+
+    if backend == "sqlite":
+        return UnifiedStore()
+
     if backend == "local":
         local_dir = settings.artifacts_dir / "_local_store"
         calendar_file = getattr(args, "calendar_file", None) or (local_dir / "content_calendar.csv")
@@ -21,6 +32,9 @@ def build_store(settings: Settings, args=None):
             triage_csv=triage_file,
             hashtag_csv=hashtag_file,
         )
+
     if backend == "google":
+        from fanpage_agent.adapters.google_sheets_store import GoogleSheetsStore
         return GoogleSheetsStore(settings=settings)
+
     raise ValueError(f"Unsupported store backend: {backend}")

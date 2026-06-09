@@ -132,6 +132,7 @@ class ContentPackage:
     package_id: str
     brand_id: str
     scheduled_date: str
+    topic: str = ""
     scheduled_time: str | None = None
     variants: list[ContentVariant] = field(default_factory=list)
     page_id: str = ""

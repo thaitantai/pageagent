@@ -25,6 +25,10 @@ include = ["fanpage_agent*", "fanpage_cli*"]
 py-modules = ["agent", "config", "tools", "scheduler", "cli"]
 
 [tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (network-dependent), skipped by default",
+]
+addopts = "-m 'not slow' --tb=short"
 filterwarnings = [
     "ignore:The 'strip_cdata' option.*:DeprecationWarning",
 ]

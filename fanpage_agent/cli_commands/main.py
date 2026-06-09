@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 
 from .parser import build_parser
-from .research import cmd_research_brief, cmd_search_trends, cmd_research_trends
+from .research import cmd_research_brief, cmd_search_trends, cmd_research_trends, cmd_learn
 from .content import cmd_write_caption, cmd_generate_hashtags
 from .publishing import (
     cmd_plan_week,
@@ -162,6 +162,8 @@ def main() -> int:
         return cmd_fetch_fb_comments(args)
     if args.command == "fetch-fb-data":
         return cmd_fetch_fb_data(args)
+    if args.command == "learn":
+        return cmd_learn(args)
 
     # ── agent commands ──────────────────────────────────
     if args.command == "agent-tick":

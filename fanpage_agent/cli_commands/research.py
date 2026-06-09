@@ -5,6 +5,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
@@ -195,5 +196,99 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
         path = ROOT_DIR / "data" / f"research-trends-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
         dump_json(path, report)
         print(f"\n💾 Saved to {path}")
+
+    return 0
+
+
+def cmd_learn(args: argparse.Namespace) -> int:
+    """Run or inspect the Research Agent's self-learning cycle."""
+    from fanpage_agent.adapters.sqlite_store import UnifiedStore
+    from fanpage_agent.tools.research.learning_optimizer import (
+        ConfidenceCalibrator,
+        DecayModel,
+        WeightOptimizer,
+    )
+
+    store = UnifiedStore()
+
+    if args.status:
+        weights = store.get_weights()
+        print("=== ⚖ Current Weights ===")
+        for name, value in weights.items():
+            print(f"  {name:30s} {value}")
+        runs = store.get_learning_runs(limit=5)
+        if runs:
+            print(f"\n=== 🧠 Recent Learning Runs ({len(runs)}) ===")
+            for r in runs:
+                print(f"  [{r['run_type']}] {r['executed_at'][:19]}")
+        return 0
+
+    if args.history:
+        limit = min(50, max(1, args.history))
+        runs = store.get_learning_runs(limit=limit)
+        if not runs:
+            print("No learning runs recorded yet.")
+            return 0
+        print(f"=== 🧠 Last {len(runs)} Learning Runs ===")
+        for r in runs:
+            smry = r["summary"]
+            changes = smry.get("changes", []) if isinstance(smry, dict) else []
+            decayed = smry.get("decayed_count", 0) if isinstance(smry, dict) else 0
+            print(f"\n  [{r['id']}] {r['run_type']}")
+            print(f"       At: {r['executed_at'][:19]}")
+            if changes:
+                print(f"       Changes: {len(changes)} weights adjusted")
+                for c in changes[:5]:
+                    d = c.get("delta", 0)
+                    arrow = "▲" if d > 0 else "▼"
+                    print(f"         {c['weight_name']}: {c['from']} → {c['to']} ({arrow}{abs(d):.4f})")
+            if decayed:
+                print(f"       Decayed: {decayed} topics")
+        return 0
+
+    results: dict[str, Any] = {}
+
+    if args.optimize or args.all:
+        optimizer = WeightOptimizer(store)
+        results["optimize"] = optimizer.run()
+
+    if args.calibrate or args.all:
+        calibrator = ConfidenceCalibrator(store)
+        results["calibrate"] = calibrator.run()
+
+    if args.decay or args.all:
+        decay = DecayModel(store)
+        results["decay"] = decay.run()
+
+    print("=== 🧠 Self-Learning Cycle ===\n")
+
+    if "optimize" in results:
+        opt = results["optimize"]
+        status_icon = "✅" if opt["status"] == "ok" else ("⏭" if opt["status"] == "no_change" else "⚠")
+        print(f"{status_icon} WeightOptimizer: {opt['status']}")
+        if opt.get("changes"):
+            for c in opt["changes"]:
+                d = c.get("delta", 0)
+                arrow = "▲" if d > 0 else "▼"
+                print(f"   {c['weight_name']:30s} {c['from']} → {c['to']} ({arrow}{abs(d):.4f}) corr={c['correlation']:.3f}")
+        if "analysis_summary" in opt:
+            s = opt["analysis_summary"]
+            print(f"   ({s['total_weights_analyzed']} analyzed, {s['weights_adjusted']} adjusted)")
+
+    if "calibrate" in results:
+        cal = results["calibrate"]
+        status_icon = "✅" if cal["status"] == "ok" else ("⏭" if cal["status"] == "no_change" else "⚠")
+        print(f"{status_icon} ConfidenceCalibrator: {cal['status']}")
+        if cal.get("adjustments"):
+            for a in cal["adjustments"]:
+                print(f"   {a['target']}: {a['from']} → {a['to']} ({a['reason']})")
+
+    if "decay" in results:
+        dc = results["decay"]
+        status_icon = "✅" if dc["status"] == "ok" else ("⏭" if dc["status"] == "no_decay_needed" else "⚠")
+        print(f"{status_icon} DecayModel: {dc['status']} — {dc.get('decayed_topics', 0)}/{dc.get('total_topics', 0)} topics decayed")
+        if dc.get("details"):
+            for d_ in dc["details"][:10]:
+                print(f"   {d_['topic'][:35]:35s} {d_['days_since_update']:3d}d ago → factor {d_['decay_factor']}")
 
     return 0

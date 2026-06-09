@@ -212,10 +212,11 @@ class FacebookClient:
         return result
 
     def get_page_posts(
-        self, limit: int = 25, before: str = "", after: str = ""
+        self, limit: int = 25
     ) -> list[dict]:
         """Fetch recent posts from the page with insight fields.
 
+        Auto-paginates internally to collect up to *limit* posts.
         Returns a list of parsed insight dicts (same shape as
         get_post_insights).
         """
@@ -223,22 +224,39 @@ class FacebookClient:
             "id,message,created_time,permalink_url,shares,"
             "likes.limit(0).summary(true),comments.limit(0).summary(true)"
         )
-        params: dict = {
-            "fields": fields,
-            "limit": str(limit),
-            "access_token": self.settings.fb_page_token,
-        }
-        if before:
-            params["before"] = before
-        if after:
-            params["after"] = after
-        raw = self._request(
-            "GET",
-            f"/{self.api_version}/{self.page_id}/posts",
-            params=params,
-        )
-        data = raw.get("data", [])
-        return [self._parse_post_insights(item) for item in data]
+        all_posts: list[dict] = []
+        after_cursor: str | None = None
+        per_page = min(limit, 100)  # Graph API max per request
+
+        while len(all_posts) < limit:
+            params: dict = {
+                "fields": fields,
+                "limit": str(per_page),
+                "access_token": self.settings.fb_page_token,
+            }
+            if after_cursor:
+                params["after"] = after_cursor
+
+            raw = self._request(
+                "GET",
+                f"/{self.api_version}/{self.page_id}/posts",
+                params=params,
+            )
+            batch = raw.get("data", [])
+            if not batch:
+                break  # no more posts
+
+            all_posts.extend(self._parse_post_insights(item) for item in batch)
+
+            # Read next cursor from paging metadata
+            paging = raw.get("paging") or {}
+            cursors = paging.get("cursors") or {}
+            after_cursor = cursors.get("after")
+
+            if not after_cursor:
+                break  # no more pages
+
+        return all_posts[:limit]
 
     def get_comments(
         self, post_id: str, limit: int = 25

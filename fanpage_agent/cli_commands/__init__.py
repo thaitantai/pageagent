@@ -32,6 +32,7 @@ from .research import (
     cmd_research_brief,
     cmd_search_trends,
     cmd_research_trends,
+    cmd_learn,
 )
 
 from .content import (
