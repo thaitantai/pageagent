@@ -551,6 +551,14 @@ class ResearchTool:
                         perf_boost = min(0.15, perf_boost + abs(variance["avg_variance"]) * 0.2)
                 total = min(1.0, total + perf_boost)
 
+            # Lifecycle boost: adjust score based on topic lifecycle stage
+            if self._unified_store is not None:
+                lc = self._unified_store.get_lifecycle_boost(topic)
+                total += lc["novelty_boost"]  # +0.10 for explore
+                total += lc["conversion_boost"]  # +0.08 for mature
+                total -= lc["penalty"]  # -0.30 for retire
+                total = max(0.0, min(1.0, total))
+
             rationale = self._topic_score_rationale(
                 topic=topic,
                 brand_relevance=brand_relevance,

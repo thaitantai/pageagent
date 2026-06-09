@@ -620,6 +620,10 @@ def build_parser() -> argparse.ArgumentParser:
     learn_parser.add_argument("--status", action="store_true", help="Show current weights + predictor quality + recent runs (no changes)")
     learn_parser.add_argument("--history", type=int, nargs="?", const=10, default=0,
                               help="Show last N learning runs")
+    learn_parser.add_argument("--lifecycle", action="store_true", help="Show topic lifecycle report")
+    learn_parser.add_argument("--set-lifecycle", nargs=2, metavar=("TOPIC", "STAGE"),
+                              help="Set topic lifecycle stage: explore, active, mature, retire")
+    learn_parser.add_argument("--auto-lifecycle", action="store_true", help="Run auto-transition scan")
 
     # ── fetch-fb-comments: pull real comments from FB API ─────
     fb_comment_parser = subparsers.add_parser("fetch-fb-comments")

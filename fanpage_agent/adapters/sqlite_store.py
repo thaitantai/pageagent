@@ -203,6 +203,17 @@ CREATE TABLE IF NOT EXISTS topic_goals (
     goal_type TEXT NOT NULL DEFAULT 'balanced',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Topic lifecycle tracking
+CREATE TABLE IF NOT EXISTS topic_lifecycle (
+    topic TEXT PRIMARY KEY,
+    stage TEXT NOT NULL DEFAULT 'explore',
+    entered_stage_at TEXT NOT NULL DEFAULT (datetime('now')),
+    first_published_at TEXT NOT NULL DEFAULT '',
+    last_published_at TEXT NOT NULL DEFAULT '',
+    total_posts INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -716,6 +727,41 @@ class UnifiedStore:
                 (topic, max(0, reach), max(0, engagements),
                  engagement_rate, engagement_rate,
                  datetime.now(timezone.utc).isoformat()),
+            )
+        # Also update lifecycle tracking (inline in same transaction)
+        lifecycle = conn.execute(
+            "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
+        ).fetchone()
+        now = datetime.now(timezone.utc).isoformat()
+        if not lifecycle:
+            conn.execute(
+                """INSERT INTO topic_lifecycle
+                   (topic, stage, entered_stage_at, first_published_at,
+                    last_published_at, total_posts, updated_at)
+                   VALUES (?, 'active', ?, ?, ?, 1, ?)""",
+                (topic, now, now, now, now),
+            )
+        else:
+            total = lifecycle["total_posts"] + 1
+            stage = lifecycle["stage"]
+            first_at = lifecycle["first_published_at"] or now
+
+            if stage == "retire":
+                new_stage = "active"
+            elif stage == "explore" and total >= 3:
+                new_stage = "active"
+            elif stage == "active" and total >= 8:
+                new_stage = "mature"
+            else:
+                new_stage = stage
+
+            entered = now if new_stage != stage else lifecycle["entered_stage_at"]
+            conn.execute(
+                """UPDATE topic_lifecycle
+                   SET stage=?, entered_stage_at=?, first_published_at=?,
+                       last_published_at=?, total_posts=?, updated_at=?
+                   WHERE topic=?""",
+                (new_stage, entered, first_at, now, total, now, topic),
             )
 
     def _mark_briefs_for_topic(
@@ -1361,6 +1407,220 @@ class UnifiedStore:
                 "SELECT topic, goal_type, updated_at FROM topic_goals ORDER BY topic"
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # ═══════════════════════════════════════════════════════════════
+    # Topic lifecycle
+    # ═══════════════════════════════════════════════════════════════
+
+    LIFE_CYCLE_STAGES = ("explore", "active", "mature", "retire")
+
+    def ensure_topic_lifecycle(self, topic: str) -> dict[str, Any]:
+        """Create lifecycle record if not exists, return current record."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
+            ).fetchone()
+            if not existing:
+                conn.execute(
+                    """INSERT INTO topic_lifecycle
+                       (topic, stage, entered_stage_at, updated_at)
+                       VALUES (?, 'explore', ?, ?)""",
+                    (topic, now, now),
+                )
+                existing = conn.execute(
+                    "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
+                ).fetchone()
+        return dict(existing) if existing else {"topic": topic, "stage": "explore"}
+
+    def get_topic_lifecycle(self, topic: str) -> dict[str, Any]:
+        """Get a topic's lifecycle record (auto-creates if missing)."""
+        return self.ensure_topic_lifecycle(topic)
+
+    def get_all_lifecycles(self) -> list[dict[str, Any]]:
+        """Get all lifecycle records, ordered by stage then last_published desc."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT * FROM topic_lifecycle
+                   ORDER BY
+                     CASE stage
+                       WHEN 'active' THEN 0
+                       WHEN 'explore' THEN 1
+                       WHEN 'mature' THEN 2
+                       WHEN 'retire' THEN 3
+                       ELSE 4
+                     END,
+                     last_published_at DESC"""
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def set_topic_stage(self, topic: str, stage: str) -> dict[str, Any]:
+        """Manually set a topic's lifecycle stage."""
+        if stage not in self.LIFE_CYCLE_STAGES:
+            raise ValueError(f"Invalid stage '{stage}'. Must be one of {self.LIFE_CYCLE_STAGES}")
+        now = datetime.now(timezone.utc).isoformat()
+        self.ensure_topic_lifecycle(topic)
+        with self._conn() as conn:
+            conn.execute(
+                """UPDATE topic_lifecycle
+                   SET stage=?, entered_stage_at=?, updated_at=?
+                   WHERE topic=?""",
+                (stage, now, now, topic),
+            )
+            row = conn.execute(
+                "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
+            ).fetchone()
+        return dict(row) if row else {"topic": topic, "stage": stage}
+
+    def record_topic_publish_for_lifecycle(self, topic: str) -> dict[str, Any]:
+        """Increment total_posts, update timestamps, apply auto-transition.
+
+        Auto-transition rules:
+        - explore → active  when total_posts >= 3
+        - active → mature   when total_posts >= 8
+        - retire → active   when being published again (revival)
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        self.ensure_topic_lifecycle(topic)
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
+            ).fetchone()
+            if not row:
+                return {"topic": topic, "stage": "explore"}
+
+            stage = row["stage"]
+            total = row["total_posts"] + 1
+            first_at = row["first_published_at"] or now
+
+            # Determine new stage based on auto-transition rules
+            if stage == "retire":
+                # Revival: publishing a retired topic moves it back to active
+                new_stage = "active"
+            elif stage == "explore" and total >= 3:
+                new_stage = "active"
+            elif stage == "active" and total >= 8:
+                new_stage = "mature"
+            else:
+                new_stage = stage
+
+            entered = now if new_stage != stage else row["entered_stage_at"]
+
+            conn.execute(
+                """UPDATE topic_lifecycle
+                   SET stage=?, entered_stage_at=?, first_published_at=?,
+                       last_published_at=?, total_posts=?, updated_at=?
+                   WHERE topic=?""",
+                (new_stage, entered, first_at, now, total, now, topic),
+            )
+            updated = conn.execute(
+                "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
+            ).fetchone()
+        return dict(updated) if updated else {"topic": topic, "stage": new_stage}
+
+    def auto_transition_lifecycles(self, force: bool = False) -> list[dict[str, Any]]:
+        """Scan all lifecycle records and apply inactivity-based transitions.
+
+        Rules:
+        - mature → retire  when last_published is empty or >60 days ago
+        - explore → retire when last_published is empty and created >90 days ago (never published)
+        - retire → explore when last_published is within 14 days (auto-revival detection)
+
+        Returns list of transitions applied.
+        """
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        transitions: list[dict[str, Any]] = []
+        records = self.get_all_lifecycles()
+
+        for rec in records:
+            topic = rec["topic"]
+            stage = rec["stage"]
+            new_stage = stage
+            reason = ""
+
+            last_pub = rec.get("last_published_at", "")
+            entered_at = rec.get("entered_stage_at", "")
+
+            if last_pub:
+                try:
+                    last_dt = datetime.fromisoformat(last_pub)
+                    days_since = (now - last_dt).days
+                except (ValueError, TypeError):
+                    days_since = 999
+            else:
+                days_since = 999
+
+            # Days since entering current stage (for explore→retire timeout)
+            if entered_at:
+                try:
+                    entered_dt = datetime.fromisoformat(entered_at)
+                    days_in_stage = (now - entered_dt).days
+                except (ValueError, TypeError):
+                    days_in_stage = 999
+            else:
+                days_in_stage = 999
+
+            if stage == "mature" and days_since > 60:
+                new_stage = "retire"
+                reason = f"inactive for {days_since}d (>60d threshold)"
+            elif stage == "explore" and days_in_stage > 90 and rec["total_posts"] == 0:
+                new_stage = "retire"
+                reason = f"never published in {days_in_stage}d (>90d threshold)"
+            elif stage == "retire" and days_since <= 14 and rec["total_posts"] > 0:
+                new_stage = "active"
+                reason = f"revived — published {days_since}d ago"
+
+            if new_stage != stage:
+                entered = now.isoformat()
+                with self._conn() as conn:
+                    conn.execute(
+                        """UPDATE topic_lifecycle
+                           SET stage=?, entered_stage_at=?, updated_at=?
+                           WHERE topic=?""",
+                        (new_stage, entered, entered, topic),
+                    )
+                transitions.append({
+                    "topic": topic,
+                    "from": stage,
+                    "to": new_stage,
+                    "reason": reason,
+                    "total_posts": rec["total_posts"],
+                    "days_since_last_publish": days_since,
+                })
+
+        return transitions
+
+    def get_lifecycle_boost(self, topic: str) -> dict[str, Any]:
+        """Get lifecycle-based scoring modifiers.
+
+        Returns dict with:
+        - stage: current lifecycle stage
+        - novelty_boost: extra novelty weight (explore gets +0.10)
+        - conversion_boost: extra conversion weight (mature gets +0.08)
+        - penalty: general score penalty (retire gets -0.30)
+        - frequency_mod: multiplier for suggested publish frequency
+        """
+        rec = self.ensure_topic_lifecycle(topic)
+        stage = rec["stage"]
+
+        base = {"stage": stage, "novelty_boost": 0.0, "conversion_boost": 0.0,
+                "penalty": 0.0, "frequency_mod": 1.0}
+
+        if stage == "explore":
+            base["novelty_boost"] = 0.10
+            base["frequency_mod"] = 2.0  # publish less often in explore
+        elif stage == "active":
+            pass  # normal — no modifiers
+        elif stage == "mature":
+            base["conversion_boost"] = 0.08
+            base["frequency_mod"] = 1.5  # publish slightly less
+        elif stage == "retire":
+            base["penalty"] = 0.30
+            base["frequency_mod"] = 5.0  # strongly discourage
+
+        return base
 
     # ═══════════════════════════════════════════════════════════════
     # Learning runs (self-learning audit)

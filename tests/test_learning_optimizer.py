@@ -20,6 +20,7 @@ from fanpage_agent.tools.research.learning_optimizer import (
     ConfidenceCalibrator,
     DecayModel,
     GoalWeightOptimizer,
+    LifecycleManager,
     PerformancePredictor,
     WeightOptimizer,
     _exp_decay,
@@ -647,6 +648,162 @@ class GoalWeightStoreTest(unittest.TestCase):
         goal_map = {g["topic"]: g["goal_type"] for g in goals}
         self.assertEqual(goal_map["topic_a"], "reach")
         self.assertEqual(goal_map["topic_b"], "engagement")
+
+
+class LifecycleManagerTest(unittest.TestCase):
+    """LifecycleManager: topic stage transitions and lifecycle report."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp()
+        self.db_path = Path(self.tmp) / "test_lifecycle.db"
+        self.store = UnifiedStore(db_path=self.db_path)
+
+    def tearDown(self) -> None:
+        self.store.close()
+
+    def test_lifecycle_starts_at_explore(self) -> None:
+        """New topic starts at 'explore' stage."""
+        lc = self.store.ensure_topic_lifecycle("retinoid mới")
+        self.assertEqual(lc["stage"], "explore")
+        self.assertEqual(lc["total_posts"], 0)
+
+    def test_explore_to_active_after_3_posts(self) -> None:
+        """Publishing 3 times transitions explore → active."""
+        topic = "test topic explore"
+        for i in range(3):
+            self.store.record_topic_publish_for_lifecycle(topic)
+        lc = self.store.get_topic_lifecycle(topic)
+        self.assertEqual(lc["stage"], "active")
+        self.assertEqual(lc["total_posts"], 3)
+
+    def test_active_to_mature_after_8_posts(self) -> None:
+        """Publishing 8 times transitions active → mature."""
+        topic = "test topic mature"
+        for i in range(8):
+            self.store.record_topic_publish_for_lifecycle(topic)
+        lc = self.store.get_topic_lifecycle(topic)
+        self.assertEqual(lc["stage"], "mature")
+        self.assertEqual(lc["total_posts"], 8)
+
+    def test_retire_revives_to_active(self) -> None:
+        """Publishing a retired topic revives to active."""
+        topic = "test revival"
+        self.store.set_topic_stage(topic, "retire")
+        self.store.record_topic_publish_for_lifecycle(topic)
+        lc = self.store.get_topic_lifecycle(topic)
+        self.assertEqual(lc["stage"], "active")
+
+    def test_set_topic_stage_validates(self) -> None:
+        """Invalid stage raises ValueError."""
+        with self.assertRaises(ValueError):
+            self.store.set_topic_stage("topic", "invalid_stage")
+
+    def test_set_topic_stage_works(self) -> None:
+        """Manual stage setting overrides auto stage."""
+        topic = "manual topic"
+        self.store.ensure_topic_lifecycle(topic)
+        result = self.store.set_topic_stage(topic, "mature")
+        self.assertEqual(result["stage"], "mature")
+        lc = self.store.get_topic_lifecycle(topic)
+        self.assertEqual(lc["stage"], "mature")
+
+    def test_get_all_lifecycles(self) -> None:
+        """get_all_lifecycles returns all tracked topics."""
+        self.store.ensure_topic_lifecycle("topic_a")
+        self.store.ensure_topic_lifecycle("topic_b")
+        records = self.store.get_all_lifecycles()
+        self.assertGreaterEqual(len(records), 2)
+
+    def test_get_lifecycle_boost_explore(self) -> None:
+        """Explore topics get novelty boost + frequency penalty."""
+        self.store.ensure_topic_lifecycle("explore_topic")
+        boost = self.store.get_lifecycle_boost("explore_topic")
+        self.assertEqual(boost["stage"], "explore")
+        self.assertGreater(boost["novelty_boost"], 0)
+        self.assertGreater(boost["frequency_mod"], 1.0)
+
+    def test_get_lifecycle_boost_active(self) -> None:
+        """Active topics have no modifiers."""
+        topic = "active_topic"
+        self.store.set_topic_stage(topic, "active")
+        boost = self.store.get_lifecycle_boost(topic)
+        self.assertEqual(boost["novelty_boost"], 0.0)
+        self.assertEqual(boost["conversion_boost"], 0.0)
+        self.assertEqual(boost["penalty"], 0.0)
+        self.assertEqual(boost["frequency_mod"], 1.0)
+
+    def test_get_lifecycle_boost_mature(self) -> None:
+        """Mature topics get conversion boost."""
+        topic = "mature_topic"
+        self.store.set_topic_stage(topic, "mature")
+        boost = self.store.get_lifecycle_boost(topic)
+        self.assertGreater(boost["conversion_boost"], 0)
+
+    def test_get_lifecycle_boost_retire(self) -> None:
+        """Retired topics get penalty + strong frequency reduction."""
+        topic = "retired_topic"
+        self.store.set_topic_stage(topic, "retire")
+        boost = self.store.get_lifecycle_boost(topic)
+        self.assertGreater(boost["penalty"], 0)
+        self.assertGreaterEqual(boost["frequency_mod"], 3.0)
+
+    def test_lifecycle_report_structure(self) -> None:
+        """LifecycleManager.get_lifecycle_report returns expected structure."""
+        self.store.ensure_topic_lifecycle("report_topic")
+        report = LifecycleManager(self.store).get_lifecycle_report()
+        self.assertIn("total_topics", report)
+        self.assertIn("by_stage", report)
+        self.assertIn("explore", report["by_stage"])
+
+    def test_auto_transition_no_change_for_fresh(self) -> None:
+        """Fresh topics don't auto-transition."""
+        self.store.ensure_topic_lifecycle("fresh_topic")
+        trans = self.store.auto_transition_lifecycles()
+        self.assertEqual(len(trans), 0)
+
+    def test_recorded_publish_updates_lifecycle_inline(self) -> None:
+        """Publishing via record_post_metrics also updates lifecycle."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        # Create a calendar entry
+        with self.store._conn() as conn:
+            conn.execute(
+                """INSERT INTO calendar
+                   (calendar_id, brand_id, date, pillar, objective, topic,
+                    angle, status, published_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                ("cal_lc_1", "test", "2026-06-07", "education", "reach",
+                 "lifecycle_inline_test", "test", "published", now),
+            )
+        # Record metrics — triggers _record_topic_performance → lifecycle update
+        self.store.record_post_metrics(
+            calendar_id="cal_lc_1", reach=1000, engagements=50,
+            leads=10, recorded_at=now,
+        )
+        lc = self.store.get_topic_lifecycle("lifecycle_inline_test")
+        self.assertEqual(lc["total_posts"], 1)
+        self.assertIn(lc["stage"], ("explore", "active"))
+
+    def test_lifecycle_logs_learning_run(self) -> None:
+        """Auto-transition creates a learning run audit log."""
+        topic = "audit_topic"
+        self.store.set_topic_stage(topic, "mature")
+        # Ensure it has a last_published_at >60 days ago
+        from datetime import datetime, timedelta, timezone
+        old = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        with self.store._conn() as conn:
+            conn.execute(
+                """UPDATE topic_lifecycle
+                   SET last_published_at=?, entered_stage_at=?, total_posts=5
+                   WHERE topic=?""",
+                (old, old, topic),
+            )
+        manager = LifecycleManager(self.store)
+        result = manager.run()
+        if result["transition_count"] > 0:
+            runs = self.store.get_learning_runs(run_type="lifecycle_transition")
+            self.assertGreaterEqual(len(runs), 1)
+            self.assertIn("transitions", runs[0]["summary"])
 
 
 if __name__ == "__main__":

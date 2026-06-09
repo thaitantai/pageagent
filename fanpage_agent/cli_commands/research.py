@@ -213,6 +213,47 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     store = UnifiedStore()
 
+    if args.lifecycle:
+        from fanpage_agent.tools.research.learning_optimizer import LifecycleManager
+        report = LifecycleManager(store).get_lifecycle_report()
+        print("=== 🔄 Topic Lifecycle Report ===\n")
+        print(f"Total topics tracked: {report['total_topics']}\n")
+        for stage in ("explore", "active", "mature", "retire"):
+            entry = report["by_stage"][stage]
+            icon = {"explore": "🌱", "active": "✅", "mature": "💰", "retire": "⏹"}[stage]
+            print(f"  {icon} {stage.title()}: {entry['count']} topics")
+            for t in entry["topics"]:
+                posts = t["total_posts"]
+                days_post = t["days_since_publish"]
+                days_stage = t["days_in_stage"]
+                last = t["last_published"] or "never"
+                print(f"      {t['topic'][:40]:40s} | {posts} posts | last {last} ({days_post}d ago)")
+        return 0
+
+    if args.set_lifecycle:
+        topic, stage = args.set_lifecycle
+        from fanpage_agent.adapters.sqlite_store import UnifiedStore
+        try:
+            result = store.set_topic_stage(topic, stage)
+            print(f"✅ Topic '{result['topic']}' set to stage '{result['stage']}'")
+            return 0
+        except ValueError as e:
+            print(f"❌ {e}")
+            return 1
+
+    if args.auto_lifecycle:
+        from fanpage_agent.tools.research.learning_optimizer import LifecycleManager
+        result = LifecycleManager(store).run()
+        if result["transitions"]:
+            print("=== 🔄 Auto Lifecycle Transitions ===\n")
+            for t in result["transitions"]:
+                arrow = "→"
+                print(f"  {t['topic'][:40]:40s} {t['from']} {arrow} {t['to']}")
+                print(f"      {t['reason']} ({t['total_posts']} posts)")
+        else:
+            print("⏭ No transitions needed.")
+        return 0
+
     if args.status:
         weights = store.get_weights()
         print("=== ⚖ Global Weights ===")
@@ -329,6 +370,11 @@ def cmd_learn(args: argparse.Namespace) -> int:
         decay = DecayModel(store)
         results["decay"] = decay.run()
 
+    # Lifecycle transition is always run as part of --all
+    if args.all:
+        from fanpage_agent.tools.research.learning_optimizer import LifecycleManager as _LifecycleManager
+        results["lifecycle"] = _LifecycleManager(store).run()
+
     if args.predict:
         predictor = PerformancePredictor(store)
         results["predict"] = predictor.train()
@@ -377,5 +423,13 @@ def cmd_learn(args: argparse.Namespace) -> int:
                 print(f"   ⚠ {pr['drift_message']}")
         else:
             print(f"⏭ PerformancePredictor: {pr.get('reason', 'skipped')}")
+
+    if "lifecycle" in results:
+        lc = results["lifecycle"]
+        icon = "🔄" if lc["transition_count"] > 0 else "⏭"
+        print(f"{icon} LifecycleManager: {lc['status']} — {lc['transition_count']} transitions")
+        if lc.get("transitions"):
+            for t in lc["transitions"]:
+                print(f"   {t['topic'][:35]:35s} {t['from']} → {t['to']} ({t['reason']})")
 
     return 0
