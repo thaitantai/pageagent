@@ -204,6 +204,34 @@ CREATE TABLE IF NOT EXISTS topic_goals (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Content Queue (Phase 4): draft → queued → approved/rejected → published
+CREATE TABLE IF NOT EXISTS content_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    calendar_id TEXT NOT NULL,
+    brand_id TEXT NOT NULL DEFAULT '',
+    caption_ref TEXT NOT NULL DEFAULT '',
+    caption_preview TEXT NOT NULL DEFAULT '',
+    topic TEXT NOT NULL DEFAULT '',
+    pillar TEXT NOT NULL DEFAULT '',
+    objective TEXT NOT NULL DEFAULT '',
+    queue_status TEXT NOT NULL DEFAULT 'queued',
+    approved_by TEXT NOT NULL DEFAULT '',
+    approved_at TEXT NOT NULL DEFAULT '',
+    rejected_reason TEXT NOT NULL DEFAULT '',
+    rejected_at TEXT NOT NULL DEFAULT '',
+    scheduled_for TEXT NOT NULL DEFAULT '',
+    batch_id TEXT NOT NULL DEFAULT '',
+    fb_post_id TEXT NOT NULL DEFAULT '',
+    fb_posted_at TEXT NOT NULL DEFAULT '',
+    fb_error TEXT NOT NULL DEFAULT '',
+    enqueued_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_queue_status ON content_queue(queue_status);
+CREATE INDEX IF NOT EXISTS idx_queue_calendar ON content_queue(calendar_id);
+CREATE INDEX IF NOT EXISTS idx_queue_batch ON content_queue(batch_id);
+CREATE INDEX IF NOT EXISTS idx_queue_scheduled ON content_queue(scheduled_for);
+
 -- Topic lifecycle tracking
 CREATE TABLE IF NOT EXISTS topic_lifecycle (
     topic TEXT PRIMARY KEY,
@@ -1704,6 +1732,241 @@ class UnifiedStore:
                 "UPDATE topic_performance SET avg_engagement_rate=? WHERE topic=?",
                 (new_avg_rate, topic),
             )
+
+    # ═══════════════════════════════════════════════════════════════
+    # Content Queue — Phase 4
+    # ═══════════════════════════════════════════════════════════════
+
+    def enqueue_calendar_item(
+        self,
+        calendar_id: str,
+        brand_id: str = "",
+        caption_ref: str = "",
+        caption_preview: str = "",
+        topic: str = "",
+        pillar: str = "",
+        objective: str = "",
+        scheduled_for: str = "",
+        batch_id: str = "",
+    ) -> dict[str, Any]:
+        """Add a calendar item to the content queue."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn() as conn:
+            # Upsert: if calendar_id already queued, update in place
+            existing = conn.execute(
+                "SELECT id FROM content_queue WHERE calendar_id=?", (calendar_id,)
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """UPDATE content_queue SET brand_id=?, caption_ref=?,
+                       caption_preview=?, topic=?, pillar=?, objective=?,
+                       scheduled_for=?, batch_id=?, updated_at=?
+                       WHERE calendar_id=?""",
+                    (brand_id, caption_ref, caption_preview, topic,
+                     pillar, objective, scheduled_for, batch_id, now, calendar_id),
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO content_queue
+                       (calendar_id, brand_id, caption_ref, caption_preview,
+                        topic, pillar, objective, scheduled_for, batch_id)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (calendar_id, brand_id, caption_ref, caption_preview,
+                     topic, pillar, objective, scheduled_for, batch_id),
+                )
+            row = conn.execute(
+                "SELECT * FROM content_queue WHERE calendar_id=?", (calendar_id,)
+            ).fetchone()
+        return dict(row) if row else {}
+
+    def list_content_queue(
+        self,
+        status: str | None = None,
+        brand_id: str | None = None,
+        topic: str | None = None,
+        pillar: str | None = None,
+        batch_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """List queue items with optional filters."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        if status:
+            conditions.append("queue_status = ?")
+            params.append(status)
+        if brand_id:
+            conditions.append("brand_id = ?")
+            params.append(brand_id)
+        if topic:
+            conditions.append("topic = ?")
+            params.append(topic)
+        if pillar:
+            conditions.append("pillar = ?")
+            params.append(pillar)
+        if batch_id:
+            conditions.append("batch_id = ?")
+            params.append(batch_id)
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        sql = f"SELECT * FROM content_queue{where} ORDER BY enqueued_at DESC{limit_clause}"
+        with self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def approve_queue_item(
+        self,
+        calendar_id: str,
+        approved_by: str = "admin",
+    ) -> dict[str, Any]:
+        """Approve a queued content item."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                """UPDATE content_queue SET queue_status='approved',
+                   approved_by=?, approved_at=?, updated_at=?
+                   WHERE calendar_id=? AND queue_status='queued'""",
+                (approved_by, now, now, calendar_id),
+            )
+            row = conn.execute(
+                "SELECT * FROM content_queue WHERE calendar_id=?", (calendar_id,)
+            ).fetchone()
+        return dict(row) if row else {}
+
+    def reject_queue_item(
+        self,
+        calendar_id: str,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        """Reject a queued content item."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                """UPDATE content_queue SET queue_status='rejected',
+                   rejected_reason=?, rejected_at=?, updated_at=?
+                   WHERE calendar_id=? AND queue_status='queued'""",
+                (reason, now, now, calendar_id),
+            )
+            row = conn.execute(
+                "SELECT * FROM content_queue WHERE calendar_id=?", (calendar_id,)
+            ).fetchone()
+        return dict(row) if row else {}
+
+    def mark_queue_item_published(
+        self,
+        calendar_id: str,
+        fb_post_id: str = "",
+        fb_error: str = "",
+    ) -> dict[str, Any]:
+        """Mark a queued item as published (or failed) after FB API call."""
+        now = datetime.now(timezone.utc).isoformat()
+        new_status = "published" if not fb_error else "failed"
+        with self._conn() as conn:
+            conn.execute(
+                """UPDATE content_queue SET queue_status=?,
+                   fb_post_id=?, fb_posted_at=?, fb_error=?, updated_at=?
+                   WHERE calendar_id=?""",
+                (new_status, fb_post_id, now, fb_error, now, calendar_id),
+            )
+            row = conn.execute(
+                "SELECT * FROM content_queue WHERE calendar_id=?", (calendar_id,)
+            ).fetchone()
+        return dict(row) if row else {}
+
+    def get_queue_stats(self) -> dict[str, Any]:
+        """Get queue statistics: counts by status."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT queue_status, COUNT(*) as cnt FROM content_queue GROUP BY queue_status"
+            ).fetchall()
+        stats: dict[str, int] = {}
+        for r in rows:
+            stats[r["queue_status"]] = r["cnt"]
+        return {
+            "queued": stats.get("queued", 0),
+            "approved": stats.get("approved", 0),
+            "rejected": stats.get("rejected", 0),
+            "published": stats.get("published", 0),
+            "failed": stats.get("failed", 0),
+            "total": sum(stats.values()),
+        }
+
+    def batch_approve_queue(
+        self,
+        status: str = "queued",
+        brand_id: str | None = None,
+        pillar: str | None = None,
+        topic: str | None = None,
+        approved_by: str = "admin",
+        limit: int | None = None,
+    ) -> dict[str, Any]:
+        """Batch-approve queue items matching filters."""
+        conditions = ["queue_status = ?"]
+        params: list[Any] = [status]
+        if brand_id:
+            conditions.append("brand_id = ?")
+            params.append(brand_id)
+        if pillar:
+            conditions.append("pillar = ?")
+            params.append(pillar)
+        if topic:
+            conditions.append("topic = ?")
+            params.append(topic)
+        now = datetime.now(timezone.utc).isoformat()
+        where = " AND ".join(conditions)
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        with self._conn() as conn:
+            # Get matching items first
+            matching = conn.execute(
+                f"SELECT calendar_id FROM content_queue WHERE {where}{limit_clause}", params
+            ).fetchall()
+            ids = [r["calendar_id"] for r in matching]
+            if not ids:
+                return {"approved_count": 0, "calendars": []}
+            # Update them
+            placeholders = ",".join("?" * len(ids))
+            conn.execute(
+                f"""UPDATE content_queue SET queue_status='approved',
+                   approved_by=?, approved_at=?, updated_at=?
+                   WHERE calendar_id IN ({placeholders})""",
+                [approved_by, now, now] + ids,
+            )
+        n = len(ids)
+        # Also update calendar table
+        for cal_id in ids:
+            with self._conn() as conn2:
+                conn2.execute(
+                    "UPDATE calendar SET approval_status='approved', updated_at=? WHERE calendar_id=?",
+                    (now, cal_id),
+                )
+        return {"approved_count": n, "calendars": ids}
+
+    def batch_publish_queue(
+        self,
+        brand_id: str | None = None,
+        pillar: str | None = None,
+        topic: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get all approved & unpublished queue items ready for FB publishing."""
+        conditions = ["queue_status = 'approved'"]
+        params: list[Any] = []
+        if brand_id:
+            conditions.append("brand_id = ?")
+            params.append(brand_id)
+        if pillar:
+            conditions.append("pillar = ?")
+            params.append(pillar)
+        if topic:
+            conditions.append("topic = ?")
+            params.append(topic)
+        where = " AND ".join(conditions)
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM content_queue WHERE {where} ORDER BY enqueued_at ASC{limit_clause}",
+                params,
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # ═══════════════════════════════════════════════════════════════
     # Export utilities

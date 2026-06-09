@@ -556,6 +556,169 @@ def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
     return 0 if result.error_count == 0 else 1
 
 
+# ── Content Queue handlers (Phase 4) ────────────────────────────
+
+
+def cmd_queue_show(args: argparse.Namespace) -> int:
+    """Show content queue with optional filters."""
+    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    queue_svc = ContentQueueTool(store=store)
+
+    result = queue_svc.show_queue(
+        status=args.status,
+        topic=args.topic,
+        pillar=args.pillar,
+        limit=args.limit,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    # Pretty-print stats to stderr
+    stats = result["stats"]
+    print(f"\n📊 Queue stats: {stats['queued']} queued | {stats['approved']} approved | "
+          f"{stats['rejected']} rejected | {stats['published']} published | "
+          f"{stats['failed']} failed | {stats['total']} total", file=sys.stderr)
+
+    items = result.get("items", [])
+    if not items:
+        print("📭 Queue is empty.", file=sys.stderr)
+        return 0
+    print(f"\n📋 Queue items ({len(items)}):", file=sys.stderr)
+    for item in items[:20]:
+        cid = item.get("calendar_id", "?")
+        s = item.get("queue_status", "?")
+        t = str(item.get("topic", "?"))[:40]
+        p = item.get("pillar", "?")
+        print(f"  [{s}] {t} ({p}) | {cid}", file=sys.stderr)
+    return 0
+
+
+def cmd_queue_enqueue(args: argparse.Namespace) -> int:
+    """Enqueue a calendar item into the content queue."""
+    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    queue_svc = ContentQueueTool(store=store)
+
+    result = queue_svc.enqueue_from_calendar(
+        calendar_id=args.calendar_id,
+        batch_id=args.batch_id or "",
+        scheduled_for=args.scheduled_for or "",
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result.get("enqueued") else 1
+
+
+def cmd_queue_approve(args: argparse.Namespace) -> int:
+    """Approve a queued item (single or batch)."""
+    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    queue_svc = ContentQueueTool(store=store)
+
+    if args.all or args.pillar or args.topic:
+        result = queue_svc.batch_approve(
+            pillar=args.pillar, topic=args.topic,
+            approved_by=args.approved_by or "admin",
+            limit=args.limit,
+        )
+    elif args.calendar_id:
+        result = queue_svc.approve_item(
+            calendar_id=args.calendar_id,
+            approved_by=args.approved_by or "admin",
+        )
+    else:
+        print("ERROR: Specify --calendar-id or --all / --pillar / --topic", file=sys.stderr)
+        return 1
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    approved = result.get("approved_count") or (1 if result.get("approved") else 0)
+    print(f"✅ Approved {approved} item(s)", file=sys.stderr)
+    return 0
+
+
+def cmd_queue_reject(args: argparse.Namespace) -> int:
+    """Reject a queued item (single or batch)."""
+    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    queue_svc = ContentQueueTool(store=store)
+
+    reason = args.reason or ""
+    if args.all or args.pillar or args.topic:
+        result = queue_svc.batch_reject(
+            pillar=args.pillar, topic=args.topic,
+            reason=reason, limit=args.limit,
+        )
+    elif args.calendar_id:
+        result = queue_svc.reject_item(
+            calendar_id=args.calendar_id, reason=reason,
+        )
+    else:
+        print("ERROR: Specify --calendar-id or --all / --pillar / --topic", file=sys.stderr)
+        return 1
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    rejected = result.get("rejected_count") or (1 if result.get("rejected") else 0)
+    print(f"⛔ Rejected {rejected} item(s)", file=sys.stderr)
+    return 0
+
+
+def cmd_queue_publish(args: argparse.Namespace) -> int:
+    """Publish approved queue items to Facebook."""
+    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
+    from fanpage_agent.adapters.facebook_client import FacebookClient
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+
+    fb_client: FacebookClient | None = None
+    if not args.dry_run:
+        try:
+            fb_client = FacebookClient(settings)
+        except Exception as exc:
+            print(f"⚠️  No FB client available: {exc}", file=sys.stderr)
+            print("Use --dry-run to preview without FB API.", file=sys.stderr)
+
+    queue_svc = ContentQueueTool(store=store, fb_client=fb_client, dry_run=args.dry_run)
+
+    if args.calendar_id:
+        result = queue_svc.publish_to_facebook(calendar_id=args.calendar_id)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result.get("published"):
+            print(f"✅ Published {args.calendar_id}", file=sys.stderr)
+        else:
+            print(f"❌ Failed: {result.get('error', 'unknown')}", file=sys.stderr)
+            return 1
+    else:
+        result = queue_svc.batch_publish_to_facebook(
+            pillar=args.pillar, topic=args.topic, limit=args.limit,
+        )
+        payload = result.to_dict()
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(f"✅ Published: {payload['published_count']} | "
+              f"❌ Failed: {payload['failed_count']} | "
+              f"⏭️ Skipped: {payload['skipped_count']}", file=sys.stderr)
+    return 0
+
+
+def cmd_queue_stats(args: argparse.Namespace) -> int:
+    """Show queue statistics only."""
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    store = build_store(settings=settings, args=args)
+    stats = store.get_queue_stats()
+    print(json.dumps(stats, ensure_ascii=False, indent=2))
+    print(f"\n📊 Queue: {stats['queued']} queued | {stats['approved']} approved | "
+          f"{stats['rejected']} rejected | {stats['published']} published | "
+          f"{stats['failed']} failed | {stats['total']} total", file=sys.stderr)
+    return 0
+
+
 def cmd_record_post_metrics(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     payload = build_store(settings=settings, args=args).record_post_metrics(

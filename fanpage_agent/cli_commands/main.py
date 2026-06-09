@@ -23,6 +23,13 @@ from .publishing import (
     cmd_record_post_metrics,
     cmd_weekly_report,
     cmd_deliver_weekly_report,
+    # Phase 4: Content Queue
+    cmd_queue_show,
+    cmd_queue_enqueue,
+    cmd_queue_approve,
+    cmd_queue_reject,
+    cmd_queue_publish,
+    cmd_queue_stats,
 )
 from .triage import (
     cmd_triage_community,
@@ -164,6 +171,20 @@ def main() -> int:
         return cmd_fetch_fb_data(args)
     if args.command == "learn":
         return cmd_learn(args)
+
+    # ── Content Queue commands (Phase 4) ──────────────────
+    if args.command == "queue-show":
+        return cmd_queue_show(args)
+    if args.command == "queue-enqueue":
+        return cmd_queue_enqueue(args)
+    if args.command == "queue-approve":
+        return cmd_queue_approve(args)
+    if args.command == "queue-reject":
+        return cmd_queue_reject(args)
+    if args.command == "queue-publish":
+        return cmd_queue_publish(args)
+    if args.command == "queue-stats":
+        return cmd_queue_stats(args)
 
     # ── agent commands ──────────────────────────────────
     if args.command == "agent-tick":
