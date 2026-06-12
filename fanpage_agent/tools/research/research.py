@@ -68,39 +68,69 @@ class ResearchTool:
         self._topic_discovery = topic_discovery or ProductAwareTopicDiscovery()
         self._offer_evaluator = offer_evaluator
         self._competitor_discovery = competitor_discovery or CompetitorPageDiscoveryTool()
-        self._competitor_learning = competitor_learning
-        if self._competitor_learning is None:
-            try:
-                from fanpage_agent.adapters.sqlite_store import UnifiedStore
-                store = UnifiedStore()
-                self._competitor_learning = CompetitorLearningEngine(
-                    discovery_tool=self._competitor_discovery,
-                    store=store,
-                )
-            except Exception:
-                self._competitor_learning = None
-        self._affiliate_registry = affiliate_registry
-        if self._affiliate_registry is None:
-            try:
-                from fanpage_agent.affiliate import AffiliateRegistry as _AffiliateRegistry
-
-                self._affiliate_registry = _AffiliateRegistry()
-            except Exception:
-                self._affiliate_registry = None
+        self._competitor_learning = (
+            competitor_learning
+            if competitor_learning is not None
+            else self._default_competitor_learning()
+        )
+        self._affiliate_registry = (
+            affiliate_registry
+            if affiliate_registry is not None
+            else self._default_affiliate_registry()
+        )
         # Feedback loop: topic performance store (lazy init — UnifiedStore preferred)
-        self._topic_performance = topic_performance_store
         self._unified_store = None
-        if self._topic_performance is None:
-            try:
-                from fanpage_agent.adapters.sqlite_store import UnifiedStore
-                self._unified_store = UnifiedStore()
-                self._topic_performance = self._unified_store
-            except Exception:
-                try:
-                    from fanpage_agent.tools.research.topic_performance import TopicPerformanceStore
-                    self._topic_performance = TopicPerformanceStore()
-                except Exception:
-                    self._topic_performance = None
+        if topic_performance_store is not None:
+            self._topic_performance = topic_performance_store
+        else:
+            self._topic_performance = self._default_topic_performance()
+
+    def _default_competitor_learning(self) -> CompetitorLearningEngine | None:
+        """Optional dependency — research still works without it, but the
+        operator must be able to see WHY it is missing."""
+        import sqlite3
+
+        try:
+            from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
+            return CompetitorLearningEngine(
+                discovery_tool=self._competitor_discovery,
+                store=UnifiedStore(),
+            )
+        except (ImportError, OSError, sqlite3.Error) as exc:
+            logger.warning("ResearchTool: competitor learning unavailable: %s", exc)
+            return None
+
+    @staticmethod
+    def _default_affiliate_registry() -> AffiliateRegistry | None:
+        try:
+            from fanpage_agent.affiliate import AffiliateRegistry as _AffiliateRegistry
+
+            return _AffiliateRegistry()
+        except (ImportError, OSError, ValueError) as exc:
+            logger.warning("ResearchTool: affiliate registry unavailable: %s", exc)
+            return None
+
+    def _default_topic_performance(self):
+        import sqlite3
+
+        try:
+            from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
+            self._unified_store = UnifiedStore()
+            return self._unified_store
+        except (ImportError, OSError, sqlite3.Error) as exc:
+            logger.warning(
+                "ResearchTool: UnifiedStore unavailable for topic performance"
+                " (%s), falling back to TopicPerformanceStore", exc,
+            )
+        try:
+            from fanpage_agent.tools.research.topic_performance import TopicPerformanceStore
+
+            return TopicPerformanceStore()
+        except (ImportError, OSError, sqlite3.Error) as exc:
+            logger.warning("ResearchTool: topic performance unavailable: %s", exc)
+            return None
 
     def build_brief(
         self,

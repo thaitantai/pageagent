@@ -142,9 +142,12 @@ class ScheduledPublishTool:
                                     "reason": f"Tone verification failed: {issues}",
                                 })
                                 continue
-                        except Exception:
+                        except Exception as exc:
                             # Fail open — if file is unreadable, publish anyway
-                            pass
+                            logger.warning(
+                                "Tone verification skipped for %s (unreadable caption %s): %s",
+                                calendar_id, caption_ref, exc,
+                            )
 
             # Publish it ───────────────────────────────────────────────
             published_at = item_date if item_date <= ref else ref
@@ -176,9 +179,12 @@ class ScheduledPublishTool:
                             # Use caption's visual_brief over row's if available
                             if variants[0].get("visual_brief"):
                                 visual_brief = variants[0]["visual_brief"]
-                    except Exception:
+                    except Exception as exc:
                         # Fail open — fall back to topic as message
-                        pass
+                        logger.warning(
+                            "Caption file unreadable for %s (%s), falling back to topic: %s",
+                            calendar_id, caption_file, exc,
+                        )
 
             # Generate image from visual_brief if service is available
             image_path: str | None = None

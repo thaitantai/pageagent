@@ -405,7 +405,11 @@ class AutoContentOrchestrator:
                         start_date=run_date,
                         days=1,
                     )
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Planner angle failed for gap '%s', dùng gap title làm angle: %s",
+                        gap.title, exc,
+                    )
                     plan = None
 
                 angle = plan.days[0].angle if plan and plan.days else gap.title

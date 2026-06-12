@@ -104,8 +104,11 @@ class ContentQueueTool:
                 if variants:
                     caption_preview = variants[0].get("caption_text", "") or variants[0].get("caption", "")
                     caption_preview = caption_preview[:200]
-            except (FileNotFoundError, json.JSONDecodeError, OSError):
-                pass
+            except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+                logger.warning(
+                    "Caption preview unavailable for %s (ref=%s): %s",
+                    calendar_id, caption_ref, exc,
+                )
 
         result = self.store.enqueue_calendar_item(
             calendar_id=calendar_id,
