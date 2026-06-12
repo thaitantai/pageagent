@@ -41,7 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
         if handler is not None:
             subparser.set_defaults(_handler=handler)
 
-    from fanpage_cli import sheets
+    from fanpage_cli import runtime, sheets
 
     sheets.register_subcommand(subparsers)
+    runtime.register_subcommand(subparsers)
     return parser

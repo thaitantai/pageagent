@@ -15,8 +15,12 @@ from fanpage_agent.cli_commands.main import HANDLERS
 from fanpage_agent.cli_commands.parser import build_parser as build_canonical_parser
 from fanpage_cli import build_parser as build_console_parser
 
-# Commands that intentionally exist only on the console script.
-CONSOLE_ONLY = {"init-sheets"}
+# Commands that exist only on the unified tree (not in the canonical
+# operational parser): the Google Sheets bootstrap + the 12 runtime
+# actions that used to be parsed inline by fanpage_agent.main.cli().
+from fanpage_cli.runtime import RUNTIME_ACTIONS
+
+CONSOLE_ONLY = {"init-sheets", *RUNTIME_ACTIONS}
 
 
 def _subparsers(parser: argparse.ArgumentParser) -> dict[str, argparse.ArgumentParser]:
