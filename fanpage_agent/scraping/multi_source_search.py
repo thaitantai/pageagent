@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from fanpage_agent.throttle import TokenBucket
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,19 +47,31 @@ class SearchBackend(ABC):
 
 
 class SearXNGBackend(SearchBackend):
-    """Search qua SearXNG self-hosted (http://localhost:8899)."""
+    """Search qua SearXNG self-hosted (xem Settings.searxng_base_url)."""
 
-    def __init__(self, base_url: str = "http://localhost:8899", timeout: int = 15):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8899",
+        timeout: int = 15,
+        requests_per_minute: int = 30,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._limiter = TokenBucket(capacity=requests_per_minute, window_sec=60.0)
+        self._client: Any | None = None  # lazy — one pooled httpx.Client per backend
 
     @property
     def name(self) -> str:
         return "searxng"
 
-    def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
+    def _http_client(self):
         import httpx
 
+        if self._client is None:
+            self._client = httpx.Client(timeout=self.timeout)
+        return self._client
+
+    def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
         params: dict[str, Any] = {
             "q": query,
             "format": "json",
@@ -65,11 +79,11 @@ class SearXNGBackend(SearchBackend):
             "categories": "general",
             "pageno": 1,
         }
+        self._limiter.acquire()
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                resp = client.get(f"{self.base_url}/search", params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            resp = self._http_client().get(f"{self.base_url}/search", params=params)
+            resp.raise_for_status()
+            data = resp.json()
         except Exception as exc:
             logger.warning("SearXNG backend thất bại [%s]: %s", query[:40], exc)
             return []
@@ -96,15 +110,20 @@ class SearXNGBackend(SearchBackend):
 class DDGBackend(SearchBackend):
     """DuckDuckGo search — fallback khi SearXNG không trả kết quả."""
 
-    def __init__(self, region: str = "vn-vn", timeout: int = 15):
+    def __init__(
+        self, region: str = "vn-vn", timeout: int = 15, requests_per_minute: int = 20
+    ):
         self.region = region
         self.timeout = timeout
+        # DDG là dịch vụ công cộng không có API key — giữ nhịp lịch sự
+        self._limiter = TokenBucket(capacity=requests_per_minute, window_sec=60.0)
 
     @property
     def name(self) -> str:
         return "ddg"
 
     def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
+        self._limiter.acquire()
         try:
             from ddgs import DDGS
             with DDGS() as ddgs:
