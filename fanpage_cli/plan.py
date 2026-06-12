@@ -53,6 +53,10 @@ def register_subcommand(subparsers) -> None:
     p.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE))
     p.add_argument("--save", action="store_true")
     p.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    p.add_argument("--scan-competitor", action="store_true",
+        help="Enable competitor page analysis (reads competitor_page_names from brand profile)")
+    p.add_argument("--competitor-pages", nargs="*",
+        help="Override competitor page names (space-separated, overrides config)")
     add_store_backend_arg(p)
     p.set_defaults(_handler=cmd_research_brief)
 

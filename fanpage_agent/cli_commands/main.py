@@ -9,6 +9,7 @@ from .publishing import (
     cmd_plan_week,
     cmd_deliver_research_brief,
     cmd_auto_content_cycle,
+    cmd_build_strategy,
     cmd_run_daily,
     cmd_deliver_daily_packet,
     cmd_publish_post,
@@ -155,6 +156,8 @@ def main() -> int:
         return cmd_auto_content_cycle(args)
     if args.command == "generate-hashtags":
         return cmd_generate_hashtags(args)
+    if args.command == "build-strategy":
+        return cmd_build_strategy(args)
     if args.command == "auto-fetch-metrics":
         return cmd_auto_fetch_metrics(args)
     if args.command == "hermes-cron-status":

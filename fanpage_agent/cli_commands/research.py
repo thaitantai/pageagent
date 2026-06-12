@@ -12,26 +12,77 @@ from fanpage_agent.config import Settings
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.web_search import WebSearchClient
+from fanpage_agent.tools.research.competitor_page_discovery import (
+    CompetitorPageDiscoveryTool,
+)
 from fanpage_agent.tools.research.research import ResearchTool
 from fanpage_agent.utils import dump_json
 
 from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
 
 
-def _build_research_service(timeout: int = 15) -> ResearchTool:
-    """Build ResearchTool với TrendScraper + WebSearchClient tích hợp."""
+def _build_research_service(
+    timeout: int = 15,
+) -> ResearchTool:
+    """Build ResearchTool với TrendScraper + WebSearchClient tích hợp.
+
+    Parameters
+    ----------
+    timeout : int
+        HTTP timeout for web scraping.
+    """
     web_search = WebSearchClient()
     scraper = TrendScraper(timeout=timeout, web_search=web_search)
-    return ResearchTool(trend_scraper=scraper)
+    # CompetitorPageDiscoveryTool tự tạo MultiSourceSearchClient khi cần
+    competitor_discovery = CompetitorPageDiscoveryTool()
+    return ResearchTool(
+        trend_scraper=scraper,
+        competitor_discovery=competitor_discovery,
+        # CompetitorLearningEngine lazy init bên trong ResearchTool.__init__
+    )
 
 
 def build_research_brief(args: argparse.Namespace):
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=with_default_store_backend(args))
-    return _build_research_service().build_brief(
+
+    # ── Competitor page scan ──
+    scan_competitor = getattr(args, "scan_competitor", False) or False
+    competitor_names: list[str] | None = None
+
+    if scan_competitor:
+        # Read competitor_page_names from page config (multi-page setup)
+        try:
+            page_config = settings.get_page_config(settings.fb_page_id)
+            competitor_names = list(page_config.competitor_page_names or [])
+        except Exception:
+            competitor_names = []
+
+        # Fallback: load from brand profile JSON (skincare_genz.json)
+        if not competitor_names:
+            try:
+                from fanpage_agent.loaders.brand_loader import load_brand_profile
+                brand_path = ROOT_DIR / "brand_profiles" / "skincare_genz.json"
+                if brand_path.exists():
+                    profile = load_brand_profile(brand_path)
+                    competitor_names = list(getattr(profile, "competitor_page_names", []) or [])
+            except Exception:
+                pass
+
+        # CLI override: --competitor-pages name1 name2 (vẫn dùng tên, ko phải FB ID)
+        cli_pages = getattr(args, "competitor_pages", None)
+        if cli_pages:
+            competitor_names = [
+                p.strip() for p in cli_pages if p.strip()
+            ]
+
+    rt = _build_research_service()
+    return rt.build_brief(
         store=store,
         comment_csv=args.comment_file,
         campaign_notes_file=args.campaign_file,
+        scan_competitor_pages=scan_competitor,
+        competitor_names=competitor_names,
     )
 
 
@@ -252,6 +303,36 @@ def cmd_learn(args: argparse.Namespace) -> int:
                 print(f"      {t['reason']} ({t['total_posts']} posts)")
         else:
             print("⏭ No transitions needed.")
+        return 0
+
+    if args.auto_discover:
+        from fanpage_agent.tools.research.competitor_learning_engine import CompetitorLearningEngine
+        from fanpage_agent.tools.research.competitor_page_discovery import CompetitorPageDiscoveryTool
+
+        discovery_tool = CompetitorPageDiscoveryTool()
+        engine = CompetitorLearningEngine(
+            discovery_tool=discovery_tool,
+            store=store,
+        )
+        result = engine.scan_auto_discover()
+        if result["status"] == "no_candidates":
+            print("⏭ No candidates ready for promotion yet.")
+        elif result["status"] == "promotion_failed":
+            print("⚠ Candidate promotion failed.")
+        else:
+            promoted = result.get("promoted", [])
+            print(f"✅ Promoted {len(promoted)} new competitors: {', '.join(promoted)}")
+            scan = result.get("scan", {})
+            if scan:
+                for name in promoted:
+                    profile = None
+                    for p in scan.get("profiles", []):
+                        if p.get("name", "").lower() == name.lower():
+                            profile = p
+                            break
+                    if profile:
+                        print(f"   {name}: {len(profile.get('products_detected', []))} products, "
+                              f"angle={profile.get('unique_angle', '?')}")
         return 0
 
     if args.status:

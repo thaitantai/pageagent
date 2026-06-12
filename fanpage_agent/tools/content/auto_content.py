@@ -61,6 +61,7 @@ class AutoContentReport:
     gaps: list[GapItem] = field(default_factory=list)
     proposals: list[DraftProposal] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    strategy: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +89,7 @@ class AutoContentReport:
                 for p in self.proposals
             ],
             "errors": self.errors,
+            "strategy": self.strategy,
         }
 
     def format_telegram(self, brand_name: str = "") -> str:
@@ -306,9 +308,10 @@ class AutoContentOrchestrator:
 
     Pipeline per cycle:
       1. Research — web search + scrape → ResearchBrief với trends
-      2. Gap analysis — so sánh trends vs published history → gaps
-      3. Draft — sinh caption cho top gaps (nếu có brand profile)
-      4. Report — tổng hợp + format Telegram
+      2. Strategist — research → strategy (pillar mix, ideas, gap fills)
+      3. Gap analysis — so sánh trends vs published history → gaps
+      4. Draft — sinh caption cho top gaps (nếu có brand profile)
+      5. Report — tổng hợp + format Telegram
     """
 
     def __init__(
@@ -316,10 +319,12 @@ class AutoContentOrchestrator:
         research_service: ResearchTool | None = None,
         writer_service: WriterTool | None = None,
         planner_service: PlannerTool | None = None,
+        strategist_service: Any = None,  # StrategistTool
     ) -> None:
         self.research = research_service or ResearchTool()
         self.writer = writer_service or WriterTool()
         self.planner = planner_service or PlannerTool()
+        self._strategist = strategist_service
 
     def run_cycle(
         self,
@@ -364,7 +369,20 @@ class AutoContentOrchestrator:
                 errors=errors,
             )
 
-        # ── 2. Gap analysis ──
+        # ── 2. Strategist: research → strategy ──
+        strategy_payload: dict[str, Any] = {}
+        if self._strategist and brand_profile:
+            try:
+                strategy = self._strategist.build_strategy(
+                    profile=brand_profile,
+                    research_brief=brief,
+                )
+                strategy_payload = strategy.model_dump(mode="json")
+            except Exception as exc:
+                logger.warning("Strategist step failed (non-fatal): %s", exc)
+                errors.append(f"Strategist: {exc}")
+
+        # ── 3. Gap analysis ──
         post_history = store.read_post_history(limit=90)  # type: ignore[union-attr]
 
         gaps = analyze_gaps(
@@ -434,6 +452,7 @@ class AutoContentOrchestrator:
             gaps=gaps,
             proposals=proposals,
             errors=errors,
+            strategy=strategy_payload,
         )
 
     @staticmethod

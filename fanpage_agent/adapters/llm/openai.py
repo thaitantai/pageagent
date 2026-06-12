@@ -13,6 +13,7 @@ from fanpage_agent.config import Settings
 from fanpage_agent.models import (
     BrandProfile,
     CaptionPackage,
+    ContentStrategy,
     ResearchBrief,
     WeeklyPlan,
 )
@@ -36,6 +37,7 @@ class OpenAICompatibleClient:
         start_date: str,
         days: int = 7,
         research_brief: ResearchBrief | None = None,
+        strategy: ContentStrategy | None = None,
     ) -> WeeklyPlan:
         payload = self._complete_json(
             system_prompt=self._weekly_plan_system_prompt(),

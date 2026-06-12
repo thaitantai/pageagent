@@ -104,6 +104,10 @@ def build_parser() -> argparse.ArgumentParser:
     research_parser.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE))
     research_parser.add_argument("--save", action="store_true")
     research_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
+    research_parser.add_argument("--scan-competitor", action="store_true",
+        help="Enable competitor page analysis (reads competitor_pages from brand profile)")
+    research_parser.add_argument("--competitor-pages", nargs="*",
+        help="Override competitor page IDs (space-separated, overrides config)")
     add_store_backend_arg(research_parser)
 
     # ── search-trends: web search + scrape ────────────────────
@@ -403,6 +407,15 @@ def build_parser() -> argparse.ArgumentParser:
     img_parser.add_argument("prompt", nargs="?", help="Visual brief text (reads from stdin if omitted)")
     img_parser.add_argument("--output", help="Output file path (auto-generates if omitted)")
 
+    # ── build-strategy: strategist tool ────────────────────────
+    strategy_parser = subparsers.add_parser("build-strategy")
+    strategy_parser.add_argument("--brand-file", required=True)
+    strategy_parser.add_argument("--research-file", help="Path to existing research brief JSON")
+    strategy_parser.add_argument("--build-research", action="store_true", help="Build fresh research brief instead of loading from file")
+    strategy_parser.add_argument("--save", action="store_true", help="Save strategy to artifacts")
+    strategy_parser.add_argument("--no-llm", action="store_true", help="Use mock strategy (no LLM calls)")
+    strategy_parser.add_argument("--store-backend", choices=["local", "google"])
+
     # ── list-calendar: browse content calendar items ──────────
     cal_list = subparsers.add_parser("list-calendar")
     cal_list.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
@@ -624,6 +637,8 @@ def build_parser() -> argparse.ArgumentParser:
     learn_parser.add_argument("--set-lifecycle", nargs=2, metavar=("TOPIC", "STAGE"),
                               help="Set topic lifecycle stage: explore, active, mature, retire")
     learn_parser.add_argument("--auto-lifecycle", action="store_true", help="Run auto-transition scan")
+    learn_parser.add_argument("--auto-discover", action="store_true",
+                              help="Auto-discover & promote competitor candidates")
 
     # ── fetch-fb-comments: pull real comments from FB API ─────
     fb_comment_parser = subparsers.add_parser("fetch-fb-comments")

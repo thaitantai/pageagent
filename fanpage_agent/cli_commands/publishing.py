@@ -38,6 +38,7 @@ from fanpage_agent.tools.research.research_packet import (
     save_research_packet,
 )
 from fanpage_agent.utils import dump_json
+from fanpage_agent.models import ResearchBrief
 
 from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
 
@@ -756,5 +757,58 @@ def cmd_deliver_weekly_report(args: argparse.Namespace) -> int:
     payload["delivery"] = DeliveryTool(settings).deliver_weekly_report(
         payload, chat_id=getattr(args, "chat_id", None)
     )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_build_strategy(args: argparse.Namespace) -> int:
+    """Build a content strategy from brand profile + optional research brief.
+
+    Runs StrategistTool to produce pillar mix, trend ideas, competitor gap fills.
+    Saves to artifacts if --save is set.
+    """
+    from fanpage_agent.tools.content.strategist import StrategistTool
+
+    settings = Settings.from_env(root_dir=ROOT_DIR)
+    profile = load_brand_profile(args.brand_file)
+    llm_client = build_llm_client(settings) if not args.no_llm else None
+    strategist = StrategistTool(llm_client=llm_client)
+
+    # Load research brief if available
+    research_brief: ResearchBrief | None = None
+    if args.research_file:
+        try:
+            data = json.loads(Path(args.research_file).read_text(encoding="utf-8"))
+            # ResearchPacket wrapper or raw ResearchBrief
+            brief_data = data.get("brief", data)
+            research_brief = ResearchBrief(**brief_data)
+        except Exception as exc:
+            print(f"⚠️  Could not load research brief: {exc}", file=sys.stderr)
+    elif args.build_research:
+        # Build fresh research brief
+        from .research import build_research_brief
+
+        store = build_store(settings=settings, args=args)
+        # We create dummy args to call build_research_brief
+        dummy_args = argparse.Namespace(
+            comment_file=None,
+            campaign_file=None,
+            scan_competitor=True,
+            competitor_pages=None,
+            store_backend="local",
+        )
+        research_brief = build_research_brief(dummy_args)
+        print("✅ Research brief built from live data.", file=sys.stderr)
+
+    strategy = strategist.build_strategy(profile=profile, research_brief=research_brief)
+    payload = strategy.model_dump(mode="json")
+
+    if args.save:
+        out_dir = settings.artifacts_dir / "strategies"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"strategy-{strategy.generated_at[:19].replace(':', '-')}.json"
+        dump_json(out_path, payload)
+        print(f"💾 Saved to {out_path}", file=sys.stderr)
+
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0

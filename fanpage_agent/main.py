@@ -211,7 +211,7 @@ def cli() -> None:
     runtime_actions = {
         "tick", "status", "daemon", "backup", "restore", "list-backups",
         "check-db", "harness-status", "roadmap-status", "research-standalone",
-        "page-status",
+        "page-status", "competitor-learn",
     }
     if len(sys.argv) > 1 and sys.argv[1] not in runtime_actions:
         raise SystemExit(legacy_cli_main())
@@ -266,6 +266,16 @@ def cli() -> None:
                        help="maximum product-aware topic candidates to include")
     parser.add_argument("--no-external-trends", action="store_true",
                        help="skip external trend fetch for deterministic/offline runs")
+    parser.add_argument("--competitor-names", nargs="*",
+                       help="competitor names to scan (default: from DB tracked list)")
+    parser.add_argument("--auto-discover", action="store_true",
+                       help="run auto-discovery: scan candidates + promote")
+    parser.add_argument("--show-summary", action="store_true",
+                       help="show learning summary (no scan)")
+    parser.add_argument("--promote-min-score", type=float, default=3.0,
+                       help="minimum candidate score to auto-promote (default: 3.0)")
+    parser.add_argument("--no-save", action="store_true",
+                       help="dry run: don't save to DB")
 
     args = parser.parse_args()
 
@@ -320,6 +330,16 @@ def cli() -> None:
             output_dir=args.output_dir,
             page_id=args.page_id,
             limit=args.limit,
+        )
+
+    elif args.action == "competitor-learn":
+        _run_competitor_learn(
+            competitor_names=args.competitor_names,
+            auto_discover=args.auto_discover,
+            show_summary=args.show_summary,
+            promote_min_score=args.promote_min_score,
+            no_save=args.no_save,
+            data_dir=args.data_dir,
         )
 
     elif args.action == "daemon":
@@ -594,6 +614,65 @@ def _run_roadmap_status() -> None:
         "progress_entries": progress_entries,
         "next_recommended_actions": (active_phase or {}).get("remaining_tasks", [])[:3],
     }, ensure_ascii=False, indent=2))
+
+
+def _run_competitor_learn(
+    competitor_names: list[str] | None = None,
+    auto_discover: bool = False,
+    show_summary: bool = False,
+    promote_min_score: float = 3.0,
+    no_save: bool = False,
+    data_dir: str = "data/agent",
+) -> None:
+    """competitor-learn CLI handler."""
+    import os
+
+    from fanpage_agent.adapters.sqlite_store import UnifiedStore
+    from fanpage_agent.tools.research.competitor_learning_engine import (
+        CompetitorLearningEngine,
+    )
+    from fanpage_agent.tools.research.competitor_page_discovery import (
+        CompetitorPageDiscoveryTool,
+    )
+
+    # Build store path
+    db_path = Path(data_dir) / "agent.db"
+
+    store = UnifiedStore(db_path=str(db_path))
+    discovery_tool = CompetitorPageDiscoveryTool()
+    engine = CompetitorLearningEngine(
+        discovery_tool=discovery_tool,
+        store=store,
+    )
+
+    if show_summary:
+        summary = engine.get_learning_summary()
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
+    if auto_discover:
+        result = engine.scan_auto_discover(min_score=promote_min_score)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    # Scan with specific or all tracked competitors
+    names = competitor_names or [
+        c["name"] for c in store.list_competitors(active_only=True)
+    ]
+    if not names:
+        print(json.dumps({
+            "status": "error",
+            "message": "No competitor names provided and no tracked competitors in DB. "
+                       "Use --competitor-names 'Name1' 'Name2'",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    result = engine.scan(
+        competitor_names=names,
+        save_snapshot=not no_save,
+        discover_new=not no_save,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

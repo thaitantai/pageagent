@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fanpage_agent.adapters.llm_client import MockLLMClient
-from fanpage_agent.models import BrandProfile, ResearchBrief, WeeklyPlan
+from fanpage_agent.models import BrandProfile, ContentStrategy, ResearchBrief, WeeklyPlan
 
 
 class PlannerTool:
@@ -14,10 +14,12 @@ class PlannerTool:
         start_date: str,
         days: int = 7,
         research_brief: ResearchBrief | None = None,
+        strategy: ContentStrategy | None = None,
     ) -> WeeklyPlan:
         return self.llm_client.generate_weekly_plan(
             profile=profile,
             start_date=start_date,
             days=days,
             research_brief=research_brief,
+            strategy=strategy,
         )

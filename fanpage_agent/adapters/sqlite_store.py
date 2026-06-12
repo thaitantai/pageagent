@@ -242,6 +242,79 @@ CREATE TABLE IF NOT EXISTS topic_lifecycle (
     total_posts INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Competitor registry
+CREATE TABLE IF NOT EXISTS competitors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    normalized_name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'skincare',
+    first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+    last_scanned TEXT NOT NULL DEFAULT (datetime('now')),
+    scan_count INTEGER NOT NULL DEFAULT 1,
+    auto_discovered INTEGER NOT NULL DEFAULT 0,
+    discovery_query TEXT NOT NULL DEFAULT '',
+    discovery_score REAL NOT NULL DEFAULT 0.0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    notes TEXT NOT NULL DEFAULT ''
+);
+
+-- Per-scan snapshot of each competitor
+CREATE TABLE IF NOT EXISTS competitor_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    competitor_name TEXT NOT NULL,
+    scanned_at TEXT NOT NULL DEFAULT (datetime('now')),
+    products_json TEXT NOT NULL DEFAULT '[]',
+    top_products_json TEXT NOT NULL DEFAULT '[]',
+    price_positioning TEXT NOT NULL DEFAULT '',
+    content_tone TEXT NOT NULL DEFAULT '',
+    top_format TEXT NOT NULL DEFAULT '',
+    unique_angle TEXT NOT NULL DEFAULT '',
+    findings_count INTEGER NOT NULL DEFAULT 0,
+    search_urls_json TEXT NOT NULL DEFAULT '[]',
+    next_topics_json TEXT NOT NULL DEFAULT '[]'
+);
+
+-- Products detected per competitor (aggregated across scans)
+CREATE TABLE IF NOT EXISTS competitor_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    competitor_name TEXT NOT NULL,
+    product_name TEXT NOT NULL,
+    first_detected TEXT NOT NULL DEFAULT (datetime('now')),
+    last_detected TEXT NOT NULL DEFAULT (datetime('now')),
+    detection_count INTEGER NOT NULL DEFAULT 1,
+    avg_relevance REAL NOT NULL DEFAULT 0.5,
+    UNIQUE(competitor_name, product_name)
+);
+
+-- Auto-discovered candidate competitors (scored, before being promoted to competitors table)
+CREATE TABLE IF NOT EXISTS competitor_candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    candidate_name TEXT NOT NULL UNIQUE,
+    normalized_name TEXT NOT NULL,
+    mention_count INTEGER NOT NULL DEFAULT 1,
+    total_score REAL NOT NULL DEFAULT 0.0,
+    first_mentioned TEXT NOT NULL DEFAULT (datetime('now')),
+    last_mentioned TEXT NOT NULL DEFAULT (datetime('now')),
+    source_scan TEXT NOT NULL DEFAULT '',
+    source_query TEXT NOT NULL DEFAULT ''
+);
+
+-- Cross-competitor gaps (from latest scan)
+CREATE TABLE IF NOT EXISTS competitor_gaps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scanned_at TEXT NOT NULL DEFAULT (datetime('now')),
+    gap_type TEXT NOT NULL,
+    gap_name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    opportunity_level TEXT NOT NULL DEFAULT 'medium'
+);
+
+CREATE INDEX IF NOT EXISTS idx_comp_name ON competitors(normalized_name);
+CREATE INDEX IF NOT EXISTS idx_comp_active ON competitors(is_active);
+CREATE INDEX IF NOT EXISTS idx_comp_scan ON competitor_snapshots(competitor_name, scanned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_comp_prod ON competitor_products(competitor_name, product_name);
+CREATE INDEX IF NOT EXISTS idx_comp_cand_score ON competitor_candidates(total_score DESC);
 """
 
 
@@ -1969,8 +2042,331 @@ class UnifiedStore:
         return [dict(r) for r in rows]
 
     # ═══════════════════════════════════════════════════════════════
-    # Export utilities
+    # Competitor self-learning store
     # ═══════════════════════════════════════════════════════════════
+
+    def upsert_competitor(
+        self, name: str, auto_discovered: bool = False,
+        discovery_query: str = "", discovery_score: float = 0.0,
+    ) -> dict[str, Any]:
+        """Register or update a competitor."""
+        normalized = name.strip().lower()
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM competitors WHERE normalized_name=?",
+                (normalized,),
+            ).fetchone()
+            now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            if existing:
+                conn.execute(
+                    """UPDATE competitors SET last_scanned=?, scan_count=scan_count+1,
+                       notes=CASE WHEN ?!='' THEN ? ELSE notes END
+                       WHERE normalized_name=?""",
+                    (now, discovery_query, discovery_query, normalized),
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO competitors
+                       (name, normalized_name, auto_discovered, discovery_query, discovery_score, first_seen, last_scanned)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (name.strip(), normalized, int(auto_discovered),
+                     discovery_query, discovery_score, now, now),
+                )
+            row = conn.execute(
+                "SELECT * FROM competitors WHERE normalized_name=?", (normalized,)
+            ).fetchone()
+        return dict(row) if row else {}
+
+    def get_competitor(self, name: str) -> dict[str, Any] | None:
+        """Get competitor by name."""
+        normalized = name.strip().lower()
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM competitors WHERE normalized_name=?", (normalized,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_competitors(
+        self, active_only: bool = True, auto_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        """List all competitors."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        if active_only:
+            conditions.append("is_active = 1")
+        if auto_only:
+            conditions.append("auto_discovered = 1")
+        where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM competitors{where} ORDER BY scan_count DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def deactivate_competitor(self, name: str) -> None:
+        """Mark competitor as inactive (stop tracking)."""
+        normalized = name.strip().lower()
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE competitors SET is_active=0 WHERE normalized_name=?",
+                (normalized,),
+            )
+
+    def save_competitor_snapshot(
+        self, competitor_name: str, profile: dict[str, Any],
+        products: list[str], next_topics: list[str],
+    ) -> int:
+        """Save a per-scan snapshot of competitor analysis."""
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self._conn() as conn:
+            cursor = conn.execute(
+                """INSERT INTO competitor_snapshots
+                   (competitor_name, scanned_at, products_json,
+                    top_products_json, price_positioning, content_tone,
+                    top_format, unique_angle, findings_count,
+                    search_urls_json, next_topics_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    competitor_name.strip().lower(),
+                    now,
+                    json.dumps(products, ensure_ascii=False),
+                    json.dumps(profile.get("top_products", []), ensure_ascii=False),
+                    profile.get("price_positioning", ""),
+                    profile.get("content_tone", ""),
+                    profile.get("top_format", ""),
+                    profile.get("unique_angle", ""),
+                    profile.get("findings_count", 0),
+                    json.dumps(profile.get("search_urls", []), ensure_ascii=False),
+                    json.dumps(next_topics, ensure_ascii=False),
+                ),
+            )
+            return cursor.lastrowid or 0
+
+    def get_competitor_snapshots(
+        self, name: str, limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Get scan history for a competitor."""
+        normalized = name.strip().lower()
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT * FROM competitor_snapshots WHERE competitor_name=?
+                   ORDER BY scanned_at DESC LIMIT ?""",
+                (normalized, limit),
+            ).fetchall()
+        result = []
+        for r in rows:
+            entry = dict(r)
+            for key in ("products_json", "top_products_json",
+                         "search_urls_json", "next_topics_json"):
+                try:
+                    entry[key] = json.loads(entry[key])
+                except (json.JSONDecodeError, TypeError):
+                    entry[key] = []
+            result.append(entry)
+        return result
+
+    def record_competitor_product(
+        self, competitor_name: str, product_name: str, relevance: float = 0.5,
+    ) -> None:
+        """Record a product detected for a competitor (aggregated)."""
+        normalized = competitor_name.strip().lower()
+        prod = product_name.strip().lower()
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM competitor_products WHERE competitor_name=? AND product_name=?",
+                (normalized, prod),
+            ).fetchone()
+            if existing:
+                old_rel = existing["avg_relevance"]
+                new_rel = round((old_rel * existing["detection_count"] + relevance) / (existing["detection_count"] + 1), 3)
+                conn.execute(
+                    """UPDATE competitor_products SET last_detected=?,
+                       detection_count=detection_count+1, avg_relevance=?
+                       WHERE competitor_name=? AND product_name=?""",
+                    (now, new_rel, normalized, prod),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO competitor_products (competitor_name, product_name, avg_relevance) VALUES (?, ?, ?)",
+                    (normalized, prod, relevance),
+                )
+
+    def get_competitor_products(
+        self, name: str, min_detections: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Get all products detected for a competitor."""
+        normalized = name.strip().lower()
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT * FROM competitor_products WHERE competitor_name=? AND detection_count>=?
+                   ORDER BY detection_count DESC""",
+                (normalized, min_detections),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_top_competitor_products(
+        self, limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Get most-frequently detected products across all competitors."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT product_name, SUM(detection_count) as total_detections,
+                          COUNT(DISTINCT competitor_name) as competitor_count,
+                          ROUND(AVG(avg_relevance), 3) as avg_relevance
+                   FROM competitor_products
+                   GROUP BY product_name
+                   HAVING competitor_count >= 2
+                   ORDER BY total_detections DESC, avg_relevance DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── Candidate discovery ──────────────────────────────────
+
+    def upsert_competitor_candidate(
+        self, candidate_name: str, score: float,
+        source_scan: str = "", source_query: str = "",
+    ) -> dict[str, Any]:
+        """Add or update a candidate competitor (auto-discovered)."""
+        normalized = candidate_name.strip().lower()
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM competitor_candidates WHERE normalized_name=?",
+                (normalized,),
+            ).fetchone()
+            if existing:
+                new_score = round(existing["total_score"] + score, 2)
+                conn.execute(
+                    """UPDATE competitor_candidates SET total_score=?,
+                       mention_count=mention_count+1, last_mentioned=?,
+                       source_scan=CASE WHEN ?!='' THEN ? ELSE source_scan END,
+                       source_query=CASE WHEN ?!='' THEN ? ELSE source_query END
+                       WHERE normalized_name=?""",
+                    (new_score, now, source_scan, source_scan,
+                     source_query, source_query, normalized),
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO competitor_candidates
+                       (candidate_name, normalized_name, total_score, source_scan, source_query)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (candidate_name.strip(), normalized, score, source_scan, source_query),
+                )
+            row = conn.execute(
+                "SELECT * FROM competitor_candidates WHERE normalized_name=?",
+                (normalized,),
+            ).fetchone()
+        return dict(row) if row else {}
+
+    def list_competitor_candidates(
+        self, min_score: float = 1.0, limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """List auto-discovered candidates sorted by score."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT * FROM competitor_candidates
+                   WHERE total_score >= ?
+                   ORDER BY total_score DESC
+                   LIMIT ?""",
+                (min_score, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def promote_candidate(self, candidate_name: str) -> dict[str, Any]:
+        """Move a candidate to the competitors table."""
+        normalized = candidate_name.strip().lower()
+        with self._conn() as conn:
+            cand = conn.execute(
+                "SELECT * FROM competitor_candidates WHERE normalized_name=?",
+                (normalized,),
+            ).fetchone()
+            if not cand:
+                return {"error": "candidate not found"}
+            # Check if already exists as competitor
+            existing = conn.execute(
+                "SELECT id FROM competitors WHERE normalized_name=?", (normalized,),
+            ).fetchone()
+            if existing:
+                # Already tracked, just remove from candidates
+                conn.execute(
+                    "DELETE FROM competitor_candidates WHERE normalized_name=?",
+                    (normalized,),
+                )
+                return {"status": "already_tracked", "name": cand["candidate_name"]}
+            # Promote
+            conn.execute(
+                """INSERT INTO competitors
+                   (name, normalized_name, auto_discovered, discovery_query, discovery_score)
+                   VALUES (?, ?, 1, ?, ?)""",
+                (cand["candidate_name"], normalized,
+                 cand["source_query"], cand["total_score"]),
+            )
+            conn.execute(
+                "DELETE FROM competitor_candidates WHERE normalized_name=?",
+                (normalized,),
+            )
+            row = conn.execute(
+                "SELECT * FROM competitors WHERE normalized_name=?", (normalized,),
+            ).fetchone()
+        return dict(row) if row else {}
+
+    # ── Gaps ──────────────────────────────────────────────────
+
+    def save_competitor_gaps(self, gaps: list[dict[str, Any]]) -> int:
+        """Save cross-competitor gap analysis results."""
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        count = 0
+        with self._conn() as conn:
+            for g in gaps:
+                conn.execute(
+                    """INSERT INTO competitor_gaps
+                       (scanned_at, gap_type, gap_name, description, opportunity_level)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (now, g.get("gap_type", "product"),
+                     g.get("gap_name", ""),
+                     g.get("description", ""),
+                     g.get("opportunity_level", "medium")),
+                )
+                count += 1
+        return count
+
+    def get_latest_gaps(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Get most recent gap analysis."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT * FROM competitor_gaps ORDER BY scanned_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── History / trends ─────────────────────────────────────
+
+    def get_competitor_trend(
+        self, name: str, since_days: int = 30,
+    ) -> dict[str, Any]:
+        """Get a competitor's trend over time: products, formats, angles."""
+        normalized = name.strip().lower()
+        snapshots = self.get_competitor_snapshots(normalized, limit=30)
+        competitor = self.get_competitor(normalized)
+        products = self.get_competitor_products(normalized)
+        return {
+            "name": name,
+            "scan_count": competitor["scan_count"] if competitor else 0,
+            "first_seen": competitor["first_seen"] if competitor else "",
+            "last_scanned": competitor["last_scanned"] if competitor else "",
+            "auto_discovered": bool(competitor["auto_discovered"]) if competitor else False,
+            "snapshot_count": len(snapshots),
+            "recent_snapshots": snapshots[:5],
+            "products_tracked": len(products),
+            "top_products": [p["product_name"] for p in products[:10]],
+            "new_products": [
+                p for p in products
+                if p["detection_count"] <= 1
+            ],
+        }
 
     def export_csv(self, table: str) -> str:
         """Export a table to CSV string."""

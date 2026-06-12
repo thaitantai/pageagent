@@ -405,8 +405,8 @@ def run_test() -> None:
             fetch_external_trends=True,
             discover_product_topics=True,
             discover_offers=True,
-            scan_competitor_pages=False,       # Không có FB pages config thật
-            competitor_page_ids=None,
+            scan_competitor_pages=False,       # Chưa config đối thủ thật
+            competitor_names=None,
             fetch_affiliate_offers=True,        # AccessTrade API thật
             max_product_topics=10,
         )

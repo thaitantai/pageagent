@@ -11,6 +11,11 @@ from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.sqlite_store import UnifiedStore
 from fanpage_agent.config import Settings
 
+try:  # Optional dependency path retained for legacy tests/callers.
+    from fanpage_agent.adapters.google_sheets_store import GoogleSheetsStore
+except Exception:  # pragma: no cover - exercised only when deps are absent.
+    GoogleSheetsStore = None  # type: ignore[assignment]
+
 
 def build_store(settings: Settings, args=None):
     backend = getattr(args, "store_backend", None) or settings.store_backend
@@ -34,7 +39,8 @@ def build_store(settings: Settings, args=None):
         )
 
     if backend == "google":
-        from fanpage_agent.adapters.google_sheets_store import GoogleSheetsStore
+        if GoogleSheetsStore is None:
+            raise RuntimeError("Google Sheets backend is unavailable")
         return GoogleSheetsStore(settings=settings)
 
     raise ValueError(f"Unsupported store backend: {backend}")

@@ -25,7 +25,6 @@ from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.tools.research.competitor_page_discovery import (
     CompetitorPageDiscoveryTool,
-    FacebookPageClient,
 )
 from fanpage_agent.tools.research.offer_discovery import OfferDiscoveryTool
 from fanpage_agent.tools.research.offer_evaluator import OfferEvaluator, SearchClient
@@ -182,7 +181,7 @@ def create_mock_scraper() -> MagicMock:
 # ────────────────────────────────────────
 def create_mock_fb_client() -> MagicMock:
     """Facebook API mock với dữ liệu post skincare giống thật."""
-    mock = MagicMock(spec=FacebookPageClient)
+    mock = MagicMock()
 
     # Page info cho competitor pages
     mock.get_public_page_info.side_effect = lambda page_id: {
@@ -349,9 +348,7 @@ def run_demo():
         service = ResearchTool(
             trend_scraper=mock_scraper,
             trend_analyzer=TrendAnalyzer([]),  # sẽ reset bên trong build_brief
-            competitor_discovery=CompetitorPageDiscoveryTool(
-                fb_client=mock_fb_client,
-            ),
+            competitor_discovery=CompetitorPageDiscoveryTool(),
             offer_evaluator=OfferEvaluator(
                 search_client=mock_evaluator_search,
             ),
@@ -442,10 +439,8 @@ def run_demo():
 
         print(_header("📱 Bước 4: CompetitorPageDiscovery — scan Facebook đối thủ"))
         print(_chip("Seed pages", "['skincare_vn', 'beauty_tips_asia']"))
-        fb_offers, new_pages = CompetitorPageDiscoveryTool(
-            fb_client=mock_fb_client,
-        ).discover(
-            competitor_page_ids=["skincare_vn", "beauty_tips_asia"],
+        fb_offers, new_pages = CompetitorPageDiscoveryTool().discover(
+            competitor_names=["skincare_vn", "beauty_tips_asia"],
             existing_offers=["Kem chống nắng", *(d.product_name for d in discovered)],
         )
         print(f"  ➡️  Phát hiện {len(fb_offers)} offer từ Facebook:")
@@ -469,7 +464,7 @@ def run_demo():
             discover_product_topics=True,
             discover_offers=True,
             scan_competitor_pages=True,
-            competitor_page_ids=["skincare_vn", "beauty_tips_asia"],
+            competitor_names=["skincare_vn", "beauty_tips_asia"],
             max_product_topics=8,
         )
 

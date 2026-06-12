@@ -72,6 +72,7 @@ from .publishing import (
     cmd_plan_week,
     cmd_deliver_research_brief,
     cmd_auto_content_cycle,
+    cmd_build_strategy,
     cmd_run_daily,
     cmd_deliver_daily_packet,
     cmd_publish_post,

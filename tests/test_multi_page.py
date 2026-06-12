@@ -135,13 +135,14 @@ class TestGetRegistry:
         assert reg.default_page_id is not None or reg.page_count >= 1
 
     def test_registry_handles_env_settings(self):
-        """Verify registry can load from env-provided pages."""
-        from fanpage_agent.adapters.settings import get_settings
+        """Verify registry can load from env-style page settings."""
+        from config import Settings
         from fanpage_agent.adapters.page_registry import PageRegistry
-        settings = get_settings()
+
+        settings = Settings(fb_page_id="main", fb_page_token="tok_main")
         reg = PageRegistry(settings)
         ids = reg.all_page_ids
-        assert len(ids) >= 1
+        assert ids == ["main"]
 
 
 # ── FacebookAdapter multi-page ───────────────────────────────────

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import csv
-import json
 import logging
 from collections import Counter
 from datetime import datetime, timezone
@@ -25,11 +23,20 @@ from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.tools.research.competitor_page_discovery import (
     CompetitorPageDiscoveryTool,
 )
+from fanpage_agent.tools.research.competitor_learning_engine import CompetitorLearningEngine
 from fanpage_agent.tools.research.offer_discovery import OfferDiscoveryTool
 from fanpage_agent.tools.research.offer_evaluator import OfferEvaluator
 from fanpage_agent.tools.research.product_topic_discovery import (
     ProductAwareTopicDiscovery,
     ProductTopicCandidate,
+)
+from fanpage_agent.tools.research.research_helpers import (
+    read_comments as _read_comments,
+    read_campaign_notes as _read_campaign_notes,
+    dedupe as _dedupe,
+    keyword_overlap_score as _keyword_overlap_score,
+    confidence_score as _confidence_score,
+    quality_warnings as _quality_warnings,
 )
 from fanpage_agent.tools.research.research_insights import EvidenceExtractor, ResearchQualityGate
 from fanpage_agent.tools.research.search_query_builder import build_search_queries as _build_queries_smart
@@ -50,6 +57,7 @@ class ResearchTool:
         topic_discovery: ProductAwareTopicDiscovery | None = None,
         offer_evaluator: OfferEvaluator | None = None,
         competitor_discovery: CompetitorPageDiscoveryTool | None = None,
+        competitor_learning: CompetitorLearningEngine | None = None,
         affiliate_registry: AffiliateRegistry | None = None,
         topic_performance_store=None,
     ):
@@ -60,6 +68,17 @@ class ResearchTool:
         self._topic_discovery = topic_discovery or ProductAwareTopicDiscovery()
         self._offer_evaluator = offer_evaluator
         self._competitor_discovery = competitor_discovery or CompetitorPageDiscoveryTool()
+        self._competitor_learning = competitor_learning
+        if self._competitor_learning is None:
+            try:
+                from fanpage_agent.adapters.sqlite_store import UnifiedStore
+                store = UnifiedStore()
+                self._competitor_learning = CompetitorLearningEngine(
+                    discovery_tool=self._competitor_discovery,
+                    store=store,
+                )
+            except Exception:
+                self._competitor_learning = None
         self._affiliate_registry = affiliate_registry
         if self._affiliate_registry is None:
             try:
@@ -96,7 +115,7 @@ class ResearchTool:
         discover_product_topics: bool = False,
         discover_offers: bool = False,
         scan_competitor_pages: bool = False,
-        competitor_page_ids: list[str] | None = None,
+        competitor_names: list[str] | None = None,
         max_product_topics: int = 8,
         fetch_affiliate_offers: bool = False,
     ) -> ResearchBrief:
@@ -241,18 +260,20 @@ class ResearchTool:
                     "đã đưa vào pipeline đánh giá."
                 )
 
-        # --- CompetitorPageDiscovery: phân tích post Facebook page cùng niche ---
-        if scan_competitor_pages and competitor_page_ids:
-            fb_pages = list(dict.fromkeys(p.strip() for p in competitor_page_ids if p.strip()))
+        # --- CompetitorPageDiscovery: phân tích đối thủ nâng cao ---
+        analysis_payload: dict = {"profiles": [], "cross_competitor": {}}
+        if scan_competitor_pages and competitor_names:
+            names = [n.strip().lower() for n in competitor_names if n.strip()]
+            # Legacy: discover offer candidates
             discovered_offers, new_pages = self._competitor_discovery.discover(
-                competitor_page_ids=fb_pages,
+                competitor_names=names,
                 existing_offers=[p.product_name for p in product_topics],
             )
             if discovered_offers:
                 product_topics.extend(discovered_offers)
                 recommendations.append(
                     f"Phát hiện {len(discovered_offers)} offer từ phân tích "
-                    f"{len(fb_pages)} page Facebook cùng niche."
+                    f"{len(names)} đối thủ cùng niche."
                 )
             if new_pages:
                 new_page_str = ", ".join(new_pages[:3])
@@ -260,6 +281,104 @@ class ResearchTool:
                     f"Tự động phát hiện {len(new_pages)} page Facebook mới từ "
                     f"mention trong post — {new_page_str}."
                 )
+
+            # NEW: structured competitor profiles + cross-competitor insights
+            profiles: list[Any] = []
+            insight: Any = None
+            try:
+                profiles, insight = self._competitor_discovery.analyze_competitors(
+                    competitor_names=names,
+                )
+                if profiles:
+                    # Serialize for JSON
+                    analysis_payload = {
+                        "profiles": [
+                            {
+                                "name": p.name,
+                                "products_detected": p.products_detected,
+                                "top_products": p.top_products,
+                                "angles_detected": p.angles_detected,
+                                "top_angle": p.top_angle,
+                                "top_format": p.top_format,
+                                "price_positioning": p.price_positioning,
+                                "content_tone": p.content_tone,
+                                "unique_angle": p.unique_angle,
+                                "findings_count": p.findings_count,
+                                "analyzed_at": p.analyzed_at,
+                            }
+                            for p in profiles
+                        ],
+                        "cross_competitor": {
+                            "shared_products": [
+                                {"product": prod, "competitor_count": cnt}
+                                for prod, cnt in insight.shared_products[:5]
+                            ],
+                            "gap_products": insight.gap_products[:5],
+                            "underused_formats": insight.underused_formats,
+                            "recommendation": insight.recommendation,
+                        },
+                    }
+                    # Add per-competitor unique products
+                    for p in profiles:
+                        if p.name in insight.unique_products_by_competitor:
+                            unique = insight.unique_products_by_competitor[p.name]
+                            if unique:
+                                # Add to the profile in analysis_payload
+                                for prof in analysis_payload["profiles"]:
+                                    if prof["name"] == p.name:
+                                        prof["unique_products"] = unique
+                                        break
+
+                    # Add competitor insights to recommendations
+                    if insight.recommendation:
+                        recommendations.append(insight.recommendation)
+                    if insight.gap_products:
+                        recommendations.append(
+                            f"Cơ hội nội dung: sản phẩm '{insight.gap_products[0]}' "
+                            "chưa đối thủ nào khai thác mạnh."
+                        )
+                else:
+                    analysis_payload = {"profiles": [], "cross_competitor": {}}
+            except Exception as exc:
+                logger.warning("Competitor analysis failed: %s", exc)
+                analysis_payload = {"profiles": [], "cross_competitor": {}}
+
+            # --- CompetitorLearningEngine: ghi nhận scan result + auto-discover ---
+            if (
+                scan_competitor_pages
+                and competitor_names
+                and self._competitor_learning
+                and profiles
+            ):
+                try:
+                    learn_result = self._competitor_learning.record_scan_result(
+                        competitor_names=names,
+                        profiles=profiles,
+                        insight=insight,
+                    )
+                    # Auto-discover found new candidate competitors
+                    new_candidates = learn_result.get("discovered_candidates", [])
+                    if new_candidates:
+                        recommendations.append(
+                            f"Phát hiện {len(new_candidates)} đối thủ tiềm năng mới "
+                            f"qua auto-discover: {', '.join(new_candidates[:3])}."
+                        )
+                    # Trend detection
+                    trends = learn_result.get("trends", {})
+                    rising = trends.get("rising_products", [])
+                    if rising:
+                        rec_products = [f"{p[0]}" for p in rising[:3]]
+                        recommendations.append(
+                            f"Sản phẩm đang lên từ đối thủ: {', '.join(rec_products)}."
+                        )
+                    new_products = trends.get("competitors_with_new_products", [])
+                    if new_products:
+                        recommendations.append(
+                            f"{len(new_products)} đối thủ có sản phẩm mới — "
+                            "xem competitor_analysis để biết chi tiết."
+                        )
+                except Exception as exc:
+                    logger.warning("CompetitorLearningEngine record failed: %s", exc)
 
         # --- AffiliateRegistry: pull products from AF networks (AccessTrade, Shopee...) ---
         if fetch_affiliate_offers and self._affiliate_registry:
@@ -396,6 +515,7 @@ class ResearchTool:
             topic_scores=topic_scores,
             source_documents=source_documents,
             source_candidates=source_candidates,
+            competitor_analysis=analysis_payload,
         )
 
     def _build_evidence(
@@ -585,30 +705,7 @@ class ResearchTool:
 
     @staticmethod
     def _keyword_overlap_score(topic: str, references: list[str]) -> float:
-        """Semantic overlap score using fuzzy string matching.
-
-        Uses difflib.SequenceMatcher for character-based similarity,
-        which handles partial matches, word order, and Vietnamese text
-        better than simple word-set overlap.
-
-        If rapidfuzz is installed, uses it for faster/better results.
-        """
-        if not topic or not references:
-            return 0.0
-        topic_lower = topic.lower().strip()
-        try:
-            from rapidfuzz import fuzz
-            scores = [
-                fuzz.token_sort_ratio(topic_lower, ref.lower()) / 100.0
-                for ref in references
-            ]
-        except ImportError:
-            from difflib import SequenceMatcher
-            scores = [
-                SequenceMatcher(None, topic_lower, ref.lower()).ratio()
-                for ref in references
-            ]
-        return min(1.0, max(scores))
+        return _keyword_overlap_score(topic, references)
 
     def _topic_source_confidence(self, topic: str, evidence: list[ResearchEvidence]) -> float:
         """Confidence score: semantic overlap between topic and evidence claims.
@@ -688,59 +785,20 @@ class ResearchTool:
 
     @staticmethod
     def _confidence_score(evidence: list[ResearchEvidence]) -> float:
-        if not evidence:
-            return 0.0
-        return round(sum(item.confidence for item in evidence) / len(evidence), 3)
+        return _confidence_score(evidence)
 
     @staticmethod
     def _quality_warnings(evidence: list[ResearchEvidence], external_trends: list[TrendItem]) -> list[str]:
-        warnings: list[str] = []
-        if not external_trends:
-            warnings.append("Không có external_trends; Research chỉ dựa vào dữ liệu nội bộ/operator.")
-        source_count = len({item.source for item in evidence if item.source})
-        if source_count < 2:
-            warnings.append("Evidence chưa đủ đa nguồn; cần thêm ít nhất 2 nguồn độc lập.")
-        if not any(item.url for item in evidence):
-            warnings.append("Evidence chưa có URL nguồn để Writer trích dẫn hoặc kiểm chứng.")
-        return warnings
+        return _quality_warnings(evidence, external_trends)
 
     @staticmethod
     def _read_comments(path: str | Path | None) -> list[CommentInboxEntry]:
-        if not path:
-            return []
-        file_path = Path(path)
-        if not file_path.exists():
-            return []
-        with file_path.open("r", encoding="utf-8", newline="") as handle:
-            rows = list(csv.DictReader(handle))
-        return [
-            CommentInboxEntry(
-                id=row.get("id", ""),
-                post_id=row.get("post_id", ""),
-                created_at=row.get("created_at", ""),
-                source=row.get("source", ""),
-                message=row.get("message", ""),
-            )
-            for row in rows
-            if row.get("message")
-        ]
+        return _read_comments(path)
 
     @staticmethod
     def _read_campaign_notes(path: str | Path | None) -> dict:
-        if not path:
-            return {}
-        file_path = Path(path)
-        if not file_path.exists():
-            return {}
-        return json.loads(file_path.read_text(encoding="utf-8"))
+        return _read_campaign_notes(path)
 
     @staticmethod
     def _dedupe(items: list[str]) -> list[str]:
-        seen: set[str] = set()
-        result: list[str] = []
-        for item in items:
-            if not item or item in seen:
-                continue
-            seen.add(item)
-            result.append(item)
-        return result
+        return _dedupe(items)

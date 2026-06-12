@@ -67,6 +67,7 @@ class BrandProfile(BaseModel):
     banned_phrases: List[str] = Field(default_factory=list)
     compliance_notes: List[str] = Field(default_factory=list)
     approval_flow: ApprovalFlow
+    competitor_page_names: List[str] = Field(default_factory=list)
 
 
 class PlanDay(BaseModel):
@@ -233,6 +234,7 @@ class ResearchBrief(BaseModel):
     topic_scores: List[ResearchTopicScore] = Field(default_factory=list)
     source_documents: List[SourceDocument] = Field(default_factory=list)
     source_candidates: List[SourceCandidate] = Field(default_factory=list)
+    competitor_analysis: dict = Field(default_factory=dict, description="Structured competitor profiles + cross-competitor insights")
 
 
 class ResearchPacket(BaseModel):
@@ -289,3 +291,28 @@ class CommunityTriageBatch(BaseModel):
 class VerificationResult(BaseModel):
     passed: bool
     issues: List[str] = Field(default_factory=list)
+
+
+class StrategyIdea(BaseModel):
+    """Một ý tưởng content trong strategy."""
+    pillar: str
+    topic: str
+    angle: str
+    target_audience: str = ""
+    rationale: str = ""
+    priority: str = "medium"  # high / medium / low
+
+
+class ContentStrategy(BaseModel):
+    """Output của StrategistTool — chiến lược content tổng thể."""
+    brand_id: str
+    generated_at: str
+    recommended_pillar_mix: dict[str, float]  # pillar → % phân bổ
+    trend_driven_ideas: List[StrategyIdea] = Field(default_factory=list)
+    competitor_fills: List[StrategyIdea] = Field(default_factory=list)
+    recommended_posting_times: List[str] = Field(default_factory=list)
+    weekly_frequency: int = 5
+    strategic_reasoning: str = ""
+    confidence_score: float = 0.5
+    generated_by: str = "mock"  # mock / llm
+    warnings: List[str] = Field(default_factory=list)

@@ -9,6 +9,7 @@ from fanpage_agent.models import (
     BrandProfile,
     CaptionPackage,
     CaptionVariant,
+    ContentStrategy,
     PlanDay,
     ResearchBrief,
     WeeklyPlan,
@@ -24,11 +25,12 @@ class MockLLMClient:
         start_date: str,
         days: int = 7,
         research_brief: ResearchBrief | None = None,
+        strategy: ContentStrategy | None = None,
     ) -> WeeklyPlan:
         start = date.fromisoformat(start_date)
         entries: list[PlanDay] = []
         objectives = self._build_objective_lane(profile, research_brief)
-        pillars = self._build_pillar_lane(profile, research_brief)
+        pillars = self._build_pillar_lane(profile, research_brief, strategy)
         angles = self._build_angle_lane(profile, research_brief)
         first_question = research_brief.frequent_questions[0] if research_brief and research_brief.frequent_questions else None
 
@@ -162,7 +164,16 @@ class MockLLMClient:
         return profile.fanpage_goals or ["reach"]
 
     @staticmethod
-    def _build_pillar_lane(profile: BrandProfile, research_brief: ResearchBrief | None) -> list[str]:
+    def _build_pillar_lane(profile: BrandProfile, research_brief: ResearchBrief | None = None,
+                           strategy: ContentStrategy | None = None) -> list[str]:
+        if strategy and strategy.recommended_pillar_mix:
+            # Sort pillars by recommended mix (highest first)
+            sorted_pillars = sorted(
+                strategy.recommended_pillar_mix.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+            return [p[0] for p in sorted_pillars]
         if research_brief and research_brief.recommended_pillars:
             return research_brief.recommended_pillars
         return [item.pillar_name for item in profile.content_pillars]

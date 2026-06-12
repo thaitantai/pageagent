@@ -36,6 +36,7 @@ class PageConfig:
     banned_topics: list[str] = field(default_factory=list)
     research_sources: list[str] = field(default_factory=list)
     competitor_pages: list[str] = field(default_factory=list)
+    competitor_page_names: list[str] = field(default_factory=list)
     api_version: str = "v21.0"
     is_default: bool = False
 
@@ -76,9 +77,9 @@ class Settings(BaseModel):
     llm_max_tokens: int = 1200
     llm_base_url: str = ""
     llm_api_key: str = ""
-    store_backend: str = "sqlite"
+    store_backend: str = "local"
     # DEPRECATED: Google Sheets fields. Will be removed in a future release.
-    # Use backend='sqlite' (default) or 'local' instead.
+    # Use backend='sqlite' or the legacy local CSV backend.
     google_sheets_id: str = ""
     google_service_account_file: str = ""
     google_sheets_tabs_prefix: str = ""
@@ -128,9 +129,11 @@ class Settings(BaseModel):
                 if dotenv_path.exists():
                     sources.update(_load_root_dotenv(ancestor))
                     break
-        # 2. real env overrides .env
-        for key in os.environ:
-            sources[key] = os.environ[key]
+        # 2. real env overrides .env for normal runtime. Tests can pass an
+        # explicit env dict to avoid leaking the developer's local .env/shell.
+        if env is None:
+            for key in os.environ:
+                sources[key] = os.environ[key]
         # 3. explicit env overrides everything for tests/CLI callers
         if env is not None:
             sources.update(env)
@@ -201,6 +204,7 @@ class Settings(BaseModel):
                     banned_topics=list(pdata.get("banned_topics", [])),
                     research_sources=list(pdata.get("research_sources", [])),
                     competitor_pages=list(pdata.get("competitor_pages", [])),
+                    competitor_page_names=list(pdata.get("competitor_page_names", [])),
                     api_version=pdata.get("api_version", self.fb_api_version),
                 )
         # Fallback to default
