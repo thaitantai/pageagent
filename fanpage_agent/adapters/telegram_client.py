@@ -10,8 +10,7 @@ from fanpage_agent.config import Settings
 class TelegramClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        if not settings.telegram_bot_token:
-            raise RuntimeError("TELEGRAM_BOT_TOKEN is required for Telegram delivery")
+        settings.require("telegram_bot_token")
         self.base_url = settings.telegram_base_url.rstrip("/")
 
     def send_message(self, text: str, chat_id: str | None = None, parse_mode: str | None = "Markdown") -> dict:

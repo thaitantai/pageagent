@@ -3,7 +3,25 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fanpage_agent.config import Settings
+from fanpage_agent.config import ConfigError, Settings
+
+
+class SettingsRequireTest(unittest.TestCase):
+    def test_require_passes_when_fields_set(self) -> None:
+        settings = Settings(fb_page_id="123", fb_page_token="tok")
+        self.assertIs(settings.require("fb_page_id", "fb_page_token"), settings)
+
+    def test_require_lists_every_missing_env_var(self) -> None:
+        settings = Settings()
+        with self.assertRaises(ConfigError) as ctx:
+            settings.require("fb_page_id", "fb_page_token", "telegram_bot_token")
+        message = str(ctx.exception)
+        self.assertIn("FB_PAGE_ID", message)
+        self.assertIn("FB_PAGE_TOKEN", message)
+        self.assertIn("TELEGRAM_BOT_TOKEN", message)
+
+    def test_config_error_is_runtime_error(self) -> None:
+        self.assertTrue(issubclass(ConfigError, RuntimeError))
 
 
 class SettingsTest(unittest.TestCase):

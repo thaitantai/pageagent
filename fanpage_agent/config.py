@@ -3,4 +3,4 @@
 Maintains backward compatibility for ``from fanpage_agent.config import Settings``.
 """
 
-from config import Settings, _load_root_dotenv, _parse_csv_list  # noqa: F401
+from config import ConfigError, Settings, _load_root_dotenv, _parse_csv_list  # noqa: F401

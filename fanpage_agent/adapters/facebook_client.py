@@ -27,10 +27,7 @@ class FacebookClient:
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        if not settings.fb_page_id:
-            raise RuntimeError("FB_PAGE_ID is required for Facebook API calls")
-        if not settings.fb_page_token:
-            raise RuntimeError("FB_PAGE_TOKEN is required for Facebook API calls")
+        settings.require("fb_page_id", "fb_page_token")
         self.page_id = settings.fb_page_id
         self.api_version = settings.fb_api_version
         self._limiter = TokenBucket(capacity=180, window_sec=3600.0)  # 180 req/h

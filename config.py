@@ -68,6 +68,14 @@ def _load_root_dotenv(root: Path) -> dict[str, str]:
 # ── project-wide settings ───────────────────────────────────────
 
 
+class ConfigError(RuntimeError):
+    """A required configuration value is missing.
+
+    Subclasses RuntimeError so existing ``except RuntimeError`` handlers
+    and test assertions keep working.
+    """
+
+
 class Settings(BaseModel):
     """Project-wide configuration — LLM, Telegram, Facebook, image, store."""
 
@@ -181,6 +189,19 @@ class Settings(BaseModel):
     def model_post_init(self, _context) -> None:
         if self.llm_model_candidates is None:
             self.llm_model_candidates = []
+
+    def require(self, *field_names: str) -> "Settings":
+        """Validate at the use-boundary: raise ConfigError naming every
+        missing env var at once (construction stays permissive so tests
+        and offline commands can build empty Settings)."""
+        missing = [name.upper() for name in field_names if not getattr(self, name)]
+        if missing:
+            raise ConfigError(
+                "Missing required configuration: "
+                + ", ".join(missing)
+                + " — set these in .env or the environment."
+            )
+        return self
 
     def get_page_config(self, page_id: str | None = None) -> PageConfig:
         """Return PageConfig for a given page_id.

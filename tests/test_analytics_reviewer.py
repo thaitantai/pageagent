@@ -232,9 +232,9 @@ class TestAnalyticsReviewer:
 
     def test_run_review_error_no_fb_token(self, store):
         """Should raise RuntimeError if FB token is missing."""
-        settings = MagicMock(spec=Settings)
-        settings.fb_page_id = ""
-        settings.fb_page_token = ""
+        # Real Settings: require() runs the actual validation a spec'd
+        # MagicMock would silently swallow.
+        settings = Settings(fb_page_id="", fb_page_token="")
 
         with pytest.raises(RuntimeError, match="FB_PAGE_ID"):
             AnalyticsReviewer(settings)
