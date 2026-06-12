@@ -35,6 +35,34 @@ class DailyOpsToolTest(unittest.TestCase):
             self.assertIn("Weekly Plan", packet["telegram_preview"]["plan_message"])
             self.assertIn("Caption Package", packet["telegram_preview"]["caption_message"])
 
+    def test_evidence_gate_blocked_packet_skips_public_caption_draft(self) -> None:
+        sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"
+        profile = load_brand_profile(sample)
+
+        class BlockedResearchPacket:
+            handoff_policy = {"max_safe_use": "draft_questions_only"}
+            gate_reasons = ["chưa có source_documents đã kiểm chứng"]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            store = LocalSheetStore(
+                calendar_csv=tmpdir / "calendar.csv",
+                history_csv=tmpdir / "history.csv",
+            )
+
+            packet = DailyOpsTool().build_packet(
+                profile=profile,
+                run_date="2026-06-12",
+                store=store,
+                days=1,
+                research_packet=BlockedResearchPacket(),
+            )
+
+            self.assertIn("add_sources", packet["actions"])
+            self.assertNotIn("approve_or_revise", packet["actions"])
+            self.assertFalse(packet["caption_package"]["verification"]["passed"])
+            self.assertIn("Research blocked", packet["caption_package"]["topic"])
+
 
 if __name__ == "__main__":
     unittest.main()

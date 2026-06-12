@@ -223,6 +223,7 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
         days=args.days,
         write_calendar=args.write_calendar,
         research_brief=research_brief,
+        research_packet=research_packet,
     )
     packet["research_packet"] = packet_to_brief_payload(research_packet)
     if args.save:
@@ -287,6 +288,7 @@ def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
         days=args.days,
         write_calendar=args.write_calendar,
         research_brief=research_brief,
+        research_packet=research_packet,
     )
     packet["research_packet"] = packet_to_brief_payload(research_packet)
     if args.save:
