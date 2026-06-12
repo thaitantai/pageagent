@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from config import AgentConfig
-from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.llm import build_llm_client
 from fanpage_agent.config import Settings
 from tools import (
     dispatch_tool,

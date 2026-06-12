@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.llm import build_llm_client
 from fanpage_agent.tools.content.content_stats import compute_content_stats
 from fanpage_agent.tools.content.writer import WriterTool
 

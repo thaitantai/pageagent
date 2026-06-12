@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.llm import build_llm_client
 from fanpage_agent.legacy_cli import build_daily_artifacts, build_ops_status_payload
 from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool
 from fanpage_agent.tools.publishing.planner import PlannerTool

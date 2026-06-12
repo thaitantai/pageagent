@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fanpage_agent.adapters.llm_client import MockLLMClient
+from fanpage_agent.adapters.llm import MockLLMClient
 from fanpage_agent.models import BrandProfile, PlanDay, ResearchBrief, WeeklyPlan
 from fanpage_agent.tools.publishing.planner import PlannerTool
 from fanpage_agent.tools.research.research import ResearchTool

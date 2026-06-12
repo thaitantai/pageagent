@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.llm import build_llm_client
 from fanpage_agent.tools.publishing.calendar_gap_service import CalendarGapTool
 from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool
 from fanpage_agent.tools.publishing.planner import PlannerTool

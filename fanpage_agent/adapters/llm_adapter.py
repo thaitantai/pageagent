@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fanpage_agent.adapters.llm_client import (
+from fanpage_agent.adapters.llm import (
     OpenAICompatibleClient as _RealLLMClient,
 )
 from fanpage_agent.adapters.settings import get_settings

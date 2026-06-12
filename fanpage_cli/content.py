@@ -6,7 +6,7 @@ import sys
 from datetime import timezone
 
 from fanpage_agent.adapters.facebook_client import FacebookClient
-from fanpage_agent.adapters.llm_client import build_llm_client
+from fanpage_agent.adapters.llm import build_llm_client
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings

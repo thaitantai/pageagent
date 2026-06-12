@@ -175,7 +175,7 @@ def _test_telegram() -> list[str]:
 def _test_llm() -> list[str]:
     errors: list[str] = []
     try:
-        from fanpage_agent.adapters.llm_client import build_llm_client
+        from fanpage_agent.adapters.llm import build_llm_client
         from fanpage_agent.config import Settings
         from fanpage_agent.tools.publishing.planner import PlannerTool
 

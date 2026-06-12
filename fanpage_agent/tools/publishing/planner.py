@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fanpage_agent.adapters.llm_client import MockLLMClient
+from fanpage_agent.adapters.llm import MockLLMClient
 from fanpage_agent.models import BrandProfile, ContentStrategy, ResearchBrief, WeeklyPlan
 
 
