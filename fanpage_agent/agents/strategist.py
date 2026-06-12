@@ -17,6 +17,7 @@ from fanpage_agent.core.types import (
     AgentTask,
 )
 from fanpage_agent.prompts._loader import PromptLoader
+from fanpage_agent.tools.content import strategy_core
 
 
 def _strategist_system_prompt() -> str:
@@ -183,7 +184,9 @@ Yêu cầu output JSON:
                         "brand_id": self._brand_id,
                         "schedule": data.get("schedule", []),
                         "pillar_distribution": data.get("pillar_distribution", {}),
-                        "recommended_posting_times": data.get("recommended_posting_times", ["09:00", "12:00", "20:00"]),
+                        "recommended_posting_times": data.get(
+                            "recommended_posting_times", list(strategy_core.DEFAULT_POSTING_TIMES)
+                        ),
                         "reasoning": data.get("reasoning", ""),
                         "research_priority_topics": research_context["priority_topics"],
                         "research_blocked_topics": research_context["blocked_topics"],
@@ -397,20 +400,7 @@ Yêu cầu output JSON:
 
     @staticmethod
     def _select_content_angle(topic: dict[str, Any], safe_use: str) -> str:
-        text = str(topic.get("topic", "")).lower()
-        codes = {str(code) for code in topic.get("reason_codes", [])}
-        score = float(topic.get("total_score") or 0)
-        if "comparison" in text or "so sánh" in text:
-            return "fair_comparison"
-        if "sai lầm" in text or "myth" in text or "lầm tưởng" in text:
-            return "cautionary_post"
-        if "checklist" in text or safe_use == "human_review_only":
-            return "checklist"
-        if any(code.startswith("affiliate") or code.startswith("product") for code in codes):
-            return "guarded_buying_guide" if score >= 0.8 and safe_use == "public_draft" else "checklist"
-        if any(word in text for word in ["review", "top", "sản phẩm", "san pham"]):
-            return "fair_comparison"
-        return "education"
+        return strategy_core.select_content_angle(topic, safe_use)
 
     def _build_strategy_packet(
         self,
@@ -475,75 +465,23 @@ Yêu cầu output JSON:
         }
 
     def _score_strategy_variants(self, item: dict[str, Any], feedback_context: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-        angle = str(item.get("content_angle") or "education")
-        safe_use = str(item.get("safe_use") or "public_draft")
-        review_required = bool(item.get("review_required"))
-        candidates = [
-            {
-                "name": "community_education",
-                "format": "text_image",
-                "hook_style": "relatable_problem",
-                "score": 0.62,
-                "why": "An toan cho noi dung giao duc va de duyet.",
-            },
-            {
-                "name": "checklist_carousel",
-                "format": "carousel",
-                "hook_style": "saveable_checklist",
-                "score": 0.66,
-                "why": "Phu hop khi can nhieu dieu kien, uu-nhuoc diem hoac review nguon.",
-            },
-            {
-                "name": "soft_buying_guide",
-                "format": "carousel",
-                "hook_style": "decision_helper",
-                "score": 0.58,
-                "why": "Chi dung khi evidence du manh va van giu CTA mem.",
-            },
-        ]
-        signals = (feedback_context or {}).get("signals", [])
-        preferred_formats = {
-            str(signal.get("format"))
-            for signal in signals
-            if isinstance(signal, dict) and signal.get("format")
-        }
-        for candidate in candidates:
-            if candidate["format"] in preferred_formats:
-                candidate["score"] += 0.07
-            if angle in {"checklist", "fair_comparison"} and candidate["name"] == "checklist_carousel":
-                candidate["score"] += 0.18
-            if angle == "guarded_buying_guide" and candidate["name"] == "soft_buying_guide":
-                candidate["score"] += 0.22
-            if angle == "cautionary_post" and candidate["name"] == "community_education":
-                candidate["score"] += 0.16
-            if safe_use != "public_draft" and candidate["name"] == "soft_buying_guide":
-                candidate["score"] -= 0.3
-            if review_required and candidate["name"] == "checklist_carousel":
-                candidate["score"] += 0.08
-            candidate["score"] = round(max(0, min(1, candidate["score"])), 2)
-        return sorted(candidates, key=lambda value: value["score"], reverse=True)
+        return strategy_core.score_strategy_variants(item, feedback_context)
 
     @staticmethod
     def _infer_pillar(topic: str) -> str:
-        text = topic.lower()
-        if any(word in text for word in ["routine", "buổi sáng", "buổi tối", "layer"]):
-            return "skincare_routine"
-        if any(word in text for word in ["vitamin", "retinol", "niacinamide", "bha", "aha"]):
-            return "ingredient_deepdive"
-        if any(word in text for word in ["myth", "lầm tưởng", "sai lầm"]):
-            return "myth_busting"
-        if any(word in text for word in ["review", "so sánh", "top", "sản phẩm"]):
-            return "product_review"
-        if any(word in text for word in ["genz", "sinh viên", "văn phòng", "du lịch"]):
-            return "genz_lifestyle"
-        return "medical_reference"
+        """Map free text to a pillar (template-key taxonomy)."""
+        return strategy_core.infer_pillar(
+            topic,
+            strategy_core.AGENT_PILLAR_TAXONOMY,
+            strategy_core.AGENT_PILLAR_DEFAULT,
+        )
 
     def _recommend_times(self) -> list[str]:
         """Return optimal posting times based on memory."""
         if not self._memory:
-            return ["09:00", "12:00", "20:00"]
+            return list(strategy_core.DEFAULT_POSTING_TIMES)
         top = self._memory.get_top_patterns(pattern_type="posting_hour", limit=3)
-        return [p.value for p in top] if top else ["09:00", "12:00", "20:00"]
+        return [p.value for p in top] if top else list(strategy_core.DEFAULT_POSTING_TIMES)
 
     def _gap_analysis(self, calendar: list[dict]) -> AgentResult:
         """Identify gaps in the content calendar."""

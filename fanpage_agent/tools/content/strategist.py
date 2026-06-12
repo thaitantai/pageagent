@@ -26,6 +26,8 @@ from fanpage_agent.models import (
     ResearchBrief,
     StrategyIdea,
 )
+from fanpage_agent.tools.content import strategy_core
+from fanpage_agent.tools.content.strategy_core import DEFAULT_POSTING_TIMES
 from fanpage_agent.tools.research.competitor_page_discovery import (
     CompetitorPageDiscoveryTool,
 )
@@ -40,12 +42,6 @@ DEFAULT_PILLAR_MIX: dict[str, float] = {
     "routine_guide": 0.20,
     "viet_brand_spotlight": 0.15,
 }
-
-DEFAULT_POSTING_TIMES: list[str] = [
-    "09:00",
-    "12:00",
-    "20:00",
-]
 
 
 class StrategistTool:
@@ -162,39 +158,13 @@ class StrategistTool:
         research_brief: ResearchBrief | None = None,
     ) -> dict[str, float]:
         """Compute pillar mix from brand profile pillars + research signals."""
-        pillar_names = [p.pillar_name for p in profile.content_pillars]
-        if not pillar_names:
-            return dict(DEFAULT_PILLAR_MIX)
-
-        # Start with default mix, keep only pillars that exist in profile
-        mix = {k: v for k, v in DEFAULT_PILLAR_MIX.items() if k in pillar_names}
-
-        # Add any extra pillars from profile (evenly split from remainder)
-        extra_pillars = [p for p in pillar_names if p not in mix]
-        if extra_pillars:
-            remainder = 1.0 - sum(mix.values())
-            each = remainder / len(extra_pillars)
-            for p in extra_pillars:
-                mix[p] = round(each, 2)
-
-        # Normalize
-        total = sum(mix.values())
-        if total > 0:
-            mix = {k: round(v / total, 2) for k, v in mix.items()}
-
-        # Adjust from research signals
-        if research_brief and research_brief.recommended_pillars:
-            boost = research_brief.recommended_pillars[:3]
-            for p in boost:
-                if p in mix:
-                    mix[p] = min(mix[p] + 0.10, 0.50)
-
-        # Re-normalize
-        total = sum(mix.values())
-        if total > 0:
-            mix = {k: round(v / total, 2) for k, v in mix.items()}
-
-        return mix
+        return strategy_core.compute_pillar_mix(
+            pillar_names=[p.pillar_name for p in profile.content_pillars],
+            default_mix=DEFAULT_PILLAR_MIX,
+            recommended_pillars=(
+                research_brief.recommended_pillars if research_brief else None
+            ),
+        )
 
     def _mock_trend_ideas(
         self,
@@ -394,28 +364,16 @@ Viết reasoning bằng tiếng Việt. Phân bổ pillar phải dựa trên m�
         research_brief: ResearchBrief | None = None,
     ) -> int:
         """Suggest weekly posting frequency based on goals and research."""
-        goals = {g.lower() for g in profile.fanpage_goals}
-        if "reach" in goals and "engagement" in goals:
-            return 7
-        if "lead" in goals:
-            return 5
-        return 5
+        return strategy_core.compute_weekly_frequency(profile.fanpage_goals)
 
     @staticmethod
     def _infer_pillar(text: str) -> str:
-        """Map a topic/idea to the most likely pillar."""
-        t = text.lower()
-        if any(w in t for w in ["routine", "sáng", "tối", "layer", "bước"]):
-            return "routine_guide"
-        if any(w in t for w in ["việt", "cocoon", "thuần việt", "nội địa"]):
-            return "viet_brand_spotlight"
-        if any(w in t for w in ["vitamin", "retinol", "niacinamide", "bha", "aha", "thành phần", "ingredient"]):
-            return "education"
-        if any(w in t for w in ["myth", "lầm tưởng", "sai lầm", "thật"]):
-            return "myth_busting"
-        if any(w in t for w in ["review", "so sánh", "sản phẩm", "đáng mua", "giá"]):
-            return "product_review"
-        return "education"
+        """Map a topic/idea to the most likely pillar (brand-profile taxonomy)."""
+        return strategy_core.infer_pillar(
+            text,
+            strategy_core.TOOL_PILLAR_TAXONOMY,
+            strategy_core.TOOL_PILLAR_DEFAULT,
+        )
 
     @staticmethod
     def _strategist_system_prompt() -> str:
@@ -479,13 +437,4 @@ Viết reasoning bằng tiếng Việt. Phân bổ pillar phải dựa trên m�
     @staticmethod
     def _extract_json(text: str) -> str:
         """Extract JSON from LLM response (handles markdown code fences)."""
-        import re
-        # Try ```json ... ``` first
-        m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
-        if m:
-            return m.group(1).strip()
-        # Try standalone { ... }
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            return m.group(0)
-        return text.strip()
+        return strategy_core.extract_json(text)
