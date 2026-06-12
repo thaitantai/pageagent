@@ -83,18 +83,18 @@ class CompetitorPageDiscoveryTool:
         else:
             # Competitor search: chỉ dùng SearXNG + DDG, bỏ VNCrawler
             # VNCrawler crawl site cố định (hellobacsi, chiaki...) không liên quan đối thủ
+            from fanpage_agent.adapters.settings import get_settings
             from fanpage_agent.scraping.multi_source_search import (
                 DDGBackend,
                 MultiSourceSearchClient,
                 SearXNGBackend,
             )
 
-            searxng = SearXNGBackend(base_url="http://localhost:8899", timeout=10)
+            searxng = SearXNGBackend(
+                base_url=get_settings().searxng_base_url, timeout=10
+            )
             ddg = DDGBackend(timeout=6)
-            client = MultiSourceSearchClient()
-            # Override backends: chỉ SearXNG + DDG (bỏ VNCrawler — site cố định không liên quan đối thủ)
-            client._backends = [searxng, ddg]
-            self._web_search = client
+            self._web_search = MultiSourceSearchClient(backends=[searxng, ddg])
 
     # ── Public API ──────────────────────────────────────────
 

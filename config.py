@@ -94,6 +94,9 @@ class Settings(BaseModel):
     img_base_url: str = ""
     img_model: str = "dall-e-3"
     artifacts_dir: Path = Path("artifacts")
+    # Self-hosted SearXNG instance for trend/competitor research
+    # (docker-compose service "searxng"). Env var: SEARXNG_BASE_URL.
+    searxng_base_url: str = "http://localhost:8899"
 
     # Multi-page support: list of PageConfig dicts
     pages: list[dict] = Field(default_factory=list, exclude=True)

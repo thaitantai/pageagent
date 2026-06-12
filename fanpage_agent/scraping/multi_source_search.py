@@ -300,11 +300,28 @@ class MultiSourceSearchClient:
 
     def __init__(
         self,
-        searxng_base_url: str = "http://localhost:8899",
+        searxng_base_url: str | None = None,
         timeout: int = 15,
+        backends: list[SearchBackend] | None = None,
     ):
+        """Build the client.
+
+        Args:
+            searxng_base_url: SearXNG instance URL. Defaults to
+                ``Settings.searxng_base_url`` (env ``SEARXNG_BASE_URL``).
+            timeout: per-backend timeout in seconds.
+            backends: explicit backend list — overrides the default trio
+                (SearXNG + VNCrawler + DDG) when callers need a subset.
+        """
         self.timeout = timeout
-        self._backends: list[SearchBackend] = [
+        if backends is not None:
+            self._backends: list[SearchBackend] = list(backends)
+            return
+        if searxng_base_url is None:
+            from fanpage_agent.adapters.settings import get_settings
+
+            searxng_base_url = get_settings().searxng_base_url
+        self._backends = [
             SearXNGBackend(base_url=searxng_base_url, timeout=timeout),
             VNCrawlerBackend(timeout=timeout),
             DDGBackend(timeout=timeout),
