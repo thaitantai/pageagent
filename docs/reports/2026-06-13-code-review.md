@@ -104,5 +104,11 @@ Hai "não" tồn tại song song: **Runtime A** (root `agent.py` — LLM tool-lo
 | Baseline test | 🟢 647 passed / 0 failed (Windows, `PYTHONUTF8=1`) |
 | P0 .gitignore + tools/data | 🟢 commit `76ad1ef` |
 | Windows compat + sqlite leak | 🟢 commit `0c76de6` |
-| Refactor 6 phase | Xem [refactor plan](../plans/2026-06-13-refactor-plan.md) |
-| Expansion 5 increment | Xem [expansion plan](../plans/2026-06-13-expansion-plan.md) |
+| Phase 1 quick wins (1.1–1.5) | 🟢 5 commits (SearXNG→Settings, dọn nuốt lỗi, rate-limit, deps+lock+packaging, `Settings.require`) |
+| Phase 2 strategist core | 🟢 `3d03377` — `strategy_core.py` chung, 2 taxonomy cạnh nhau |
+| Phase 3 store Protocol + bug sqlite | 🟢 `9d114d5` — kèm fix leak connection UnifiedStore + rollback mất history |
+| Phase 4 LLM flatten | 🟢 `a018f43` |
+| Phase 5 CLI consolidation | 🟢 `61e683a`+`bf849f1`+`3d69359` — 1 cây parser + 1 dispatch table, xóa ~2k LOC trùng, parity test |
+| Increment 1 score-before-approval | 🟢 `7bf4cc4` — predictor nối vào approval queue + daily packet + Telegram (kèm fix bug `--score-variants` xóa items) |
+| Suite cuối | 🟢 659 passed / 0 failed |
+| Expansion Increment 2-5 | Chưa làm — xem [expansion plan](../plans/2026-06-13-expansion-plan.md) |
