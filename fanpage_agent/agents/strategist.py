@@ -185,6 +185,8 @@ Yêu cầu output JSON:
                         "recommended_posting_times": data.get("recommended_posting_times", ["09:00", "12:00", "20:00"]),
                         "reasoning": data.get("reasoning", ""),
                         "research_priority_topics": research_context["priority_topics"],
+                        "research_blocked_topics": research_context["blocked_topics"],
+                        "research_evidence_status": research_context["evidence_status"],
                         "research_confidence": research_context["confidence_score"],
                         "page_context": research_context.get("page_context", {}),
                         "generated_by": "llm",
@@ -230,11 +232,18 @@ Yêu cầu output JSON:
         pillars = list(templates.keys())
         priority_topics = research_context["priority_topics"]
         schedule = []
+        blocked_topics = research_context["blocked_topics"]
         for day_offset in range(days):
             if day_offset < len(priority_topics):
-                chosen = self._infer_pillar(priority_topics[day_offset].get("topic", ""))
-                topic = priority_topics[day_offset].get("topic", "")
+                topic_entry = priority_topics[day_offset]
+                chosen = self._infer_pillar(topic_entry.get("topic", ""))
+                topic = topic_entry.get("topic", "")
+            elif not priority_topics and day_offset < len(blocked_topics):
+                topic_entry = blocked_topics[day_offset]
+                chosen = self._infer_pillar(topic_entry.get("topic", ""))
+                topic = f"Research follow-up: {topic_entry.get('topic', '')}"
             else:
+                topic_entry = {}
                 chosen = random.choice(pillars)
                 topic = random.choice(templates[chosen])
             schedule.append({
@@ -242,6 +251,9 @@ Yêu cầu output JSON:
                 "pillar": chosen,
                 "topic_template": topic,
                 "platform": "facebook",
+                "strategy_action": topic_entry.get("strategy_action", "draft"),
+                "safe_use": topic_entry.get("safe_use", "public_draft"),
+                "review_required": topic_entry.get("review_required", False),
             })
 
         return AgentResult(
@@ -255,6 +267,8 @@ Yêu cầu output JSON:
                 },
                 "recommended_posting_times": self._recommend_times(),
                 "research_priority_topics": priority_topics,
+                "research_blocked_topics": research_context["blocked_topics"],
+                "research_evidence_status": research_context["evidence_status"],
                 "research_confidence": research_context["confidence_score"],
                 "page_context": research_context.get("page_context", {}),
                 "generated_by": "template",
@@ -267,27 +281,94 @@ Yêu cầu output JSON:
         if "brief" in brief and isinstance(brief.get("brief"), dict):
             brief = brief["brief"]
 
+        evidence_status = self._evidence_status(packet)
         priority_topics = []
         for item in brief.get("topic_scores", [])[:10]:
             if isinstance(item, dict) and item.get("topic"):
+                topic_guard = self._topic_guardrails(item, evidence_status)
                 priority_topics.append({
                     "topic": str(item.get("topic", "")),
                     "total_score": item.get("total_score", 0),
                     "duplication_risk": item.get("duplication_risk", 0),
+                    "evidence_status": topic_guard["evidence_status"],
+                    "safe_use": topic_guard["safe_use"],
+                    "strategy_action": topic_guard["strategy_action"],
+                    "review_required": topic_guard["review_required"],
+                    "follow_up_questions": topic_guard["follow_up_questions"],
                 })
 
         if not priority_topics:
             priority_topics = [{"topic": t, "total_score": 0, "duplication_risk": 0} for t in brief.get("next_angles", [])[:10]]
+
+        writable_topics = [
+            topic for topic in priority_topics
+            if topic.get("strategy_action") != "research_follow_up"
+        ]
 
         findings = []
         for finding in brief.get("findings", [])[:10]:
             findings.append(str(finding))
 
         return {
-            "priority_topics": priority_topics,
+            "priority_topics": writable_topics,
+            "blocked_topics": [
+                topic for topic in priority_topics
+                if topic.get("strategy_action") == "research_follow_up"
+            ],
             "findings": findings,
             "confidence_score": brief.get("confidence_score", 0),
+            "evidence_status": evidence_status,
             "page_context": packet.get("page_context", {}) if isinstance(packet, dict) else {},
+        }
+
+    @staticmethod
+    def _evidence_status(packet: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(packet, dict):
+            return {"status": "unknown", "max_safe_use": "public_draft", "gate_reasons": []}
+        policy = packet.get("handoff_policy") or {}
+        max_safe_use = policy.get("max_safe_use") if isinstance(policy, dict) else None
+        return {
+            "status": str(packet.get("status") or "ready"),
+            "max_safe_use": str(max_safe_use or "public_draft"),
+            "gate_reasons": list(packet.get("gate_reasons") or []),
+        }
+
+    @staticmethod
+    def _topic_guardrails(topic: dict[str, Any], evidence_status: dict[str, Any]) -> dict[str, Any]:
+        status = evidence_status.get("status", "ready")
+        max_safe_use = evidence_status.get("max_safe_use", "public_draft")
+        is_affiliate = any(
+            str(code).startswith("affiliate") or str(code).startswith("product")
+            for code in topic.get("reason_codes", [])
+        )
+        topic_text = str(topic.get("topic", "chu de nay"))
+
+        if max_safe_use == "draft_questions_only":
+            return {
+                "evidence_status": status,
+                "safe_use": "research_questions_only",
+                "strategy_action": "research_follow_up",
+                "review_required": True,
+                "follow_up_questions": [
+                    f"Can bo sung nguon doc lap nao de kiem chung '{topic_text}'?",
+                    "Co du it nhat 2 URL evidence va 2 source/domain doc lap chua?",
+                    "Canh bao/uu-nhuoc diem nao can dua vao truoc khi viet bai public?",
+                ],
+            }
+        if status == "needs_review" or (is_affiliate and max_safe_use == "human_review"):
+            return {
+                "evidence_status": status,
+                "safe_use": "human_review_only",
+                "strategy_action": "draft_with_review",
+                "review_required": True,
+                "follow_up_questions": [],
+            }
+        return {
+            "evidence_status": status,
+            "safe_use": "public_draft",
+            "strategy_action": "draft",
+            "review_required": False,
+            "follow_up_questions": [],
         }
 
     @staticmethod

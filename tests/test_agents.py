@@ -95,6 +95,97 @@ class TestStrategistAgent:
         assert result.data["schedule"][0]["pillar"] == "product_review"
         assert result.data["page_context"]["topic_focus"] == "phuc hoi da treatment"
 
+    def test_plan_weekly_blocks_public_brief_when_evidence_gate_blocks(self, agent):
+        packet = {
+            "status": "blocked",
+            "gate_reasons": ["affiliate topic needs verified sources"],
+            "handoff_policy": {"max_safe_use": "draft_questions_only"},
+            "brief": {
+                "confidence_score": 0.3,
+                "topic_scores": [
+                    {
+                        "topic": "Review kem chong nang affiliate dang hot",
+                        "total_score": 0.72,
+                        "reason_codes": ["affiliate_offer", "product_candidate"],
+                    }
+                ],
+            },
+        }
+        task = AgentTask(
+            id="p5",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={"days": 1, "research_brief": packet},
+        )
+
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["research_priority_topics"] == []
+        assert result.data["research_blocked_topics"][0]["safe_use"] == "research_questions_only"
+        assert result.data["research_blocked_topics"][0]["follow_up_questions"]
+        assert result.data["schedule"][0]["strategy_action"] == "research_follow_up"
+        assert result.data["schedule"][0]["safe_use"] == "research_questions_only"
+        assert result.data["schedule"][0]["topic_template"].startswith("Research follow-up:")
+
+    def test_plan_weekly_marks_needs_review_topic_for_human_review(self, agent):
+        packet = {
+            "status": "needs_review",
+            "handoff_policy": {"max_safe_use": "human_review"},
+            "brief": {
+                "confidence_score": 0.63,
+                "topic_scores": [
+                    {
+                        "topic": "Checklist chon serum phuc hoi cho da treatment",
+                        "total_score": 0.76,
+                        "reason_codes": ["affiliate_offer"],
+                    }
+                ],
+            },
+        }
+        task = AgentTask(
+            id="p6",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={"days": 1, "research_brief": packet},
+        )
+
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["research_priority_topics"][0]["safe_use"] == "human_review_only"
+        assert result.data["schedule"][0]["strategy_action"] == "draft_with_review"
+        assert result.data["schedule"][0]["review_required"] is True
+
+    def test_plan_weekly_keeps_ready_non_affiliate_topic_writable(self, agent):
+        packet = {
+            "status": "ready",
+            "handoff_policy": {"max_safe_use": "public_draft"},
+            "brief": {
+                "confidence_score": 0.82,
+                "topic_scores": [
+                    {
+                        "topic": "3 sai lam khi dung kem chong nang trong van phong",
+                        "total_score": 0.84,
+                        "reason_codes": ["education"],
+                    }
+                ],
+            },
+        }
+        task = AgentTask(
+            id="p7",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={"days": 1, "research_brief": packet},
+        )
+
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["research_blocked_topics"] == []
+        assert result.data["schedule"][0]["strategy_action"] == "draft"
+        assert result.data["schedule"][0]["safe_use"] == "public_draft"
+
     def test_generate_ideas(self, agent):
         task = AgentTask(id="i1", target=AgentRole.STRATEGIST, action="generate_ideas",
                         params={"pillar": "skincare_routine", "count": 3})
