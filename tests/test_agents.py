@@ -186,6 +186,8 @@ class TestStrategistAgent:
         assert result.success
         assert result.data["schedule"][0]["content_angle"] == "guarded_buying_guide"
         assert result.data["schedule"][0]["promise_boundaries"]
+        assert result.data["schedule"][0]["selected_variant"]["name"] == "soft_buying_guide"
+        assert result.data["schedule"][0]["strategy_variants"][0]["score"] >= 0.8
 
     def test_plan_weekly_keeps_ready_non_affiliate_topic_writable(self, agent):
         packet = {

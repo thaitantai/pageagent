@@ -246,7 +246,7 @@ Yêu cầu output JSON:
                 topic_entry = {}
                 chosen = random.choice(pillars)
                 topic = random.choice(templates[chosen])
-            schedule.append({
+            item = {
                 "day_offset": day_offset,
                 "pillar": chosen,
                 "topic_template": topic,
@@ -257,7 +257,10 @@ Yêu cầu output JSON:
                 "content_angle": topic_entry.get("content_angle", "education"),
                 "cta_policy": topic_entry.get("cta_policy", "educational_cta"),
                 "promise_boundaries": topic_entry.get("promise_boundaries", []),
-            })
+            }
+            item["strategy_variants"] = self._score_strategy_variants(item)
+            item["selected_variant"] = item["strategy_variants"][0]
+            schedule.append(item)
 
         return AgentResult(
             task_id=f"plan-{days}d",
@@ -403,6 +406,47 @@ Yêu cầu output JSON:
         if any(word in text for word in ["review", "top", "sản phẩm", "san pham"]):
             return "fair_comparison"
         return "education"
+
+    def _score_strategy_variants(self, item: dict[str, Any]) -> list[dict[str, Any]]:
+        angle = str(item.get("content_angle") or "education")
+        safe_use = str(item.get("safe_use") or "public_draft")
+        review_required = bool(item.get("review_required"))
+        candidates = [
+            {
+                "name": "community_education",
+                "format": "text_image",
+                "hook_style": "relatable_problem",
+                "score": 0.62,
+                "why": "An toan cho noi dung giao duc va de duyet.",
+            },
+            {
+                "name": "checklist_carousel",
+                "format": "carousel",
+                "hook_style": "saveable_checklist",
+                "score": 0.66,
+                "why": "Phu hop khi can nhieu dieu kien, uu-nhuoc diem hoac review nguon.",
+            },
+            {
+                "name": "soft_buying_guide",
+                "format": "carousel",
+                "hook_style": "decision_helper",
+                "score": 0.58,
+                "why": "Chi dung khi evidence du manh va van giu CTA mem.",
+            },
+        ]
+        for candidate in candidates:
+            if angle in {"checklist", "fair_comparison"} and candidate["name"] == "checklist_carousel":
+                candidate["score"] += 0.18
+            if angle == "guarded_buying_guide" and candidate["name"] == "soft_buying_guide":
+                candidate["score"] += 0.22
+            if angle == "cautionary_post" and candidate["name"] == "community_education":
+                candidate["score"] += 0.16
+            if safe_use != "public_draft" and candidate["name"] == "soft_buying_guide":
+                candidate["score"] -= 0.3
+            if review_required and candidate["name"] == "checklist_carousel":
+                candidate["score"] += 0.08
+            candidate["score"] = round(max(0, min(1, candidate["score"])), 2)
+        return sorted(candidates, key=lambda value: value["score"], reverse=True)
 
     @staticmethod
     def _infer_pillar(topic: str) -> str:
