@@ -218,6 +218,37 @@ class TestStrategistAgent:
         assert result.data["schedule"][0]["strategy_action"] == "draft"
         assert result.data["schedule"][0]["safe_use"] == "public_draft"
 
+    def test_plan_weekly_uses_performance_feedback_for_variant_scores(self):
+        class Memory:
+            def pillar_performance(self):
+                return [{"pillar": "product_review", "avg_engagement": 42}]
+
+            def get_top_patterns(self, pattern_type=None, limit=3):
+                return []
+
+        agent = StrategistAgent(config={}, performance_memory=Memory())
+        task = AgentTask(
+            id="p9",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={
+                "days": 1,
+                "research_brief": {
+                    "confidence_score": 0.82,
+                    "topic_scores": [
+                        {"topic": "So sánh kem chống nắng Nhật vs Hàn", "total_score": 0.8}
+                    ],
+                },
+            },
+        )
+
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["feedback_context"]["available"] is True
+        assert result.data["schedule"][0]["feedback_signals"][0]["pillar"] == "product_review"
+        assert result.data["schedule"][0]["selected_variant"]["format"] == "carousel"
+
     def test_generate_ideas(self, agent):
         task = AgentTask(id="i1", target=AgentRole.STRATEGIST, action="generate_ideas",
                         params={"pillar": "skincare_routine", "count": 3})

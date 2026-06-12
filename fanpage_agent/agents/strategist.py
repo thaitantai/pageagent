@@ -116,6 +116,7 @@ class StrategistAgent(BaseAgent):
         packet = research_brief or {}
         page_context = packet.get("page_context", {}) if isinstance(packet, dict) else {}
         research_context = self._normalise_research_context(research_brief)
+        feedback_context = self._feedback_context()
         if page_context:
             research_context["page_context"] = page_context
 
@@ -257,8 +258,9 @@ Yêu cầu output JSON:
                 "content_angle": topic_entry.get("content_angle", "education"),
                 "cta_policy": topic_entry.get("cta_policy", "educational_cta"),
                 "promise_boundaries": topic_entry.get("promise_boundaries", []),
+                "feedback_signals": feedback_context["signals"],
             }
-            item["strategy_variants"] = self._score_strategy_variants(item)
+            item["strategy_variants"] = self._score_strategy_variants(item, feedback_context)
             item["selected_variant"] = item["strategy_variants"][0]
             schedule.append(item)
 
@@ -277,6 +279,7 @@ Yêu cầu output JSON:
                 "research_evidence_status": research_context["evidence_status"],
                 "research_confidence": research_context["confidence_score"],
                 "page_context": research_context.get("page_context", {}),
+                "feedback_context": feedback_context,
                 "generated_by": "template",
             },
         )
@@ -407,7 +410,31 @@ Yêu cầu output JSON:
             return "fair_comparison"
         return "education"
 
-    def _score_strategy_variants(self, item: dict[str, Any]) -> list[dict[str, Any]]:
+    def _feedback_context(self) -> dict[str, Any]:
+        if not self._memory:
+            return {"available": False, "signals": [], "notes": ["Chua co du lieu performance noi bo."]}
+        signals: list[dict[str, Any]] = []
+        try:
+            for row in self._memory.pillar_performance()[:3]:
+                pillar = str(row.get("pillar", ""))
+                if not pillar:
+                    continue
+                avg_engagement = row.get("avg_engagement", 0)
+                signals.append({
+                    "type": "pillar_performance",
+                    "pillar": pillar,
+                    "avg_engagement": avg_engagement,
+                    "format": "carousel" if "review" in pillar or "ingredient" in pillar else "text_image",
+                })
+        except Exception:
+            return {"available": False, "signals": [], "notes": ["Khong doc duoc performance memory."]}
+        return {
+            "available": bool(signals),
+            "signals": signals,
+            "notes": ["Uu tien format/pillar tung co engagement tot."] if signals else ["Chua co pattern du manh."],
+        }
+
+    def _score_strategy_variants(self, item: dict[str, Any], feedback_context: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         angle = str(item.get("content_angle") or "education")
         safe_use = str(item.get("safe_use") or "public_draft")
         review_required = bool(item.get("review_required"))
@@ -434,7 +461,15 @@ Yêu cầu output JSON:
                 "why": "Chi dung khi evidence du manh va van giu CTA mem.",
             },
         ]
+        signals = (feedback_context or {}).get("signals", [])
+        preferred_formats = {
+            str(signal.get("format"))
+            for signal in signals
+            if isinstance(signal, dict) and signal.get("format")
+        }
         for candidate in candidates:
+            if candidate["format"] in preferred_formats:
+                candidate["score"] += 0.07
             if angle in {"checklist", "fair_comparison"} and candidate["name"] == "checklist_carousel":
                 candidate["score"] += 0.18
             if angle == "guarded_buying_guide" and candidate["name"] == "soft_buying_guide":
