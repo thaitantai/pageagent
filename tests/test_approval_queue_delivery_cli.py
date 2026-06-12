@@ -142,6 +142,10 @@ server.handle_request()
         self.assertIn("Approval Queue", sent_message["text"])
         self.assertIn("weekly-plan-brand_abc-2026-06-24-1", sent_message["text"])
         self.assertIn("draft caption", sent_message["text"].lower())
+        # Scoring runs by default (no flag passed) and must NOT replace the
+        # items list with the scoring summary (regression).
+        self.assertIn("variant_scoring", payload)
+        self.assertIsInstance(payload["items"], list)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from fanpage_agent.tools.publishing.telegram_formatter import TelegramFormatterT
 from fanpage_agent.utils import dump_json
 
 from .parser import ROOT_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def _content_package_from_caption_item(
@@ -70,20 +73,45 @@ def _content_package_from_caption_item(
     return ContentPackage(**package_data)
 
 
+def _build_predictor(predictor_store=None):
+    """Best-effort engagement predictor — approval delivery never blocks on it."""
+    import sqlite3
+
+    try:
+        from fanpage_agent.adapters.sqlite_store import UnifiedStore
+        from fanpage_agent.tools.research.learning_predictor import PerformancePredictor
+
+        predictor = PerformancePredictor(
+            predictor_store if predictor_store is not None else UnifiedStore()
+        )
+        return predictor, predictor.get_quality().get("status", "untrained")
+    except (ImportError, OSError, sqlite3.Error) as exc:
+        logger.warning("Engagement predictor unavailable for scoring: %s", exc)
+        return None, "untrained"
+
+
 def enrich_items_with_variant_scores(
     items: list[dict],
     memory_db: str | Path | None = None,
+    predictor_store=None,
 ) -> dict:
-    """Calculate variant quality scores and attach to each item's variants.
-    Mutates items in-place and returns a summary dict."""
+    """Calculate variant quality scores + engagement prediction per item.
+
+    Mutates items in-place (``variant_scores``, ``recommended_variant``,
+    ``quality``) and returns a summary dict. The ``quality`` block carries
+    the winning variant score, the PerformancePredictor estimate, and the
+    predictor status — see docs/plans/2026-06-13-expansion-plan.md §A.
+    """
     if not items:
-        return {"scored_items": 0, "skipped_items": 0}
+        return {"scored_items": 0, "skipped_items": 0, "predictor_status": "untrained"}
 
     from fanpage_agent.memory import PerformanceMemory
+    from fanpage_agent.tools.research.learning_predictor import quality_block
     from fanpage_agent.tools.research.variant_scorer import VariantScorer
 
     memory = PerformanceMemory(Path(memory_db) if memory_db else None)
     scorer = VariantScorer(memory)
+    predictor, predictor_status = _build_predictor(predictor_store)
 
     scored = 0
     for item in items:
@@ -112,14 +140,24 @@ def enrich_items_with_variant_scores(
             item["variants"] = new_variants
         elif "caption_ideas" in item:
             item["caption_ideas"] = new_variants
+        winning_score = None
         if package.winning_variant:
+            winning_score = next(
+                (s.score for s in scored_variants if s.variant_id == package.winning_variant.variant_id),
+                None,
+            )
             item["recommended_variant"] = {
                 "variant_id": package.winning_variant.variant_id,
-                "score": next((s.score for s in scored_variants if s.variant_id == package.winning_variant.variant_id), None),
+                "score": winning_score,
             }
+        item["quality"] = quality_block(winning_score, predictor=predictor)
         scored += 1
 
-    return {"scored_items": scored, "skipped_items": len(items) - scored}
+    return {
+        "scored_items": scored,
+        "skipped_items": len(items) - scored,
+        "predictor_status": predictor_status,
+    }
 
 
 def cmd_write_caption(args: argparse.Namespace) -> int:

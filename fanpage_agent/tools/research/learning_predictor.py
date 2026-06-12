@@ -160,4 +160,60 @@ class PerformancePredictor:
         return self.get_quality().get("drift", False)
 
 
-__all__ = ["PerformancePredictor"]
+def confidence_bucket(confidence: float) -> str:
+    """Map a 0-1 confidence to the operator-facing high/medium/low label."""
+    if confidence >= 0.75:
+        return "high"
+    if confidence >= 0.45:
+        return "medium"
+    return "low"
+
+
+def quality_block(
+    score: float | None,
+    store: "UnifiedStore | None" = None,
+    predictor: PerformancePredictor | None = None,
+    evidence_status: str | None = None,
+) -> dict[str, Any]:
+    """Best-effort quality block for approval/daily payloads — never raises.
+
+    ``score`` is the 0-1 quality signal fed to the predictor: the winning
+    variant score in the approval lane, the research-brief confidence in
+    the daily-packet lane. An untrained/unavailable predictor yields
+    ``predictor_status: "untrained"`` with null prediction — delivery is
+    never blocked on scoring.
+    """
+    import sqlite3
+
+    status = "untrained"
+    predicted = None
+    bucket = None
+    try:
+        if predictor is None:
+            from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
+            predictor = PerformancePredictor(store if store is not None else UnifiedStore())
+        status = predictor.get_quality().get("status", "untrained")
+        if status == "trained" and score is not None:
+            # VariantScorer emits 0-100; the predictor expects 0-1.
+            normalized = float(score)
+            if normalized > 1.0:
+                normalized = min(1.0, normalized / 100.0)
+            prediction = predictor.predict(normalized)
+            predicted = prediction["predicted_engagement"]
+            bucket = confidence_bucket(prediction["confidence"])
+    except (ImportError, OSError, ValueError, sqlite3.Error) as exc:
+        logger.warning("quality_block: predictor unavailable: %s", exc)
+        status = "untrained"
+    block: dict[str, Any] = {
+        "variant_score": score,
+        "predicted_engagement": predicted,
+        "prediction_confidence": bucket,
+        "predictor_status": status,
+    }
+    if evidence_status:
+        block["evidence_status"] = evidence_status
+    return block
+
+
+__all__ = ["PerformancePredictor", "confidence_bucket", "quality_block"]

@@ -88,6 +88,11 @@ class DailyOpsTool:
         else:
             actions.extend(["review_caption", "approve_or_revise"])
 
+        from fanpage_agent.tools.research.learning_predictor import quality_block
+
+        brief_confidence = (
+            getattr(research_brief, "confidence_score", None) if research_brief else None
+        )
         payload = {
             "run_date": run_date,
             "calendar_id": f"{plan.plan_title}-1",
@@ -98,6 +103,14 @@ class DailyOpsTool:
                 "caption_message": self.formatter.format_caption_package(caption_payload),
             },
             "actions": actions,
+            # Score-before-approval: predictor estimate next to the evidence
+            # gate so the operator approves with data (expansion plan Inc 1).
+            "quality": quality_block(
+                brief_confidence,
+                evidence_status=(
+                    str(max_safe_use) if max_safe_use else None
+                ),
+            ),
         }
         if research_brief:
             payload["research_brief"] = research_brief.model_dump(mode="json")

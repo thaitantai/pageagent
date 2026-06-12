@@ -25,7 +25,8 @@ class _HelpersMixin:
     def _variant_score_lines(item: dict) -> list[str]:
         recommended = item.get("recommended_variant") or {}
         scores = item.get("variant_scores") or []
-        if not recommended and not scores:
+        quality = item.get("quality") or {}
+        if not recommended and not scores and not quality:
             return []
         lines = []
         if recommended:
@@ -39,6 +40,17 @@ class _HelpersMixin:
                 for score in scores[:4]
             )
             lines.append(f"   variant scores: {compact}")
+        if quality:
+            predicted = quality.get("predicted_engagement")
+            if predicted is not None:
+                confidence = quality.get("prediction_confidence") or "-"
+                lines.append(f"   predicted engagement: ~{predicted} ({confidence})")
+            else:
+                lines.append("   predicted engagement: — (predictor untrained)")
+            if quality.get("evidence_status"):
+                lines.append(f"   evidence: {quality['evidence_status']}")
+        if item.get("needs_human_review") or quality.get("needs_human_review"):
+            lines.append("   ⚠️ needs human review")
         return lines
 
     @staticmethod

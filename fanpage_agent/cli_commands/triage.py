@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from datetime import date, datetime, timezone
 
 from typing import Any, cast
@@ -17,6 +18,8 @@ from fanpage_agent.loaders.brand_loader import load_brand_profile
 from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
 from .content import _content_package_from_caption_item, enrich_items_with_variant_scores
 from .research import summarize_calendar_items, summarize_triage_items, build_triage_store_payload
+
+logger = logging.getLogger(__name__)
 
 
 def build_calendar_store_payload(args: argparse.Namespace) -> dict:
@@ -222,9 +225,22 @@ def cmd_deliver_approval_queue(args: argparse.Namespace) -> int:
         date=getattr(args, "date", None),
         limit=getattr(args, "limit", None),
     )
-    if getattr(args, "score_variants", False):
-        items = enrich_items_with_variant_scores(items, memory_db=args.memory_db)
+    # Scoring is default-ON (--no-score-variants opts out). enrich mutates
+    # items in-place and returns a SUMMARY — the old code assigned that
+    # summary over the items list, wiping the queue when --score-variants
+    # was passed.
+    scoring_summary: dict | None = None
+    if not getattr(args, "no_score_variants", False):
+        try:
+            scoring_summary = enrich_items_with_variant_scores(
+                items, memory_db=getattr(args, "memory_db", None)
+            )
+        except Exception as exc:
+            logger.warning("Variant scoring skipped (delivery continues): %s", exc)
+            scoring_summary = {"error": str(exc)[:200]}
     payload: dict[str, Any] = {"items": items, "summary": summarize_calendar_items(items)}
+    if scoring_summary is not None:
+        payload["variant_scoring"] = scoring_summary
     payload["delivery"] = DeliveryTool(settings).deliver_approval_queue(payload, chat_id=args.chat_id)
     if args.save:
         dump_json(settings.artifacts_dir / "approvals" / f"approval-queue-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json", payload)

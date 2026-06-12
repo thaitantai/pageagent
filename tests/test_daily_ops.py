@@ -34,6 +34,11 @@ class DailyOpsToolTest(unittest.TestCase):
             self.assertIn("telegram_preview", packet)
             self.assertIn("Weekly Plan", packet["telegram_preview"]["plan_message"])
             self.assertIn("Caption Package", packet["telegram_preview"]["caption_message"])
+            # Score-before-approval: the quality block always ships with the
+            # packet; an untrained/unavailable predictor must not block it.
+            self.assertIn("quality", packet)
+            self.assertIn("predictor_status", packet["quality"])
+            self.assertIn(packet["quality"]["predictor_status"], {"trained", "untrained"})
 
     def test_evidence_gate_blocked_packet_skips_public_caption_draft(self) -> None:
         sample = Path(__file__).resolve().parents[1] / "data" / "sample" / "brand_profile.json"

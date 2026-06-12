@@ -288,7 +288,14 @@ def build_parser() -> argparse.ArgumentParser:
     approval_queue_parser.add_argument("--limit", type=int)
     approval_queue_parser.add_argument("--save", action="store_true")
     approval_queue_parser.add_argument("--chat-id")
-    approval_queue_parser.add_argument("--score-variants", action="store_true")
+    approval_queue_parser.add_argument(
+        "--score-variants", action="store_true",
+        help="Deprecated no-op — scoring is on by default",
+    )
+    approval_queue_parser.add_argument(
+        "--no-score-variants", action="store_true",
+        help="Skip variant + engagement-prediction scoring",
+    )
     approval_queue_parser.add_argument("--memory-db", default=str(ROOT_DIR / "data" / "agent" / "memory.db"))
     add_store_backend_arg(approval_queue_parser)
 
