@@ -125,7 +125,8 @@ class HermesCronStatusCliTest(unittest.TestCase):
         self.assertIn("wrong_deliver", first["errors"])
         self.assertIn("wrong_workdir", first["errors"])
         self.assertIn("not_enabled", first["errors"])
-        self.assertIn("wrapper_not_executable", first["errors"])
+        if os.name != "nt":  # Windows has no exec bit to violate
+            self.assertIn("wrapper_not_executable", first["errors"])
         self.assertIn("wrapper_wrong_target", first["errors"])
 
 

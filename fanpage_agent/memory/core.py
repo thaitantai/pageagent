@@ -244,11 +244,25 @@ class PerformanceMemory(BackupMixin):
 
     # ── internals ───────────────────────────────────────────────
 
-    def _conn(self) -> sqlite3.Connection:
+    @contextlib.contextmanager
+    def _conn(self):
+        """Yield a connection that commits on success and ALWAYS closes.
+
+        sqlite3's own context manager only commits/rolls back — it leaves
+        the connection (and the db file handle, which blocks deletion on
+        Windows) open.
+        """
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=DELETE")
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         try:
@@ -292,11 +306,20 @@ class PerformanceMemory(BackupMixin):
                 CREATE INDEX IF NOT EXISTS idx_posts_published_at ON published_posts(published_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_patterns_type ON performance_patterns(pattern_type);
                 CREATE INDEX IF NOT EXISTS idx_posts_pillar ON published_posts(pillar);
-                CREATE INDEX IF NOT EXISTS idx_posts_page ON published_posts(page_id);
-
-                -- Migration: add page_id column to existing tables (if missing)
-                ALTER TABLE published_posts ADD COLUMN page_id TEXT NOT NULL DEFAULT 'main';
             """)
+                # Migration: add page_id to pre-page-aware DBs. On fresh DBs
+                # the column already exists — that error is expected, not
+                # corruption, so it must not share the CREATE script above.
+                try:
+                    conn.execute(
+                        "ALTER TABLE published_posts ADD COLUMN page_id TEXT NOT NULL DEFAULT 'main'"
+                    )
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column" not in str(exc).lower():
+                        raise
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_posts_page ON published_posts(page_id)"
+                )
         except sqlite3.DatabaseError as e:
             logger.warning("DB corrupt at init: %s — will attempt recovery", e)
 
@@ -305,8 +328,7 @@ class PerformanceMemory(BackupMixin):
         conn: sqlite3.Connection | None = None,
     ) -> None:
         now = datetime.now(timezone.utc).isoformat()
-        executor = conn if conn else self._conn()
-        context = contextlib.nullcontext(executor) if conn else executor
+        context = contextlib.nullcontext(conn) if conn is not None else self._conn()
         with context as c:
             c.execute(
                 """INSERT INTO performance_patterns

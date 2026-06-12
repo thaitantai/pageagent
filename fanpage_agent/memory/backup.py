@@ -104,7 +104,8 @@ class BackupMixin:
             new_idx = current_idx + 1
             # Drop if beyond keep limit
             if new_idx <= keep:
-                p.rename(self._extract_backup_path(new_idx))
+                # replace(): rename() refuses to overwrite on Windows
+                p.replace(self._extract_backup_path(new_idx))
 
         # Create new .bak.1 as copy of current DB
         backup_path = self._extract_backup_path(1)
@@ -130,11 +131,13 @@ class BackupMixin:
         try:
             conn = sqlite3.connect(str(backup_path))
             try:
-                conn.execute("PRAGMA journal_mode=WAL")
-            except sqlite3.OperationalError:
-                conn.execute("PRAGMA journal_mode=DELETE")
-            conn.execute("SELECT COUNT(*) FROM published_posts")
-            conn.close()
+                try:
+                    conn.execute("PRAGMA journal_mode=WAL")
+                except sqlite3.OperationalError:
+                    conn.execute("PRAGMA journal_mode=DELETE")
+                conn.execute("SELECT COUNT(*) FROM published_posts")
+            finally:
+                conn.close()
         except sqlite3.DatabaseError as e:
             raise BackupError(f"Backup verification failed for {backup_path}: {e}") from e
 

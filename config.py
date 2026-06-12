@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -167,9 +167,11 @@ class Settings(BaseModel):
             kwargs.setdefault("artifacts_dir", root_dir / "artifacts")
             for key in ("google_service_account_file",):
                 if key in kwargs:
-                    p = Path(kwargs[key])
-                    if not p.is_absolute():
-                        kwargs[key] = root_dir / p
+                    raw_path = str(kwargs[key])
+                    # PurePosixPath: env values like "/tmp/x.json" must count
+                    # as absolute on Windows too, and the field stays a str.
+                    if not (Path(raw_path).is_absolute() or PurePosixPath(raw_path).is_absolute()):
+                        kwargs[key] = str(root_dir / raw_path)
 
         return cls(**kwargs)
 

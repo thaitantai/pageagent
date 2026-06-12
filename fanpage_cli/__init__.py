@@ -10,6 +10,9 @@ import argparse
 
 
 def main() -> int:
+    from fanpage_agent.utils import ensure_utf8_stdio
+
+    ensure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args()
     # Each subcommand module stores a _HANDLER in the registered parser

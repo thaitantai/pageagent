@@ -336,7 +336,9 @@ def _check_wrapper(wrapper_path: Path, project_script: str) -> dict:
     status = {
         "path": str(wrapper_path),
         "exists": wrapper_path.exists(),
-        "executable": wrapper_path.exists() and wrapper_path.stat().st_mode & 0o111 != 0,
+        # Windows has no exec bit — existence is the strongest check there.
+        "executable": wrapper_path.exists()
+        and (os.name == "nt" or wrapper_path.stat().st_mode & 0o111 != 0),
         "targets_project_script": False,
     }
     if wrapper_path.exists():

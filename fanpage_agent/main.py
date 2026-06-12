@@ -208,6 +208,10 @@ def cli() -> None:
     """CLI entry point."""
     import argparse
 
+    from fanpage_agent.utils import ensure_utf8_stdio
+
+    ensure_utf8_stdio()
+
     runtime_actions = {
         "tick", "status", "daemon", "backup", "restore", "list-backups",
         "check-db", "harness-status", "roadmap-status", "research-standalone",
@@ -605,7 +609,7 @@ def _run_roadmap_status() -> None:
 
     print(json.dumps({
         "status": "ok",
-        "roadmap": str(roadmap_path),
+        "roadmap": roadmap_path.as_posix(),
         "current_phase": active_phase["phase"] if active_phase else "Phase 1: Don dep nen tang va tang kha nang quan sat",
         "next_phase": next((phase for phase in phases if active_phase and phases.index(phase) > phases.index(active_phase["phase"])), None),
         "phases_total": len(phases),
