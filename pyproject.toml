@@ -14,6 +14,24 @@ dependencies = [
     "ddgs>=9.0",
 ]
 
+[project.optional-dependencies]
+# Google Sheets store backend (store_factory degrades gracefully without it)
+google = [
+    "google-api-python-client>=2",
+    "google-auth>=2",
+]
+# Heavy browser/anti-bot stack used by the scraping pipeline
+scraping = [
+    "curl_cffi>=0.15",
+    "browserforge>=1.2",
+    "playwright>=1.60",
+    "beautifulsoup4>=4.12",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.4",
+]
+
 [project.scripts]
 fanpage-agent = "fanpage_cli:main"
 fanpage-manager = "fanpage_agent.manager_cli:main"

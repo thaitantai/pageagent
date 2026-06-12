@@ -22,8 +22,10 @@ FROM base AS deps
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# requirements.lock pins exact versions (regenerate with:
+#   uv pip compile requirements.txt -o requirements.lock --python-version 3.11)
+COPY requirements.lock .
+RUN pip install --no-cache-dir -r requirements.lock
 
 # ── Stage 3: final ─────────────────────────────────────────────
 FROM deps AS final

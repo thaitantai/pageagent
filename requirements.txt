@@ -1,7 +1,14 @@
+# Full production install: core deps + all extras.
+# Canonical dependency declarations live in pyproject.toml; keep this file
+# in sync with [project.dependencies] + [project.optional-dependencies]
+# (it exists so the Docker deps stage can cache layers without the source).
 pydantic>=2
+httpx>=0.27
 scrapling>=0.4
+ddgs>=9.0
 curl_cffi>=0.15
 browserforge>=1.2
 playwright>=1.60
+beautifulsoup4>=4.12
 google-api-python-client>=2
 google-auth>=2
