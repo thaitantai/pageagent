@@ -128,13 +128,90 @@ def packet_to_brief_payload(packet: ResearchPacket) -> dict[str, Any]:
     return payload
 
 
+def _field(item: Any, name: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(name, default)
+    return getattr(item, name, default)
+
+
+def _normalised_domain(url: str) -> str:
+    if not url:
+        return ""
+    from urllib.parse import urlparse
+
+    host = urlparse(url).netloc.lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _is_affiliate_topic(item: Any) -> bool:
+    reason_codes = [str(code) for code in (_field(item, "reason_codes", []) or [])]
+    rationale = str(_field(item, "rationale", "") or "").lower()
+    topic = str(_field(item, "topic", "") or "").lower()
+    return (
+        "affiliate_offer" in reason_codes
+        or "affiliate_disclosure_required" in reason_codes
+        or "khuyến nghị mua" in rationale
+        or "review" in topic
+        or "so sánh" in topic
+        or "mua" in topic
+    )
+
+
+def _has_affiliate_disclosure(brief: Any, affiliate_topics: list[Any]) -> bool:
+    for text in list(_field(brief, "recommendations", []) or []) + list(_field(brief, "quality_warnings", []) or []):
+        lowered = str(text).lower()
+        if "affiliate" in lowered or "tiếp thị liên kết" in lowered or "hoa hồng" in lowered:
+            return True
+    return False
+
+
+def _affiliate_evidence_stats(brief: Any, affiliate_topics: list[Any]) -> dict[str, Any]:
+    evidence = list(_field(brief, "evidence", []) or [])
+    source_documents = list(_field(brief, "source_documents", []) or [])
+    topic_text = " ".join(str(_field(topic, "topic", "")) for topic in affiliate_topics).lower()
+    matched_evidence = []
+    for item in evidence:
+        claim = str(_field(item, "claim", "") or "").lower()
+        source = str(_field(item, "source", "") or "")
+        url = str(_field(item, "url", "") or "")
+        if not affiliate_topics or claim in topic_text or any(token and token in claim for token in topic_text.split()[:12]):
+            matched_evidence.append(item)
+        elif source or url:
+            matched_evidence.append(item)
+    urls = {str(_field(item, "url", "") or "") for item in matched_evidence}
+    urls.update(str(_field(doc, "url", "") or "") for doc in source_documents)
+    urls = {url for url in urls if url.startswith(("http://", "https://"))}
+    source_keys = {
+        str(_field(item, "source_id", "") or _field(item, "source", "") or _normalised_domain(str(_field(item, "url", "") or "")))
+        for item in matched_evidence
+    }
+    source_keys.update(
+        str(_field(doc, "source_id", "") or _field(doc, "source_name", "") or _normalised_domain(str(_field(doc, "url", "") or "")))
+        for doc in source_documents
+    )
+    domains = {_normalised_domain(url) for url in urls}
+    confidences = [float(_field(item, "confidence", 0.0) or 0.0) for item in matched_evidence]
+    avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+    return {
+        "url_count": len(urls),
+        "source_count": len({key for key in source_keys if key}),
+        "domain_count": len({domain for domain in domains if domain}),
+        "avg_confidence": avg_confidence,
+        "evidence_count": len(matched_evidence),
+    }
+
+
 def research_handoff_policy(brief: Any) -> tuple[str, list[str], dict[str, object]]:
     """Classify how safely downstream agents may use this research packet."""
-    warnings = list(getattr(brief, "quality_warnings", []) or [])
-    topic_scores = list(getattr(brief, "topic_scores", []) or [])
-    source_documents = list(getattr(brief, "source_documents", []) or [])
-    source_candidates = list(getattr(brief, "source_candidates", []) or [])
-    confidence = float(getattr(brief, "confidence_score", 0.0) or 0.0)
+    warnings = list(_field(brief, "quality_warnings", []) or [])
+    topic_scores = list(_field(brief, "topic_scores", []) or [])
+    source_documents = list(_field(brief, "source_documents", []) or [])
+    source_candidates = list(_field(brief, "source_candidates", []) or [])
+    confidence = float(_field(brief, "confidence_score", 0.0) or 0.0)
+
+    affiliate_topics = [item for item in topic_scores if _is_affiliate_topic(item)]
+    affiliate_stats = _affiliate_evidence_stats(brief, affiliate_topics) if affiliate_topics else {}
+    has_disclosure = _has_affiliate_disclosure(brief, affiliate_topics) if affiliate_topics else False
 
     gate_reasons: list[str] = []
     if confidence < 0.5:
@@ -145,22 +222,41 @@ def research_handoff_policy(brief: Any) -> tuple[str, list[str], dict[str, objec
         gate_reasons.append("chưa có source_documents đã kiểm chứng")
     if source_candidates:
         gate_reasons.append(f"có {len(source_candidates)} nguồn ứng viên chưa duyệt")
-    high_risk_topics = [item.topic for item in topic_scores if getattr(item, "risk_level", "") == "high"]
+    high_risk_topics = [str(_field(item, "topic", "")) for item in topic_scores if _field(item, "risk_level", "") == "high"]
     if high_risk_topics:
         gate_reasons.append(f"có {len(high_risk_topics)} topic high-risk cần duyệt evidence")
 
-    if high_risk_topics or confidence < 0.35:
+    affiliate_blockers: list[str] = []
+    affiliate_review: list[str] = []
+    if affiliate_topics:
+        if affiliate_stats.get("url_count", 0) < 2:
+            affiliate_blockers.append("affiliate recommendation cần tối thiểu 2 URL evidence")
+        if affiliate_stats.get("source_count", 0) < 2 or affiliate_stats.get("domain_count", 0) < 2:
+            affiliate_blockers.append("affiliate recommendation cần tối thiểu 2 nguồn độc lập")
+        if affiliate_stats.get("avg_confidence", 0.0) < 0.6:
+            affiliate_blockers.append(f"affiliate evidence confidence thấp ({affiliate_stats.get('avg_confidence', 0.0):.2f})")
+        if not has_disclosure:
+            affiliate_blockers.append("affiliate recommendation thiếu disclosure")
+        if any("claim_guard_required" in (_field(item, "reason_codes", []) or []) for item in affiliate_topics):
+            affiliate_review.append("affiliate claim guard/pros-cons cần human review")
+    gate_reasons.extend(affiliate_blockers)
+    gate_reasons.extend(affiliate_review)
+
+    if high_risk_topics or confidence < 0.35 or affiliate_blockers:
         status = "blocked"
     elif gate_reasons:
         status = "needs_review"
     else:
         status = "ready"
 
+    affiliate_ready = bool(affiliate_topics) and not affiliate_blockers and status == "ready"
     handoff_policy = {
         "allow_writer_claims": status == "ready",
-        "allow_affiliate_recommendations": status == "ready" and not high_risk_topics,
-        "requires_human_review": status != "ready",
+        "allow_affiliate_recommendations": affiliate_ready,
+        "requires_human_review": status != "ready" or bool(affiliate_review),
         "requires_source_approval": bool(source_candidates),
+        "requires_affiliate_disclosure": bool(affiliate_topics),
+        "affiliate_evidence": affiliate_stats,
         "max_safe_use": "draft_questions_only"
         if status == "blocked"
         else ("draft_with_citations" if status == "needs_review" else "draft_with_claims"),

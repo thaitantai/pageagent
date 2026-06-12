@@ -206,6 +206,15 @@ class WriterAgent(BaseAgent):
         time = scheduled_time or pillar_time_map.get(pillar.strip().lower(), "09:00")
         page_context = _normalise_page_context(page_context)
         evidence_text, evidence_refs, research_packet_id = _extract_research_grounding(research_packet)
+        if isinstance(research_packet, dict):
+            policy = research_packet.get("handoff_policy") or {}
+            if isinstance(policy, dict) and policy.get("max_safe_use") == "draft_questions_only":
+                reasons = research_packet.get("gate_reasons") or ["research evidence gate blocked writer claims"]
+                return AgentResult(
+                    task_id=f"write-{package_id}",
+                    success=False,
+                    error="Evidence gate blocked writer claims: " + "; ".join(str(item) for item in reasons),
+                )
         page_id = str(page_context.get("page_id", ""))
 
         # ── Tick offset for format rotation across days ──

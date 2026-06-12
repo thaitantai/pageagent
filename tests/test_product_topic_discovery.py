@@ -1,4 +1,4 @@
-from fanpage_agent.models import ResearchEvidence, SourceDocument
+from fanpage_agent.models import ResearchBrief, ResearchEvidence, ResearchTopicScore, SourceDocument
 from fanpage_agent.tools.research.product_topic_discovery import ProductAwareTopicDiscovery
 from fanpage_agent.tools.research.research import ResearchTool
 from fanpage_agent.tools.research.research_packet import research_handoff_policy
@@ -173,5 +173,79 @@ def test_handoff_policy_blocks_affiliate_topics_without_evidence():
     assert status == "blocked"
     assert any("high-risk" in reason for reason in reasons)
     assert policy["allow_writer_claims"] is False
+    assert policy["allow_affiliate_recommendations"] is False
+    assert policy["max_safe_use"] == "draft_questions_only"
+
+
+def test_evidence_gate_allows_affiliate_when_two_independent_sources_and_disclosure():
+    brief = ResearchBrief(
+        recommendations=["Nhớ disclosure affiliate trước khi gợi ý mua."],
+        confidence_score=0.82,
+        evidence=[
+            ResearchEvidence(
+                claim="Máy lọc không khí phổ thông phù hợp phòng nhỏ",
+                source="Consumer Guide",
+                url="https://guide.example/air-filter",
+                confidence=0.82,
+                source_id="guide",
+            ),
+            ResearchEvidence(
+                claim="Checklist trước khi mua máy lọc không khí cần xét diện tích phòng",
+                source="Lab Review",
+                url="https://lab.example/air-filter-test",
+                confidence=0.78,
+                source_id="lab",
+            ),
+        ],
+        source_documents=[
+            SourceDocument(source_id="guide", source_name="Consumer Guide", url="https://guide.example/air-filter"),
+            SourceDocument(source_id="lab", source_name="Lab Review", url="https://lab.example/air-filter-test"),
+        ],
+        topic_scores=[ResearchTopicScore(
+            topic="Checklist trước khi mua máy lọc không khí",
+            total_score=0.8,
+            source_confidence=0.7,
+            product_relevance=0.8,
+            risk_level="low",
+            reason_codes=["affiliate_offer", "affiliate_disclosure_required"],
+        )],
+    )
+
+    status, reasons, policy = research_handoff_policy(brief)
+
+    assert status == "ready"
+    assert reasons == []
+    assert policy["allow_affiliate_recommendations"] is True
+    assert policy["requires_affiliate_disclosure"] is True
+    assert policy["affiliate_evidence"]["url_count"] == 2
+
+
+def test_evidence_gate_blocks_affiliate_without_disclosure_or_independent_sources():
+    brief = ResearchBrief(
+        confidence_score=0.8,
+        evidence=[ResearchEvidence(
+            claim="Máy lọc không khí phổ thông phù hợp phòng nhỏ",
+            source="Single Review",
+            url="https://review.example/air-filter",
+            confidence=0.7,
+            source_id="single",
+        )],
+        source_documents=[SourceDocument(source_id="single", source_name="Single Review", url="https://review.example/air-filter")],
+        topic_scores=[ResearchTopicScore(
+            topic="Review máy lọc không khí phổ thông nên mua không",
+            total_score=0.7,
+            source_confidence=0.5,
+            product_relevance=0.8,
+            risk_level="low",
+            reason_codes=["affiliate_offer"],
+        )],
+    )
+
+    status, reasons, policy = research_handoff_policy(brief)
+
+    assert status == "blocked"
+    assert any("2 URL" in reason for reason in reasons)
+    assert any("2 nguồn độc lập" in reason for reason in reasons)
+    assert any("thiếu disclosure" in reason for reason in reasons)
     assert policy["allow_affiliate_recommendations"] is False
     assert policy["max_safe_use"] == "draft_questions_only"

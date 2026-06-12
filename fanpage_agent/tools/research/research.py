@@ -700,6 +700,7 @@ class ResearchTool:
                 customer_value=round(customer_value, 3),
                 risk_level="high" if affiliate_without_evidence else (product_topic.risk_level if product_topic else ""),
                 rationale=rationale,
+                reason_codes=list(product_topic.reason_codes) if product_topic else [],
             ))
         return sorted(scores, key=lambda item: item.total_score, reverse=True)
 

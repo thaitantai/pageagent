@@ -214,6 +214,7 @@ class ResearchTopicScore(BaseModel):
     customer_value: float = 0.0
     risk_level: str = ""
     rationale: str = ""
+    reason_codes: List[str] = Field(default_factory=list)
 
 
 class ResearchBrief(BaseModel):
