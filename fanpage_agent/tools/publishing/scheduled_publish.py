@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fanpage_agent.adapters.sheet_store import LocalSheetStore
+from fanpage_agent.adapters.store_protocol import CalendarStore
 
 if TYPE_CHECKING:
     from fanpage_agent.adapters.facebook_client import FacebookClient
@@ -47,7 +47,7 @@ class ScheduledPublishTool:
 
     def __init__(
         self,
-        store: LocalSheetStore,
+        store: CalendarStore,
         brand_id: str,
         verifier: VerifierTool | None = None,
         brand_profile: BrandProfile | None = None,
@@ -67,7 +67,9 @@ class ScheduledPublishTool:
         Uses today's date if reference_date is not provided.
         """
         ref = reference_date or date.today().isoformat()
-        rows = self.store._read_calendar_rows()
+        # Protocol method — _read_calendar_rows() only existed on
+        # LocalSheetStore and crashed the sqlite backend.
+        rows = self.store.list_calendar_items()
         result = ScheduledPublishResult()
 
         for row in rows:

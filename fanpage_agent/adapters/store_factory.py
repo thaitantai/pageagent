@@ -7,8 +7,11 @@ Supports:
 """
 from __future__ import annotations
 
+import warnings
+
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.sqlite_store import UnifiedStore
+from fanpage_agent.adapters.store_protocol import FanpageStore
 from fanpage_agent.config import Settings
 
 try:  # Optional dependency path retained for legacy tests/callers.
@@ -17,7 +20,7 @@ except Exception:  # pragma: no cover - exercised only when deps are absent.
     GoogleSheetsStore = None  # type: ignore[assignment]
 
 
-def build_store(settings: Settings, args=None):
+def build_store(settings: Settings, args=None) -> FanpageStore:
     backend = getattr(args, "store_backend", None) or settings.store_backend
 
     if backend == "sqlite":
@@ -41,6 +44,12 @@ def build_store(settings: Settings, args=None):
     if backend == "google":
         if GoogleSheetsStore is None:
             raise RuntimeError("Google Sheets backend is unavailable")
+        warnings.warn(
+            "STORE_BACKEND=google is deprecated and will be removed in a"
+            " future release — migrate to sqlite (or local CSV).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return GoogleSheetsStore(settings=settings)
 
     raise ValueError(f"Unsupported store backend: {backend}")

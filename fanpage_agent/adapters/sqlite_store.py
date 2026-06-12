@@ -16,6 +16,7 @@ Schema covers:
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import json
 import logging
@@ -362,12 +363,25 @@ class UnifiedStore:
 
     # ── Connection helpers ───────────────────────────────────────
 
-    def _conn(self) -> sqlite3.Connection:
+    @contextlib.contextmanager
+    def _conn(self):
+        """Yield a connection that commits on success and ALWAYS closes.
+
+        sqlite3's own context manager only commits/rolls back — the open
+        handle leaked per operation and kept the db file locked on Windows.
+        """
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         try:
@@ -693,10 +707,11 @@ class UnifiedStore:
     def _append_history_entry(
         self, row: dict[str, Any], conn: sqlite3.Connection | None = None,
     ) -> None:
-        executor = conn if conn else self._conn()
-        close = conn is None
-        try:
-            executor.execute(
+        # The old open-our-own-connection path closed WITHOUT committing,
+        # silently rolling the INSERT back.
+        context = contextlib.nullcontext(conn) if conn is not None else self._conn()
+        with context as c:
+            c.execute(
                 """INSERT INTO post_history
                    (published_at, topic, hook, pillar, objective, permalink, reach, engagement_rate)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -711,9 +726,6 @@ class UnifiedStore:
                     float(row.get("engagement_rate", 0.0)),
                 ),
             )
-        finally:
-            if close:
-                executor.close()
 
     # ═══════════════════════════════════════════════════════════════
     # Post metrics

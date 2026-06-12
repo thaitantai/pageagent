@@ -296,6 +296,38 @@ class ScheduledPublishWithFacebookTest(unittest.TestCase):
         self.assertIn("error", result.published[0])
         self.assertIn("Facebook API error", result.published[0]["error"])
 
+    def test_publishes_with_sqlite_backend(self):
+        """Regression: publish_due crashed on UnifiedStore because it called
+        the LocalSheetStore-private _read_calendar_rows()."""
+        from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
+        plan = PlannerTool().plan_week(
+            profile=self.profile, start_date="2026-06-01", days=2
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            store = UnifiedStore(db_path=tmpdir / "store.db")
+            store.append_plan(self.profile.brand_id, plan)
+
+            items = store.list_calendar_items()
+            self.assertEqual(len(items), 2)
+            for item in items:
+                store.approve_calendar_item(
+                    calendar_id=item["calendar_id"],
+                    approved_by="test",
+                    final_caption_ref=str(tmpdir / "caption.json"),
+                    approved_at="2026-06-01T00:00:00+00:00",
+                )
+
+            service = ScheduledPublishTool(
+                store=store,
+                brand_id=self.profile.brand_id,
+            )
+            result = service.publish_due(reference_date="2026-06-02")
+
+        self.assertEqual(result.published_count, 2)
+        self.assertEqual(result.skipped_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
