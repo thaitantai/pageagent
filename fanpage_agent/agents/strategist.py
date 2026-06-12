@@ -254,6 +254,9 @@ Yêu cầu output JSON:
                 "strategy_action": topic_entry.get("strategy_action", "draft"),
                 "safe_use": topic_entry.get("safe_use", "public_draft"),
                 "review_required": topic_entry.get("review_required", False),
+                "content_angle": topic_entry.get("content_angle", "education"),
+                "cta_policy": topic_entry.get("cta_policy", "educational_cta"),
+                "promise_boundaries": topic_entry.get("promise_boundaries", []),
             })
 
         return AgentResult(
@@ -290,10 +293,14 @@ Yêu cầu output JSON:
                     "topic": str(item.get("topic", "")),
                     "total_score": item.get("total_score", 0),
                     "duplication_risk": item.get("duplication_risk", 0),
+                    "reason_codes": list(item.get("reason_codes", [])),
                     "evidence_status": topic_guard["evidence_status"],
                     "safe_use": topic_guard["safe_use"],
                     "strategy_action": topic_guard["strategy_action"],
                     "review_required": topic_guard["review_required"],
+                    "content_angle": topic_guard["content_angle"],
+                    "cta_policy": topic_guard["cta_policy"],
+                    "promise_boundaries": topic_guard["promise_boundaries"],
                     "follow_up_questions": topic_guard["follow_up_questions"],
                 })
 
@@ -349,6 +356,9 @@ Yêu cầu output JSON:
                 "safe_use": "research_questions_only",
                 "strategy_action": "research_follow_up",
                 "review_required": True,
+                "content_angle": "research_follow_up",
+                "cta_policy": "no_public_cta",
+                "promise_boundaries": ["Khong viet khuyen mua", "Khong neu claim hieu qua khi chua du evidence"],
                 "follow_up_questions": [
                     f"Can bo sung nguon doc lap nao de kiem chung '{topic_text}'?",
                     "Co du it nhat 2 URL evidence va 2 source/domain doc lap chua?",
@@ -361,6 +371,9 @@ Yêu cầu output JSON:
                 "safe_use": "human_review_only",
                 "strategy_action": "draft_with_review",
                 "review_required": True,
+                "content_angle": StrategistAgent._select_content_angle(topic, "human_review_only"),
+                "cta_policy": "soft_cta_review_required",
+                "promise_boundaries": ["Can disclosure neu co affiliate", "Khong cam ket ket qua san pham"],
                 "follow_up_questions": [],
             }
         return {
@@ -368,8 +381,28 @@ Yêu cầu output JSON:
             "safe_use": "public_draft",
             "strategy_action": "draft",
             "review_required": False,
+            "content_angle": StrategistAgent._select_content_angle(topic, "public_draft"),
+            "cta_policy": "educational_cta",
+            "promise_boundaries": ["Giu noi dung giao duc", "Tranh ngon ngu cam ket dieu tri"],
             "follow_up_questions": [],
         }
+
+    @staticmethod
+    def _select_content_angle(topic: dict[str, Any], safe_use: str) -> str:
+        text = str(topic.get("topic", "")).lower()
+        codes = {str(code) for code in topic.get("reason_codes", [])}
+        score = float(topic.get("total_score") or 0)
+        if "comparison" in text or "so sánh" in text:
+            return "fair_comparison"
+        if "sai lầm" in text or "myth" in text or "lầm tưởng" in text:
+            return "cautionary_post"
+        if "checklist" in text or safe_use == "human_review_only":
+            return "checklist"
+        if any(code.startswith("affiliate") or code.startswith("product") for code in codes):
+            return "guarded_buying_guide" if score >= 0.8 and safe_use == "public_draft" else "checklist"
+        if any(word in text for word in ["review", "top", "sản phẩm", "san pham"]):
+            return "fair_comparison"
+        return "education"
 
     @staticmethod
     def _infer_pillar(topic: str) -> str:

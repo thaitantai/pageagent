@@ -156,6 +156,36 @@ class TestStrategistAgent:
         assert result.data["research_priority_topics"][0]["safe_use"] == "human_review_only"
         assert result.data["schedule"][0]["strategy_action"] == "draft_with_review"
         assert result.data["schedule"][0]["review_required"] is True
+        assert result.data["schedule"][0]["content_angle"] == "checklist"
+        assert result.data["schedule"][0]["cta_policy"] == "soft_cta_review_required"
+
+    def test_plan_weekly_selects_guarded_buying_guide_for_strong_affiliate_evidence(self, agent):
+        packet = {
+            "status": "ready",
+            "handoff_policy": {"max_safe_use": "public_draft"},
+            "brief": {
+                "confidence_score": 0.9,
+                "topic_scores": [
+                    {
+                        "topic": "Serum phuc hoi cho da treatment dang can can nhac",
+                        "total_score": 0.86,
+                        "reason_codes": ["affiliate_offer", "product_candidate"],
+                    }
+                ],
+            },
+        }
+        task = AgentTask(
+            id="p8",
+            target=AgentRole.STRATEGIST,
+            action="plan_weekly",
+            params={"days": 1, "research_brief": packet},
+        )
+
+        result = agent.process(task)
+
+        assert result.success
+        assert result.data["schedule"][0]["content_angle"] == "guarded_buying_guide"
+        assert result.data["schedule"][0]["promise_boundaries"]
 
     def test_plan_weekly_keeps_ready_non_affiliate_topic_writable(self, agent):
         packet = {
