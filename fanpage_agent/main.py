@@ -24,7 +24,7 @@ from fanpage_agent.audit.auditor import AuditManager
 from fanpage_agent.core.bus import AgentBus
 from fanpage_agent.core.harness import AgentHarness
 from fanpage_agent.core.types import ActionPriority, AgentRole, AgentTask
-from fanpage_agent.legacy_cli import (
+from fanpage_agent.cli_commands.parser import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_CAMPAIGN_FILE,
     DEFAULT_COMMENT_FILE,
@@ -33,19 +33,20 @@ from fanpage_agent.legacy_cli import (
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
     DEFAULT_TRIAGE_FILE,
+    EXPECTED_HERMES_CRON_JOBS,
     OPS_ARTIFACT_FRESHNESS_HOURS,
     ROOT_DIR,
     add_store_backend_arg,
-    build_approval_audit_payload,
-    build_calendar_store_payload,
+)
+from fanpage_agent.cli_commands.research import (
     build_daily_artifacts,
-    build_operator_digest_payload,
     build_research_brief,
     build_triage_store_payload,
 )
-from fanpage_agent.legacy_cli import EXPECTED_HERMES_CRON_JOBS as EXPECTED_HERMES_CRON_JOBS
-from fanpage_agent.legacy_cli import (
-    main as legacy_cli_main,
+from fanpage_agent.cli_commands.triage import (
+    build_approval_audit_payload,
+    build_calendar_store_payload,
+    build_operator_digest_payload,
 )
 from fanpage_agent.memory import PerformanceMemory
 
