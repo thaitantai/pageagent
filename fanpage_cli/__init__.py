@@ -1,7 +1,11 @@
-"""Fanpage CLI — subcommand dispatch.
+"""Fanpage CLI — the `fanpage-agent` console script.
 
-Each subcommand group is a module in this package.
-Modules register with register_subcommand(subparsers) and expose handle(args).
+One parser tree, one dispatch table: build_parser() reuses the canonical
+subcommand declarations from fanpage_agent.cli_commands.parser and grafts
+the HANDLERS mapping from fanpage_agent.cli_commands.main onto every
+subparser, so this entry point and `python -m fanpage_agent.main` can never
+drift apart. Commands exclusive to the console script (init-sheets) are
+registered on top.
 """
 
 from __future__ import annotations
@@ -15,7 +19,6 @@ def main() -> int:
     ensure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args()
-    # Each subcommand module stores a _HANDLER in the registered parser
     handler = getattr(args, "_handler", None)
     if handler is None:
         parser.print_help()
@@ -24,41 +27,21 @@ def main() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fanpage-agent")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    from fanpage_agent.cli_commands.main import HANDLERS
+    from fanpage_agent.cli_commands.parser import build_parser as _build_canonical_parser
 
-    from fanpage_cli import (
-        agent as agent_module,
+    parser = _build_canonical_parser()
+    parser.prog = "fanpage-agent"
+    subparsers = next(
+        action for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
     )
-    from fanpage_cli import (
-        approval as approval_module,
-    )
-    from fanpage_cli import (
-        content as content_module,
-    )
-    from fanpage_cli import (
-        deliver as deliver_module,
-    )
-    from fanpage_cli import (
-        ops as ops_module,
-    )
-    from fanpage_cli import (
-        plan as plan_module,
-    )
-    from fanpage_cli import (
-        triage as triage_module,
-    )
+    for name, subparser in subparsers.choices.items():
+        handler = HANDLERS.get(name)
+        if handler is not None:
+            subparser.set_defaults(_handler=handler)
 
-    plan_module.register_subcommand(subparsers)
-    approval_module.register_subcommand(subparsers)
-    agent_module.register_subcommand(subparsers)
-    content_module.register_subcommand(subparsers)
-    deliver_module.register_subcommand(subparsers)
-    ops_module.register_subcommand(subparsers)
-    triage_module.register_subcommand(subparsers)
+    from fanpage_cli import sheets
 
+    sheets.register_subcommand(subparsers)
     return parser
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
