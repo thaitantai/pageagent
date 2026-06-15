@@ -10,7 +10,10 @@ Organized by domain:
 """
 
 # ── research group ────────────────────────────────────────────
-from fanpage_agent.tools.research.research import ResearchTool
+try:
+    from fanpage_agent.tools.research.research import ResearchTool
+except ImportError:
+    ResearchTool = None  # type: ignore[assignment]
 from fanpage_agent.tools.research.research_insights import EvidenceExtractor, ResearchQualityGate
 from fanpage_agent.tools.research.research_packet import build_research_packet, research_handoff_policy, save_research_packet
 from fanpage_agent.tools.research.research_sources import SourceRegistry

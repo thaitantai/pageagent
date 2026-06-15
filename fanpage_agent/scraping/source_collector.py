@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
-from scrapling.fetchers import Fetcher
-
 from fanpage_agent.models import ResearchSource, SourceDocument
 
-logger = logging.getLogger(__name__)
+try:
+    from scrapling.fetchers import Fetcher
+except ImportError:
+    Fetcher = None  # type: ignore[assignment,misc]
 
 
 class ScraplingFetcher(Protocol):

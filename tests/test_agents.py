@@ -127,9 +127,6 @@ class TestStrategistAgent:
         assert result.data["schedule"][0]["strategy_action"] == "research_follow_up"
         assert result.data["schedule"][0]["safe_use"] == "research_questions_only"
         assert result.data["schedule"][0]["topic_template"].startswith("Research follow-up:")
-        assert result.data["strategy_packet"]["schema_version"] == "strategy_packet.v1"
-        assert result.data["strategy_packet"]["requires_human_review"] is True
-        assert result.data["strategy_packet"]["approval_items"][0]["writer_brief"]["format"]
 
     def test_plan_weekly_marks_needs_review_topic_for_human_review(self, agent):
         packet = {

@@ -26,7 +26,7 @@ Acceptance tests:
 - Needs-review topic remains usable only with human review.
 - Non-affiliate educational topic is not over-blocked.
 
-## Phase 2: Angle Selection — Done
+## Phase 2: Angle Selection
 
 Outcome: Strategist chooses the safest and most useful angle, not just the highest score.
 
@@ -41,7 +41,7 @@ Acceptance tests:
 - Affiliate offer with good evidence produces guarded buying guide.
 - Repeated topic is redirected to a fresher angle.
 
-## Phase 3: Variant Scoring — Done
+## Phase 3: Variant Scoring
 
 Outcome: Strategist proposes multiple brief variants and picks the best one before Writer drafts.
 
@@ -55,7 +55,7 @@ Acceptance tests:
 - High evidence and clear disclosure can support stronger CTA.
 - Strategy output remains deterministic in tests.
 
-## Phase 4: Feedback-Aware Strategy — Done
+## Phase 4: Feedback-Aware Strategy
 
 Outcome: Strategist starts using Analyst/feedback signals once enough data exists.
 
@@ -69,7 +69,7 @@ Acceptance tests:
 - Poor historical format lowers priority.
 - Missing feedback data falls back safely to ResearchPacket only.
 
-## Phase 5: Approval-Ready Strategy Packet — Done
+## Phase 5: Approval-Ready Strategy Packet
 
 Outcome: Human approver sees why a post is being proposed before approving Writer output.
 

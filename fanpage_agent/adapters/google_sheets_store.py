@@ -3,8 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
+try:
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+except ImportError:
+    Credentials = None  # type: ignore[assignment,misc]
+    build = None  # type: ignore[assignment,misc]
 
 from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.config import Settings
