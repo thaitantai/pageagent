@@ -194,8 +194,11 @@ def main() -> int:
 
         cfg = AgentConfig(max_actions_per_tick=args.max_actions)
         if args.config:
-            cfg = __import__("fanpage_agent.agent.scheduler", fromlist=["load_config"]).load_config(args.config)
+            cfg = __import__("fanpage_agent.agent.scheduler", fromlist=["load_config"]).load_config(
+                args.config
+            )
         import json as _json
+
         result = tick(cfg)
         print(_json.dumps(result, ensure_ascii=False, indent=2, default=str))
         return 0
@@ -206,7 +209,9 @@ def main() -> int:
 
         cfg = AgentConfig(tick_interval_seconds=args.interval)
         if args.config:
-            cfg = __import__("fanpage_agent.agent.scheduler", fromlist=["load_config"]).load_config(args.config)
+            cfg = __import__("fanpage_agent.agent.scheduler", fromlist=["load_config"]).load_config(
+                args.config
+            )
         daemon(cfg)
         return 0
 

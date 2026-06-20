@@ -74,7 +74,9 @@ class _ReportMixin:
                 reach = data.get("reach", 0)
                 eng = data.get("engagements", 0)
                 er_val = eng / max(reach, 1)
-                lines.append(f"  \u2022 {name}: {cnt} b\u00e0i | reach {reach} | rate {er_val*100:.1f}%")
+                lines.append(
+                    f"  \u2022 {name}: {cnt} b\u00e0i | reach {reach} | rate {er_val * 100:.1f}%"
+                )
             lines.append("")
 
         recommendations = payload.get("recommendations", [])
@@ -153,7 +155,9 @@ class _ReportMixin:
             if top_post:
                 lines.append("")
                 lines.append(f"top post: {top_post.get('topic', '-')}")
-                lines.append(f"  reach: {top_post.get('reach', 0)} | engagements: {top_post.get('engagements', 0)}")
+                lines.append(
+                    f"  reach: {top_post.get('reach', 0)} | engagements: {top_post.get('engagements', 0)}"
+                )
             lines.append("")
 
         if matched_posts:
@@ -161,7 +165,9 @@ class _ReportMixin:
             for p in matched_posts[:5]:
                 recorded_badge = " [recorded]" if p.get("recorded") else " [preview]"
                 lines.append(f"- {p.get('topic', '-')} ({p.get('pillar', '-')}){recorded_badge}")
-                lines.append(f"  reach: {p.get('reach', 0)} | engagements: {p.get('engagements', 0)}")
+                lines.append(
+                    f"  reach: {p.get('reach', 0)} | engagements: {p.get('engagements', 0)}"
+                )
                 if p.get("permalink"):
                     lines.append(f"  {p['permalink']}")
             if len(matched_posts) > 5:
@@ -174,7 +180,9 @@ class _ReportMixin:
                 preview = (p.get("message_preview") or "")[:80]
                 lines.append(f"- [{p.get('fb_post_id', '')}] {p.get('created_time', '')[:10]}")
                 lines.append(f"  {preview}...")
-                lines.append(f"  reach: {p.get('reach', 0)} | engagements: {p.get('engagements', 0)}")
+                lines.append(
+                    f"  reach: {p.get('reach', 0)} | engagements: {p.get('engagements', 0)}"
+                )
                 if p.get("permalink"):
                     lines.append(f"  {p['permalink']}")
             if len(unmatched_posts) > 5:

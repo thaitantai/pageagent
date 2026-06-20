@@ -150,8 +150,9 @@ class BaseAgent(ABC):
         """Return True if *action* hasn't been done in *min_interval* seconds."""
         return self._time_since_action(action) >= min_interval
 
-    def _should_pipeline_act(self, action: str, min_interval: float = 7200,
-                             default_min_interval: float = 7200) -> bool:
+    def _should_pipeline_act(
+        self, action: str, min_interval: float = 7200, default_min_interval: float = 7200
+    ) -> bool:
         """Return True if pipeline trigger is set OR periodic timer says so.
 
         Pipeline trigger comes from the orchestrator when content is needed
@@ -174,8 +175,11 @@ class BaseAgent(ABC):
         """
         current_state = self._get_shared(self.role.value, {})
         new_version = current_state.get("version", 0) + 1
-        self._update_shared(self.role.value, {
-            "version": new_version,
-            "completed_at": time.time(),
-            **updates,
-        })
+        self._update_shared(
+            self.role.value,
+            {
+                "version": new_version,
+                "completed_at": time.time(),
+                **updates,
+            },
+        )

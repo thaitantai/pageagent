@@ -8,13 +8,13 @@ class _PlanMixin:
         lines = [
             "## Weekly Plan",
             f"plan: {payload.get('plan_title', '-')}",
-            self._format_verification(payload.get('verification')),
+            self._format_verification(payload.get("verification")),
             "",
         ]
         for index, day in enumerate(payload.get("days", []), start=1):
             lines.extend(
                 [
-                    f"{index}. {day.get('date', '-') } — {day.get('topic', '-')}",
+                    f"{index}. {day.get('date', '-')} — {day.get('topic', '-')}",
                     f"   pillar: {day.get('pillar', '-')} | objective: {day.get('objective', '-')}",
                     f"   hook: {day.get('hook', '-')}",
                     f"   cta: {day.get('cta', '-')}",
@@ -31,7 +31,7 @@ class _PlanMixin:
         lines = [
             "## Caption Package",
             f"topic: {payload.get('topic', '-')}",
-            self._format_verification(payload.get('verification')),
+            self._format_verification(payload.get("verification")),
             "",
         ]
         for variant in payload.get("variants", []):

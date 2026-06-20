@@ -52,7 +52,9 @@ def tool_approve_calendar_item(calendar_id: str) -> dict:
     settings()
     store = local_store()
     now = datetime.now(timezone.utc).isoformat()
-    result = store.approve_calendar_item(calendar_id, approved_by="agent", final_caption_ref="", approved_at=now)
+    result = store.approve_calendar_item(
+        calendar_id, approved_by="agent", final_caption_ref="", approved_at=now
+    )
     return {"approved": calendar_id, "result": result}
 
 
@@ -102,7 +104,9 @@ def tool_reject_triage_reply(item_id: str, reason: str = "") -> dict:
     settings()
     store = local_store()
     now = datetime.now(timezone.utc).isoformat()
-    result = store.reject_triage_reply(item_id, reason=reason or "Rejected by agent", rejected_at=now)
+    result = store.reject_triage_reply(
+        item_id, reason=reason or "Rejected by agent", rejected_at=now
+    )
     return {"rejected": item_id, "result": result}
 
 
@@ -115,8 +119,14 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lookahead_days": {"type": "integer", "description": "Days to scan forward (default 3)"},
-                    "max_items": {"type": "integer", "description": "Max items to fill (default 3)"},
+                    "lookahead_days": {
+                        "type": "integer",
+                        "description": "Days to scan forward (default 3)",
+                    },
+                    "max_items": {
+                        "type": "integer",
+                        "description": "Max items to fill (default 3)",
+                    },
                 },
             },
         },
@@ -173,7 +183,10 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "max_items": {"type": "integer", "description": "Max comments to triage (default 10)"},
+                    "max_items": {
+                        "type": "integer",
+                        "description": "Max comments to triage (default 10)",
+                    },
                 },
             },
         },

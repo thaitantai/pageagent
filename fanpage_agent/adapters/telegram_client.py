@@ -14,7 +14,9 @@ class TelegramClient:
             raise RuntimeError("TELEGRAM_BOT_TOKEN is required for Telegram delivery")
         self.base_url = settings.telegram_base_url.rstrip("/")
 
-    def send_message(self, text: str, chat_id: str | None = None, parse_mode: str | None = "Markdown") -> dict:
+    def send_message(
+        self, text: str, chat_id: str | None = None, parse_mode: str | None = "Markdown"
+    ) -> dict:
         target_chat_id = chat_id or self.settings.telegram_chat_id
         if not target_chat_id:
             raise RuntimeError("TELEGRAM_CHAT_ID is required for Telegram delivery")
@@ -34,7 +36,9 @@ class TelegramClient:
             with urlopen(request, timeout=60) as response:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            detail = (
+                exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            )
             # Retry with plain text if markdown parsing fails
             if parse_mode and "can't parse entities" in detail:
                 return self.send_message(text, chat_id=chat_id, parse_mode=None)

@@ -64,10 +64,16 @@ class DesignerAgent(BaseAgent):
         # Check for new writer content (choreography chain)
         if self._has_upstream_data("writer", "processed_writer_version"):
             writer_data = self._get_shared("writer", {})
-            proposals.append(("generate_brief", {
-                "topic": writer_data.get("pillar", "skincare"),
-                "format": "text_image",
-            }, ActionPriority.LOW))
+            proposals.append(
+                (
+                    "generate_brief",
+                    {
+                        "topic": writer_data.get("pillar", "skincare"),
+                        "format": "text_image",
+                    },
+                    ActionPriority.LOW,
+                )
+            )
         elif self._should_act("generate_brief", 7200):
             proposals.append(("generate_brief", {"format": "text_image"}, ActionPriority.LOW))
 
@@ -113,7 +119,7 @@ class DesignerAgent(BaseAgent):
                 "style": style,
                 "backend": self._img_backend,
                 "image_path": None,  # Filled when actually generated
-                "image_url": None,   # Filled when generated
+                "image_url": None,  # Filled when generated
                 "notes": "Image generation deferred to LLM pipeline",
             },
         )

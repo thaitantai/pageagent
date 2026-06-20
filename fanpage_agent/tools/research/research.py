@@ -84,6 +84,7 @@ class ResearchTool:
         if self._competitor_learning is None:
             try:
                 from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
                 store = UnifiedStore()
                 self._competitor_learning = CompetitorLearningEngine(
                     discovery_tool=self._competitor_discovery,
@@ -105,11 +106,13 @@ class ResearchTool:
         if self._topic_performance is None:
             try:
                 from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
                 self._unified_store = UnifiedStore()
                 self._topic_performance = self._unified_store
             except Exception:
                 try:
                     from fanpage_agent.tools.research.topic_performance import TopicPerformanceStore
+
                     self._topic_performance = TopicPerformanceStore()
                 except Exception:
                     self._topic_performance = None
@@ -157,13 +160,17 @@ class ResearchTool:
 
         top_performing_topics = [
             item.topic
-            for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)[:3]
+            for item in sorted(
+                metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True
+            )[:3]
             if item.topic
         ]
 
         recommended_pillars = [
             item.pillar
-            for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)
+            for item in sorted(
+                metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True
+            )
             if item.pillar
         ]
         recommended_pillars = self._dedupe(recommended_pillars)
@@ -174,7 +181,9 @@ class ResearchTool:
             recommended_objectives.append(priority_objective)
         metric_objectives = [
             item.objective
-            for item in sorted(metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True)
+            for item in sorted(
+                metrics, key=lambda x: (x.leads, x.engagement_rate, x.reach), reverse=True
+            )
             if item.objective
         ]
         recommended_objectives.extend(metric_objectives)
@@ -185,12 +194,18 @@ class ResearchTool:
 
         product_topics: list[ProductTopicCandidate] = []
         if discover_product_topics:
-            product_topics = self._topic_discovery.discover(page_context or {}, max_topics=max_product_topics)
+            product_topics = self._topic_discovery.discover(
+                page_context or {}, max_topics=max_product_topics
+            )
         recommendations: list[str] = []
         if recommended_objectives:
-            recommendations.append(f"Ưu tiên objective {recommended_objectives[0]} trong vòng nội dung kế tiếp.")
+            recommendations.append(
+                f"Ưu tiên objective {recommended_objectives[0]} trong vòng nội dung kế tiếp."
+            )
         if recommended_pillars:
-            recommendations.append(f"Ưu tiên pillar {recommended_pillars[0]} vì đang có tín hiệu tốt từ dữ liệu hiệu suất.")
+            recommendations.append(
+                f"Ưu tiên pillar {recommended_pillars[0]} vì đang có tín hiệu tốt từ dữ liệu hiệu suất."
+            )
         if overused_topics:
             recommendations.append(f"Giảm lặp lại topic: {overused_topics[0]}.")
         if campaign_focus:
@@ -240,8 +255,12 @@ class ResearchTool:
                     report = self._trend_analyzer.generate_report()
                     trend_keywords = [kw["word"] for kw in report["top_keywords"][:15]]
                     trend_clusters = report["clusters"]
-                    recommendations.append(f"Top keyword từ trend: {', '.join(trend_keywords[:5])}.")
-                    recommendations.append(f"Cluster nổi bật: {', '.join(list(trend_clusters.keys())[:3])}.")
+                    recommendations.append(
+                        f"Top keyword từ trend: {', '.join(trend_keywords[:5])}."
+                    )
+                    recommendations.append(
+                        f"Cluster nổi bật: {', '.join(list(trend_clusters.keys())[:3])}."
+                    )
 
             except Exception as exc:
                 logger.warning("TrendScraper/web search thất bại: %s", exc)
@@ -396,7 +415,9 @@ class ResearchTool:
         if fetch_affiliate_offers and self._affiliate_registry:
             try:
                 affiliate_candidates = self._affiliate_registry.discover_all(
-                    niche=page_context.get("industry_focus", "skincare") if page_context else "skincare",
+                    niche=page_context.get("industry_focus", "skincare")
+                    if page_context
+                    else "skincare",
                     max_total_candidates=10,
                 )
                 if affiliate_candidates:
@@ -416,21 +437,19 @@ class ResearchTool:
                         for c in new_candidates:
                             for rc in c.reason_codes:
                                 if rc.startswith("affiliate_network:"):
-                                    network_sources.add(
-                                        rc.split(":", 1)[1]
-                                    )
+                                    network_sources.add(rc.split(":", 1)[1])
                         if network_sources:
                             recommendations.append(
                                 f"Nguồn affiliate network: {', '.join(sorted(network_sources))}."
                             )
             except Exception as exc:
-                logger.warning(
-                    "AffiliateRegistry discover failed: %s", exc
-                )
+                logger.warning("AffiliateRegistry discover failed: %s", exc)
 
         # Tính next_angles sau khi đã gom đủ product_topics từ mọi nguồn
         product_topic_titles = [item.topic for item in product_topics]
-        next_angles = self._dedupe(product_topic_titles + campaign_focus + frequent_questions + top_performing_topics)[:5]
+        next_angles = self._dedupe(
+            product_topic_titles + campaign_focus + frequent_questions + top_performing_topics
+        )[:5]
 
         quality_report = self._quality_gate.evaluate(
             evidence=evidence,
@@ -482,7 +501,9 @@ class ResearchTool:
             product_topics=product_topics,
         )
         if product_topics:
-            recommendations.append(f"Đã đề xuất {len(product_topics)} topic dựa trên sản phẩm/vấn đề khách hàng.")
+            recommendations.append(
+                f"Đã đề xuất {len(product_topics)} topic dựa trên sản phẩm/vấn đề khách hàng."
+            )
         if topic_scores:
             recommendations.append(f"Ưu tiên topic có điểm cao nhất: {topic_scores[0].topic}.")
 
@@ -507,7 +528,9 @@ class ResearchTool:
         if quality_warnings:
             recommendations.append("Cần bổ sung nguồn trước khi Writer dùng các claim quan trọng.")
         if source_candidates:
-            recommendations.append(f"Tìm thấy {len(source_candidates)} nguồn ứng viên mới cần operator duyệt trước khi tin dùng.")
+            recommendations.append(
+                f"Tìm thấy {len(source_candidates)} nguồn ứng viên mới cần operator duyệt trước khi tin dùng."
+            )
 
         return ResearchBrief(
             top_performing_topics=top_performing_topics,
@@ -540,46 +563,58 @@ class ResearchTool:
     ) -> list[ResearchEvidence]:
         evidence: list[ResearchEvidence] = []
         for document in (source_documents or [])[:10]:
-            confidence = min(1.0, max(0.0, document.trust_score * 0.7 + document.freshness_score * 0.3))
-            evidence.append(ResearchEvidence(
-                claim=document.title or document.content[:120] or document.source_name,
-                source=document.source_name,
-                url=document.url,
-                evidence_type="registered_source",
-                confidence=round(confidence, 3),
-                source_id=document.source_id,
-                source_type=document.source_type,
-            ))
+            confidence = min(
+                1.0, max(0.0, document.trust_score * 0.7 + document.freshness_score * 0.3)
+            )
+            evidence.append(
+                ResearchEvidence(
+                    claim=document.title or document.content[:120] or document.source_name,
+                    source=document.source_name,
+                    url=document.url,
+                    evidence_type="registered_source",
+                    confidence=round(confidence, 3),
+                    source_id=document.source_id,
+                    source_type=document.source_type,
+                )
+            )
         for item in external_trends[:10]:
             confidence = 0.75 if item.url else 0.55
-            evidence.append(ResearchEvidence(
-                claim=item.title,
-                source=item.source or "external_trend",
-                url=item.url,
-                evidence_type="external_source",
-                confidence=confidence,
-            ))
+            evidence.append(
+                ResearchEvidence(
+                    claim=item.title,
+                    source=item.source or "external_trend",
+                    url=item.url,
+                    evidence_type="external_source",
+                    confidence=confidence,
+                )
+            )
         for topic in top_performing_topics[:5]:
-            evidence.append(ResearchEvidence(
-                claim=f"Topic '{topic}' đang có tín hiệu tốt từ dữ liệu hiệu suất nội bộ.",
-                source="post_metrics",
-                evidence_type="internal_performance",
-                confidence=0.7,
-            ))
+            evidence.append(
+                ResearchEvidence(
+                    claim=f"Topic '{topic}' đang có tín hiệu tốt từ dữ liệu hiệu suất nội bộ.",
+                    source="post_metrics",
+                    evidence_type="internal_performance",
+                    confidence=0.7,
+                )
+            )
         for question in frequent_questions[:5]:
-            evidence.append(ResearchEvidence(
-                claim=f"Khách hàng đang hỏi: {question}",
-                source="comment_inbox",
-                evidence_type="customer_voice",
-                confidence=0.65,
-            ))
+            evidence.append(
+                ResearchEvidence(
+                    claim=f"Khách hàng đang hỏi: {question}",
+                    source="comment_inbox",
+                    evidence_type="customer_voice",
+                    confidence=0.65,
+                )
+            )
         for focus in campaign_focus[:3]:
-            evidence.append(ResearchEvidence(
-                claim=f"Campaign focus hiện tại: {focus}",
-                source="campaign_notes",
-                evidence_type="operator_input",
-                confidence=0.6,
-            ))
+            evidence.append(
+                ResearchEvidence(
+                    claim=f"Campaign focus hiện tại: {focus}",
+                    source="campaign_notes",
+                    evidence_type="operator_input",
+                    confidence=0.6,
+                )
+            )
         return evidence
 
     def _affiliate_evidence_warnings(
@@ -656,16 +691,19 @@ class ResearchTool:
                 w_source, w_fit, w_customer = 0.14, 0.14, 0.10
                 w_dup = 0.03
 
-            total = max(0.0, (
-                brand_relevance * w_brand
-                + novelty * w_novelty
-                + content_potential * w_content
-                + source_confidence * w_source
-                + fanpage_fit * w_fit
-                + customer_value * w_customer
-                + (1.0 - duplication_risk) * w_dup
-                - risk_penalty
-            ))
+            total = max(
+                0.0,
+                (
+                    brand_relevance * w_brand
+                    + novelty * w_novelty
+                    + content_potential * w_content
+                    + source_confidence * w_source
+                    + fanpage_fit * w_fit
+                    + customer_value * w_customer
+                    + (1.0 - duplication_risk) * w_dup
+                    - risk_penalty
+                ),
+            )
             if affiliate_without_evidence:
                 total = min(total, 0.49)
 
@@ -699,21 +737,27 @@ class ResearchTool:
                 duplication_risk=duplication_risk,
                 product_topic=product_topic,
             )
-            scores.append(ResearchTopicScore(
-                topic=topic,
-                total_score=round(total, 3),
-                brand_relevance=round(brand_relevance, 3),
-                novelty=round(novelty, 3),
-                content_potential=round(content_potential, 3),
-                source_confidence=round(source_confidence, 3),
-                fanpage_fit=round(fanpage_fit, 3),
-                duplication_risk=round(duplication_risk, 3),
-                product_relevance=round(product_topic.product_relevance, 3) if product_topic else 0.0,
-                customer_value=round(customer_value, 3),
-                risk_level="high" if affiliate_without_evidence else (product_topic.risk_level if product_topic else ""),
-                rationale=rationale,
-                reason_codes=list(product_topic.reason_codes) if product_topic else [],
-            ))
+            scores.append(
+                ResearchTopicScore(
+                    topic=topic,
+                    total_score=round(total, 3),
+                    brand_relevance=round(brand_relevance, 3),
+                    novelty=round(novelty, 3),
+                    content_potential=round(content_potential, 3),
+                    source_confidence=round(source_confidence, 3),
+                    fanpage_fit=round(fanpage_fit, 3),
+                    duplication_risk=round(duplication_risk, 3),
+                    product_relevance=round(product_topic.product_relevance, 3)
+                    if product_topic
+                    else 0.0,
+                    customer_value=round(customer_value, 3),
+                    risk_level="high"
+                    if affiliate_without_evidence
+                    else (product_topic.risk_level if product_topic else ""),
+                    rationale=rationale,
+                    reason_codes=list(product_topic.reason_codes) if product_topic else [],
+                )
+            )
         return sorted(scores, key=lambda item: item.total_score, reverse=True)
 
     @staticmethod
@@ -733,6 +777,7 @@ class ResearchTool:
         # Use fuzzy matching like _keyword_overlap_score
         try:
             from rapidfuzz import fuzz
+
             match_scores = [
                 fuzz.token_sort_ratio(topic_lower, item.claim.lower()) / 100.0
                 for item in evidence
@@ -740,6 +785,7 @@ class ResearchTool:
             ]
         except ImportError:
             from difflib import SequenceMatcher
+
             match_scores = [
                 SequenceMatcher(None, topic_lower, item.claim.lower()).ratio()
                 for item in evidence
@@ -801,7 +847,9 @@ class ResearchTool:
         return _confidence_score(evidence)
 
     @staticmethod
-    def _quality_warnings(evidence: list[ResearchEvidence], external_trends: list[TrendItem]) -> list[str]:
+    def _quality_warnings(
+        evidence: list[ResearchEvidence], external_trends: list[TrendItem]
+    ) -> list[str]:
         return _quality_warnings(evidence, external_trends)
 
     @staticmethod

@@ -304,7 +304,11 @@ def cmd_publish_post(args: argparse.Namespace) -> int:
         or not row.get("final_caption_ref")
         or row.get("status") in {"published", "posted"}
     ):
-        print(json.dumps(_build_publish_block_payload(args.calendar_id, row), ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                _build_publish_block_payload(args.calendar_id, row), ensure_ascii=False, indent=2
+            )
+        )
         return 2
 
     published = store.publish_calendar_item(
@@ -566,9 +570,12 @@ def cmd_queue_show(args: argparse.Namespace) -> int:
 
     # Pretty-print stats to stderr
     stats = result["stats"]
-    print(f"\n📊 Queue stats: {stats['queued']} queued | {stats['approved']} approved | "
-          f"{stats['rejected']} rejected | {stats['published']} published | "
-          f"{stats['failed']} failed | {stats['total']} total", file=sys.stderr)
+    print(
+        f"\n📊 Queue stats: {stats['queued']} queued | {stats['approved']} approved | "
+        f"{stats['rejected']} rejected | {stats['published']} published | "
+        f"{stats['failed']} failed | {stats['total']} total",
+        file=sys.stderr,
+    )
 
     items = result.get("items", [])
     if not items:
@@ -611,7 +618,8 @@ def cmd_queue_approve(args: argparse.Namespace) -> int:
 
     if args.all or args.pillar or args.topic:
         result = queue_svc.batch_approve(
-            pillar=args.pillar, topic=args.topic,
+            pillar=args.pillar,
+            topic=args.topic,
             approved_by=args.approved_by or "admin",
             limit=args.limit,
         )
@@ -641,12 +649,15 @@ def cmd_queue_reject(args: argparse.Namespace) -> int:
     reason = args.reason or ""
     if args.all or args.pillar or args.topic:
         result = queue_svc.batch_reject(
-            pillar=args.pillar, topic=args.topic,
-            reason=reason, limit=args.limit,
+            pillar=args.pillar,
+            topic=args.topic,
+            reason=reason,
+            limit=args.limit,
         )
     elif args.calendar_id:
         result = queue_svc.reject_item(
-            calendar_id=args.calendar_id, reason=reason,
+            calendar_id=args.calendar_id,
+            reason=reason,
         )
     else:
         print("ERROR: Specify --calendar-id or --all / --pillar / --topic", file=sys.stderr)
@@ -686,13 +697,18 @@ def cmd_queue_publish(args: argparse.Namespace) -> int:
             return 1
     else:
         result = queue_svc.batch_publish_to_facebook(
-            pillar=args.pillar, topic=args.topic, limit=args.limit,
+            pillar=args.pillar,
+            topic=args.topic,
+            limit=args.limit,
         )
         payload = result.to_dict()
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-        print(f"✅ Published: {payload['published_count']} | "
-              f"❌ Failed: {payload['failed_count']} | "
-              f"⏭️ Skipped: {payload['skipped_count']}", file=sys.stderr)
+        print(
+            f"✅ Published: {payload['published_count']} | "
+            f"❌ Failed: {payload['failed_count']} | "
+            f"⏭️ Skipped: {payload['skipped_count']}",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -702,9 +718,12 @@ def cmd_queue_stats(args: argparse.Namespace) -> int:
     store = build_store(settings=settings, args=args)
     stats = store.get_queue_stats()
     print(json.dumps(stats, ensure_ascii=False, indent=2))
-    print(f"\n📊 Queue: {stats['queued']} queued | {stats['approved']} approved | "
-          f"{stats['rejected']} rejected | {stats['published']} published | "
-          f"{stats['failed']} failed | {stats['total']} total", file=sys.stderr)
+    print(
+        f"\n📊 Queue: {stats['queued']} queued | {stats['approved']} approved | "
+        f"{stats['rejected']} rejected | {stats['published']} published | "
+        f"{stats['failed']} failed | {stats['total']} total",
+        file=sys.stderr,
+    )
     return 0
 
 

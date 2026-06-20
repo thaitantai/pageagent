@@ -31,7 +31,9 @@ class VerifierTool:
                 issues.append(f"Duplicate hook with recent history: {item.hook}")
         return VerificationResult(passed=not issues, issues=issues)
 
-    def verify_caption_package(self, profile: BrandProfile, package: CaptionPackage) -> VerificationResult:
+    def verify_caption_package(
+        self, profile: BrandProfile, package: CaptionPackage
+    ) -> VerificationResult:
         issues: list[str] = []
         for variant in package.variants:
             self._check_banned_phrases(profile, variant.hook, issues)
@@ -43,7 +45,9 @@ class VerifierTool:
         issues.extend(tone_result.issues)
         return VerificationResult(passed=not issues, issues=issues)
 
-    def verify_tone_consistency(self, profile: BrandProfile, package: CaptionPackage) -> VerificationResult:
+    def verify_tone_consistency(
+        self, profile: BrandProfile, package: CaptionPackage
+    ) -> VerificationResult:
         """Kiểm tra từng variant có trung thành với giọng văn của brand không."""
         issues: list[str] = []
         traits = profile.tone_of_voice.brand_traits
@@ -64,9 +68,7 @@ class VerifierTool:
             lower_caption = (variant.caption + " " + variant.hook).lower()
             for phrase in avoid:
                 if phrase.lower() in lower_caption:
-                    issues.append(
-                        f"Variant {label}: caption chứa nội dung cần tránh: '{phrase}'"
-                    )
+                    issues.append(f"Variant {label}: caption chứa nội dung cần tránh: '{phrase}'")
 
             # 3. writing_rules compliance (heuristic — check pattern-based rules)
             for rule in rules:
@@ -75,9 +77,7 @@ class VerifierTool:
                 if lower_rule.startswith(("không", "tránh", "đừng", "chớ")):
                     forbidden_word = rule.split(" ", 1)[1] if " " in rule else ""
                     if forbidden_word and forbidden_word.lower() in lower_caption:
-                        issues.append(
-                            f"Variant {label}: vi phạm writing_rule: '{rule}'"
-                        )
+                        issues.append(f"Variant {label}: vi phạm writing_rule: '{rule}'")
 
         return VerificationResult(passed=not issues, issues=issues)
 

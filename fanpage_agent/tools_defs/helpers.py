@@ -32,7 +32,11 @@ def local_store() -> LocalSheetStore:
 
 def profile(s: Settings | None = None) -> BrandProfile:
     s or settings()
-    path = DEFAULT_BRAND if DEFAULT_BRAND.exists() else ROOT_DIR / "data" / "sample" / "brand_profile.json"
+    path = (
+        DEFAULT_BRAND
+        if DEFAULT_BRAND.exists()
+        else ROOT_DIR / "data" / "sample" / "brand_profile.json"
+    )
     if not path.exists():
         raise FileNotFoundError(f"Brand profile not found at {path}")
     return load_brand_profile(path)
@@ -42,8 +46,12 @@ def list_calendar_items_summary(store: LocalSheetStore) -> dict:
     items = store.list_calendar_items()
     return {
         "total": len(items),
-        "pending_approval": len([i for i in items if i.get("approval_status", "").lower() == "pending"]),
-        "approved_ready": len([i for i in items if i.get("approval_status", "").lower() == "approved"]),
+        "pending_approval": len(
+            [i for i in items if i.get("approval_status", "").lower() == "pending"]
+        ),
+        "approved_ready": len(
+            [i for i in items if i.get("approval_status", "").lower() == "approved"]
+        ),
         "published": len([i for i in items if i.get("status", "").lower() == "published"]),
     }
 
@@ -53,6 +61,8 @@ def list_triage_items_summary(store: LocalSheetStore) -> dict:
     return {
         "total": len(items),
         "pending": len([t for t in items if t.get("status", "").lower() == "pending_triage"]),
-        "approved": len([t for t in items if t.get("status", "").lower() in ("approved", "reply_approved")]),
+        "approved": len(
+            [t for t in items if t.get("status", "").lower() in ("approved", "reply_approved")]
+        ),
         "rejected": len([t for t in items if t.get("status", "").lower() == "rejected"]),
     }

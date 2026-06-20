@@ -54,17 +54,27 @@ class ProductTopicCandidate:
 class ProductAwareTopicDiscovery:
     """Generate product-led topic candidates without turning content into hard-selling."""
 
-    def discover(self, page_context: dict[str, Any], max_topics: int = 8) -> list[ProductTopicCandidate]:
+    def discover(
+        self, page_context: dict[str, Any], max_topics: int = 8
+    ) -> list[ProductTopicCandidate]:
         offers = self._as_list_of_dicts(page_context.get("affiliate_offers"))
-        products = self._as_list_of_dicts(page_context.get("products_services") or page_context.get("products"))
+        products = self._as_list_of_dicts(
+            page_context.get("products_services") or page_context.get("products")
+        )
         pains = self._pain_points(page_context)
         candidates: list[ProductTopicCandidate] = []
         for offer in offers:
-            candidates.extend(self._build_offer_candidates(offer, pains, page_context, max_topics - len(candidates)))
+            candidates.extend(
+                self._build_offer_candidates(
+                    offer, pains, page_context, max_topics - len(candidates)
+                )
+            )
             if len(candidates) >= max_topics:
                 return candidates[:max_topics]
         for product in products:
-            candidates.extend(self._build_product_candidates(product, pains, max_topics - len(candidates)))
+            candidates.extend(
+                self._build_product_candidates(product, pains, max_topics - len(candidates))
+            )
             if len(candidates) >= max_topics:
                 return candidates[:max_topics]
         return candidates
@@ -79,38 +89,53 @@ class ProductAwareTopicDiscovery:
         name = str(offer.get("name", "")).strip()
         if not name or remaining <= 0:
             return []
-        category = str(offer.get("category") or page_context.get("industry_focus") or "sản phẩm").strip()
-        benefits = self._as_strings(offer.get("benefits")) or self._as_strings(offer.get("proof_points"))
+        category = str(
+            offer.get("category") or page_context.get("industry_focus") or "sản phẩm"
+        ).strip()
+        benefits = self._as_strings(offer.get("benefits")) or self._as_strings(
+            offer.get("proof_points")
+        )
         do_not_claim = self._as_strings(offer.get("do_not_claim"))
         competitors = self._as_strings(offer.get("competitors"))
         raw_policy = page_context.get("content_policy")
         content_policy: dict[str, Any] = raw_policy if isinstance(raw_policy, dict) else {}
         disclosure_required = bool(content_policy.get("affiliate_disclosure_required", True))
         risk_level = "medium" if do_not_claim else "low"
-        pain_values = self._as_strings(offer.get("customer_pain_points")) or pains or benefits or [category]
+        pain_values = (
+            self._as_strings(offer.get("customer_pain_points")) or pains or benefits or [category]
+        )
         candidates: list[ProductTopicCandidate] = []
         for index, (angle, template) in enumerate(_AFFILIATE_TOPIC_TEMPLATES):
             pain = pain_values[index % len(pain_values)] if pain_values else "nhu cầu mua hàng"
             benefit = benefits[index % len(benefits)] if benefits else pain
             topic = template.format(product=name, category=category, pain=pain, benefit=benefit)
-            reason_codes = ["affiliate_offer", "community_first", "evidence_required", f"angle:{angle}"]
+            reason_codes = [
+                "affiliate_offer",
+                "community_first",
+                "evidence_required",
+                f"angle:{angle}",
+            ]
             if disclosure_required:
                 reason_codes.append(_AFFILIATE_DISCLOSURE)
             if do_not_claim:
                 reason_codes.append("claim_guard_required")
             if competitors and angle == "comparison":
                 reason_codes.append("competitor_comparison")
-            candidates.append(ProductTopicCandidate(
-                topic=topic,
-                angle=angle,
-                product_name=name,
-                customer_pain=pain,
-                research_query=f"{name} {category} {pain} {benefit} review comparison evidence".strip(),
-                product_relevance=0.82 if name.lower() in topic.lower() else 0.68,
-                customer_value=0.92 if angle in {"buying_guide", "checklist", "red_flags"} else 0.82,
-                risk_level=risk_level,
-                reason_codes=reason_codes,
-            ))
+            candidates.append(
+                ProductTopicCandidate(
+                    topic=topic,
+                    angle=angle,
+                    product_name=name,
+                    customer_pain=pain,
+                    research_query=f"{name} {category} {pain} {benefit} review comparison evidence".strip(),
+                    product_relevance=0.82 if name.lower() in topic.lower() else 0.68,
+                    customer_value=0.92
+                    if angle in {"buying_guide", "checklist", "red_flags"}
+                    else 0.82,
+                    risk_level=risk_level,
+                    reason_codes=reason_codes,
+                )
+            )
             if len(candidates) >= remaining:
                 return candidates
         return candidates
@@ -124,10 +149,17 @@ class ProductAwareTopicDiscovery:
         name = str(product.get("name", "")).strip()
         if not name or remaining <= 0:
             return []
-        benefits = self._as_strings(product.get("benefits")) or self._as_strings(product.get("proof_points"))
+        benefits = self._as_strings(product.get("benefits")) or self._as_strings(
+            product.get("proof_points")
+        )
         do_not_claim = self._as_strings(product.get("do_not_claim"))
         risk_level = "medium" if do_not_claim else "low"
-        pain_values = self._as_strings(product.get("customer_pain_points")) or pains or benefits or [str(product.get("category", "sản phẩm")).strip()]
+        pain_values = (
+            self._as_strings(product.get("customer_pain_points"))
+            or pains
+            or benefits
+            or [str(product.get("category", "sản phẩm")).strip()]
+        )
         candidates: list[ProductTopicCandidate] = []
         for index, (angle, template) in enumerate(_PRODUCT_TOPIC_TEMPLATES):
             pain = pain_values[index % len(pain_values)] if pain_values else "nhu cầu khách hàng"
@@ -136,17 +168,19 @@ class ProductAwareTopicDiscovery:
             reason_codes = ["product_context", f"angle:{angle}"]
             if do_not_claim:
                 reason_codes.append("claim_guard_required")
-            candidates.append(ProductTopicCandidate(
-                topic=topic,
-                angle=angle,
-                product_name=name,
-                customer_pain=pain,
-                research_query=f"{name} {pain} {benefit} evidence advice".strip(),
-                product_relevance=0.9 if name.lower() in topic.lower() else 0.75,
-                customer_value=0.85 if pain else 0.65,
-                risk_level=risk_level,
-                reason_codes=reason_codes,
-            ))
+            candidates.append(
+                ProductTopicCandidate(
+                    topic=topic,
+                    angle=angle,
+                    product_name=name,
+                    customer_pain=pain,
+                    research_query=f"{name} {pain} {benefit} evidence advice".strip(),
+                    product_relevance=0.9 if name.lower() in topic.lower() else 0.75,
+                    customer_value=0.85 if pain else 0.65,
+                    risk_level=risk_level,
+                    reason_codes=reason_codes,
+                )
+            )
             if len(candidates) >= remaining:
                 return candidates
         return candidates

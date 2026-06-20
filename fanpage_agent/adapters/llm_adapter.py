@@ -4,6 +4,7 @@ Provides-friendly methods that Agents can call to generate
 real content (strategies, captions, replies) using the configured
 LLM provider ($9router / DeepSeek / etc).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -45,6 +46,7 @@ class LLMAdapter:
         )
         import json
         import re
+
         # Extract JSON from fenced block or bare response
         text = raw.strip()
         fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, flags=re.DOTALL)

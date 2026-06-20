@@ -78,16 +78,12 @@ def keyword_overlap_score(topic: str, references: list[str]) -> float:
     topic_lower = topic.lower().strip()
     try:
         from rapidfuzz import fuzz
-        scores = [
-            fuzz.token_sort_ratio(topic_lower, ref.lower()) / 100.0
-            for ref in references
-        ]
+
+        scores = [fuzz.token_sort_ratio(topic_lower, ref.lower()) / 100.0 for ref in references]
     except ImportError:
         from difflib import SequenceMatcher
-        scores = [
-            SequenceMatcher(None, topic_lower, ref.lower()).ratio()
-            for ref in references
-        ]
+
+        scores = [SequenceMatcher(None, topic_lower, ref.lower()).ratio() for ref in references]
     return min(1.0, max(scores))
 
 
@@ -98,7 +94,9 @@ def confidence_score(evidence: list[ResearchEvidence]) -> float:
     return round(sum(item.confidence for item in evidence) / len(evidence), 3)
 
 
-def quality_warnings(evidence: list[ResearchEvidence], external_trends: list[TrendItem]) -> list[str]:
+def quality_warnings(
+    evidence: list[ResearchEvidence], external_trends: list[TrendItem]
+) -> list[str]:
     """Generate quality warnings from evidence and trends."""
     warnings: list[str] = []
     if not external_trends:

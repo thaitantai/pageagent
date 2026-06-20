@@ -227,15 +227,22 @@ class ResearchBrief(BaseModel):
     next_angles: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)
     external_trends: List[TrendItem] = Field(default_factory=list)
-    trend_keywords: List[str] = Field(default_factory=list, description="Top keywords từ TrendAnalyzer")
-    trend_clusters: dict[str, list[str]] = Field(default_factory=dict, description="Cluster tên + các title từ TrendAnalyzer")
+    trend_keywords: List[str] = Field(
+        default_factory=list, description="Top keywords từ TrendAnalyzer"
+    )
+    trend_clusters: dict[str, list[str]] = Field(
+        default_factory=dict, description="Cluster tên + các title từ TrendAnalyzer"
+    )
     evidence: List[ResearchEvidence] = Field(default_factory=list)
     confidence_score: float = 0.0
     quality_warnings: List[str] = Field(default_factory=list)
     topic_scores: List[ResearchTopicScore] = Field(default_factory=list)
     source_documents: List[SourceDocument] = Field(default_factory=list)
     source_candidates: List[SourceCandidate] = Field(default_factory=list)
-    competitor_analysis: dict = Field(default_factory=dict, description="Structured competitor profiles + cross-competitor insights")
+    competitor_analysis: dict = Field(
+        default_factory=dict,
+        description="Structured competitor profiles + cross-competitor insights",
+    )
 
 
 class ResearchPacket(BaseModel):
@@ -265,8 +272,13 @@ class AnalyticsReport(BaseModel):
     summary: AnalyticsSummary
     top_post: PostMetric | None = None
     top_posts: List[PostMetric] = Field(default_factory=list)
-    wow: dict[str, float] = Field(default_factory=dict, description="Week-over-week % change: posts, reach, engagements, engagement_rate")
-    pillar_breakdown: dict[str, dict[str, int]] = Field(default_factory=dict, description="Per pillar: count, reach, engagements")
+    wow: dict[str, float] = Field(
+        default_factory=dict,
+        description="Week-over-week % change: posts, reach, engagements, engagement_rate",
+    )
+    pillar_breakdown: dict[str, dict[str, int]] = Field(
+        default_factory=dict, description="Per pillar: count, reach, engagements"
+    )
     recommendations: List[str] = Field(default_factory=list)
 
 
@@ -296,6 +308,7 @@ class VerificationResult(BaseModel):
 
 class StrategyIdea(BaseModel):
     """Một ý tưởng content trong strategy."""
+
     pillar: str
     topic: str
     angle: str
@@ -306,6 +319,7 @@ class StrategyIdea(BaseModel):
 
 class ContentStrategy(BaseModel):
     """Output của StrategistTool — chiến lược content tổng thể."""
+
     brand_id: str
     generated_at: str
     recommended_pillar_mix: dict[str, float]  # pillar → % phân bổ

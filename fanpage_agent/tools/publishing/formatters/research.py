@@ -26,12 +26,16 @@ class _ResearchMixin:
             lines.append(f"top topic: {payload['top_performing_topics'][0]}")
         if source_documents:
             top_sources = ", ".join(
-                f"{item.get('name') or item.get('title') or item.get('source_id', '-') } ({item.get('trust_score', 0)})"
+                f"{item.get('name') or item.get('title') or item.get('source_id', '-')} ({item.get('trust_score', 0)})"
                 for item in source_documents[:3]
             )
             lines.append(f"top sources: {top_sources}")
         lines.append("")
-        source_claims = [item for item in evidence if item.get("evidence_type") in {"source_claim", "external_source"}]
+        source_claims = [
+            item
+            for item in evidence
+            if item.get("evidence_type") in {"source_claim", "external_source"}
+        ]
         if source_claims:
             lines.append("source-backed insights:")
             for item in source_claims[:3]:
@@ -70,8 +74,12 @@ class _ResearchMixin:
         ]
 
         # Group by tier
-        tiers = {"high_volume": "High Volume", "medium_volume": "Medium Volume",
-                 "low_volume": "Low Volume", "branded": "Branded"}
+        tiers = {
+            "high_volume": "High Volume",
+            "medium_volume": "Medium Volume",
+            "low_volume": "Low Volume",
+            "branded": "Branded",
+        }
         for tier_key, tier_label in tiers.items():
             tier_tags = [s for s in suggestions if s.get("tier") == tier_key]
             if not tier_tags:

@@ -56,7 +56,9 @@ class SourceRegistry:
                     return True
         return False
 
-    def to_documents(self, page_id: str = "", topics: list[str] | None = None) -> list[SourceDocument]:
+    def to_documents(
+        self, page_id: str = "", topics: list[str] | None = None
+    ) -> list[SourceDocument]:
         documents: list[SourceDocument] = []
         for source in self.select(page_id=page_id, topics=topics):
             documents.append(

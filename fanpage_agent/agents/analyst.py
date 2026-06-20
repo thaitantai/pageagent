@@ -114,8 +114,12 @@ class AnalystAgent(BaseAgent):
             patterns = self._memory.get_top_patterns(pattern_type=pt, limit=5)
             if patterns:
                 results[pt] = [
-                    {"value": p.value, "avg_engagement": p.avg_engagement,
-                     "sample_size": p.sample_size, "confidence": p.confidence}
+                    {
+                        "value": p.value,
+                        "avg_engagement": p.avg_engagement,
+                        "sample_size": p.sample_size,
+                        "confidence": p.confidence,
+                    }
                     for p in patterns
                 ]
 
@@ -128,7 +132,9 @@ class AnalystAgent(BaseAgent):
     def _pillar_health(self, page_id: str | None = None) -> AgentResult:
         """Score each pillar's health based on performance."""
         if not self._memory:
-            return AgentResult(task_id="pillar-health", success=True, data={"pillars": [], "overall": "no_data"})
+            return AgentResult(
+                task_id="pillar-health", success=True, data={"pillars": [], "overall": "no_data"}
+            )
 
         pillars = self._memory.pillar_performance(page_id=page_id)
         for p in pillars:
@@ -147,8 +153,12 @@ class AnalystAgent(BaseAgent):
             success=True,
             data={
                 "pillars": pillars,
-                "healthy_count": sum(1 for p in pillars if p.get("health") in ("excellent", "good")),
-                "needs_attention": [p for p in pillars if p.get("health") in ("needs_attention", "poor")],
+                "healthy_count": sum(
+                    1 for p in pillars if p.get("health") in ("excellent", "good")
+                ),
+                "needs_attention": [
+                    p for p in pillars if p.get("health") in ("needs_attention", "poor")
+                ],
             },
         )
 
@@ -180,7 +190,9 @@ class AnalystAgent(BaseAgent):
             data={"recommendations": recs},
         )
 
-    def _generate_summary(self, total: int, avg_eng: float, pillars: list[dict], recs: list[str]) -> str:
+    def _generate_summary(
+        self, total: int, avg_eng: float, pillars: list[dict], recs: list[str]
+    ) -> str:
         """Generate a natural-language summary for reports."""
         lines = [f"📊 Tuần này: {total} bài đăng"]
         lines.append(f"• Engagement trung bình: {avg_eng}")

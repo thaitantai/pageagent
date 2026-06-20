@@ -127,9 +127,7 @@ class WebSearchClient:
         import urllib.parse
         import urllib.request
 
-        url = (
-            f"https://html.duckduckgo.com/html/?q={urllib.parse.quote_plus(query)}"
-        )
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote_plus(query)}"
         req = urllib.request.Request(
             url,
             headers={
@@ -157,9 +155,7 @@ class WebSearchClient:
             r'<a\s+rel="nofollow"\s+class="result__a"\s+href="([^"]+)"[^>]*>(.*?)</a>',
             re.DOTALL,
         )
-        snippet_pattern = re.compile(
-            r'<a\s+class="result__snippet"[^>]*>(.*?)</a>', re.DOTALL
-        )
+        snippet_pattern = re.compile(r'<a\s+class="result__snippet"[^>]*>(.*?)</a>', re.DOTALL)
 
         links = link_pattern.findall(html)
         snippets = [re.sub(r"<[^>]+>", "", s).strip() for s in snippet_pattern.findall(html)]

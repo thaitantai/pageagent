@@ -223,14 +223,10 @@ class AnalyticsDashboardTool:
         period_start = ref - timedelta(days=days)
 
         # Separate current and previous period metrics
-        current_metrics = [
-            m for m in metrics
-            if self._parse_date(m.published_at) >= period_start
-        ]
+        current_metrics = [m for m in metrics if self._parse_date(m.published_at) >= period_start]
         prev_start = period_start - timedelta(days=days)
         prev_metrics = [
-            m for m in metrics
-            if prev_start <= self._parse_date(m.published_at) < period_start
+            m for m in metrics if prev_start <= self._parse_date(m.published_at) < period_start
         ]
 
         # Compute WoW
@@ -240,11 +236,7 @@ class AnalyticsDashboardTool:
         total_posts = len(current_metrics)
         total_reach = sum(m.reach for m in current_metrics)
         total_engagements = sum(m.engagements for m in current_metrics)
-        avg_er = (
-            round(total_engagements / total_reach, 4)
-            if total_reach > 0
-            else 0.0
-        )
+        avg_er = round(total_engagements / total_reach, 4) if total_reach > 0 else 0.0
 
         # Reach trend (daily aggregation)
         daily_reach = self._daily_reach(current_metrics, days)
@@ -255,14 +247,12 @@ class AnalyticsDashboardTool:
         pillar_data = self._pillar_breakdown(current_metrics)
 
         # Top posts (sorted by reach desc)
-        top_posts = sorted(
-            current_metrics, key=lambda m: (m.reach, m.engagements), reverse=True
-        )[:10]
+        top_posts = sorted(current_metrics, key=lambda m: (m.reach, m.engagements), reverse=True)[
+            :10
+        ]
 
         # Recommendations (from AnalyticsTool-style logic)
-        recommendations = self._generate_recommendations(
-            current_metrics, wow, pillar_data
-        )
+        recommendations = self._generate_recommendations(current_metrics, wow, pillar_data)
 
         # Format numbers
         def fmt(n: int) -> str:
@@ -289,13 +279,9 @@ class AnalyticsDashboardTool:
         # Build top posts HTML rows
         top_posts_rows = ""
         for tp in top_posts:
-            er = (
-                f"{tp.engagement_rate * 100:.1f}%"
-                if tp.reach > 0
-                else "N/A"
-            )
+            er = f"{tp.engagement_rate * 100:.1f}%" if tp.reach > 0 else "N/A"
             top_posts_rows += (
-                f'<tr><td>{self._escape(tp.topic)}</td>'
+                f"<tr><td>{self._escape(tp.topic)}</td>"
                 f'<td><span class="badge badge-pillar">{self._escape(tp.pillar)}</span></td>'
                 f'<td><span class="badge badge-obj">{self._escape(tp.objective)}</span></td>'
                 f"<td>{fmt(tp.reach)}</td>"
@@ -304,9 +290,7 @@ class AnalyticsDashboardTool:
             )
 
         # Recommendations list
-        recommendations_items = "".join(
-            f"<li>{self._escape(r)}</li>\n" for r in recommendations
-        )
+        recommendations_items = "".join(f"<li>{self._escape(r)}</li>\n" for r in recommendations)
 
         w_posts_cls, w_posts_lbl = wow_label("posts")
         w_reach_cls, w_reach_lbl = wow_label("reach")
@@ -330,9 +314,7 @@ class AnalyticsDashboardTool:
             wow_er_label=w_er_lbl,
             reach_dates=json_dumps(reach_dates),
             reach_values=json_dumps(reach_values),
-            pie_values=json_dumps(
-                [sum(m.engagements for m in current_metrics) or 1, 0, 0]
-            ),
+            pie_values=json_dumps([sum(m.engagements for m in current_metrics) or 1, 0, 0]),
             pillar_labels=json_dumps(list(pillar_data.keys())),
             pillar_reach=json_dumps([d["reach"] for d in pillar_data.values()]),
             pillar_eng=json_dumps([d["engagements"] for d in pillar_data.values()]),
@@ -374,9 +356,7 @@ class AnalyticsDashboardTool:
             return datetime.min.replace(tzinfo=timezone.utc)
 
     @staticmethod
-    def _compute_wow(
-        current: list[PostMetric], prev: list[PostMetric]
-    ) -> dict[str, float]:
+    def _compute_wow(current: list[PostMetric], prev: list[PostMetric]) -> dict[str, float]:
         def _agg(metrics: list[PostMetric]) -> dict[str, float]:
             n = len(metrics)
             r = sum(m.reach for m in metrics)
@@ -398,9 +378,7 @@ class AnalyticsDashboardTool:
         return result
 
     @staticmethod
-    def _daily_reach(
-        metrics: list[PostMetric], days: int
-    ) -> list[dict[str, object]]:
+    def _daily_reach(metrics: list[PostMetric], days: int) -> list[dict[str, object]]:
 
         ref = datetime.now(timezone.utc)
         daily: dict[str, int] = {}
@@ -442,9 +420,13 @@ class AnalyticsDashboardTool:
 
         # WoW insight
         if wow.get("reach", 0) > 10:
-            recs.append(f"Reach tăng {wow['reach']:+.0f}% so với tuần trước — giữ chất lượng nội dung hiện tại.")
+            recs.append(
+                f"Reach tăng {wow['reach']:+.0f}% so với tuần trước — giữ chất lượng nội dung hiện tại."
+            )
         elif wow.get("reach", 0) < -10:
-            recs.append(f"Reach giảm {wow['reach']:+.0f}% so với tuần trước — cần refresh hook và visual.")
+            recs.append(
+                f"Reach giảm {wow['reach']:+.0f}% so với tuần trước — cần refresh hook và visual."
+            )
 
         if wow.get("engagement_rate", 0) < -10:
             recs.append("Engagement rate giảm — kiểm tra lại CTA và tương tác đầu bài.")
@@ -475,11 +457,11 @@ class AnalyticsDashboardTool:
                 )
 
         # General
-        avg_er = (
-            sum(m.engagements for m in metrics) / max(sum(m.reach for m in metrics), 1)
-        )
+        avg_er = sum(m.engagements for m in metrics) / max(sum(m.reach for m in metrics), 1)
         if avg_er < 0.03:
-            recs.append("Engagement rate trung bình dưới 3% — cần hook mạnh hơn và visual thu hút hơn.")
+            recs.append(
+                "Engagement rate trung bình dưới 3% — cần hook mạnh hơn và visual thu hút hơn."
+            )
         elif avg_er > 0.08:
             recs.append("Engagement rate trên 8% — nội dung đang rất tốt, giữ vững phong độ!")
 
@@ -499,4 +481,5 @@ class AnalyticsDashboardTool:
 
 def json_dumps(obj: object) -> str:
     import json
+
     return json.dumps(obj, ensure_ascii=False)

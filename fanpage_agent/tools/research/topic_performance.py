@@ -44,7 +44,9 @@ class TopicPerformanceRecord:
         reach_score = min(1.0, avg_reach / 2000.0)
         engagement_score = min(1.0, self.avg_engagement_rate / 0.08)
         recency_bonus = min(0.1, self.recent_engagement * 0.02)
-        return round(max(0.0, min(1.0, reach_score * 0.45 + engagement_score * 0.35 + recency_bonus)), 3)
+        return round(
+            max(0.0, min(1.0, reach_score * 0.45 + engagement_score * 0.35 + recency_bonus)), 3
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -132,8 +134,7 @@ class TopicPerformanceStore:
         try:
             data = json.loads(self._file_path.read_text(encoding="utf-8"))
             self._records = {
-                topic: TopicPerformanceRecord.from_dict(rec)
-                for topic, rec in data.items()
+                topic: TopicPerformanceRecord.from_dict(rec) for topic, rec in data.items()
             }
         except (json.JSONDecodeError, IOError, TypeError) as exc:
             logger.warning("TopicPerformanceStore: load failed — %s", exc)

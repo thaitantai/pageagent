@@ -6,13 +6,15 @@ from pathlib import Path
 
 _PROMPTS_DIR = Path(__file__).resolve().parent
 
+
 class PromptLoader:
     """Load and cache prompt templates from .md files.
-    
+
     Usage:
         >>> system = PromptLoader.load("planner_system.md")
         >>> prompt = PromptLoader.format("writer_user_variants.md", count=3, topic="Retinol", ...)
     """
+
     _cache: dict[str, str] = {}
 
     @classmethod

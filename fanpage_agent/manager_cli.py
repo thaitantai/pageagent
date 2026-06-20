@@ -114,7 +114,9 @@ def cmd_config_show(args: argparse.Namespace) -> int:
     # Sources
     print(f"  {_colored('Sources', 'cyan')}:")
     print(f"    .env file: {'✓' if dotenv else '✗ (not found)'}")
-    print(f"    Env vars:  {len([k for k in env if k.startswith(('LLM_','FB_','TELEGRAM_','STORE_','IMG_'))])} active")
+    print(
+        f"    Env vars:  {len([k for k in env if k.startswith(('LLM_', 'FB_', 'TELEGRAM_', 'STORE_', 'IMG_'))])} active"
+    )
     print()
 
     required = ["LLM_PROVIDER", "FB_PAGE_ID", "FB_PAGE_TOKEN", "TELEGRAM_BOT_TOKEN"]
@@ -162,7 +164,9 @@ def _test_telegram() -> list[str]:
         settings = Settings.from_env(root_dir=ROOT_DIR)
         tg = TelegramClient(settings)
         # Try sending a simple ping message to verify connectivity
-        result = tg.send_message("🔧 Fanpage Manager — connection test", chat_id=settings.telegram_chat_id)
+        result = tg.send_message(
+            "🔧 Fanpage Manager — connection test", chat_id=settings.telegram_chat_id
+        )
         chat_id_shown = settings.telegram_chat_id or result.get("chat_id", "?")
         print(f"    ✓ Telegram bot — chat {chat_id_shown}")
     except Exception as e:
@@ -272,12 +276,17 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"     .env file: {'✓' if dotenv.exists() else _colored('✗ missing', 'red')}")
     if dotenv.exists():
         from fanpage_agent.config import Settings
+
         try:
             s = Settings.from_env(root_dir=ROOT_DIR)
             print(f"     LLM: {s.llm_provider}/{s.llm_model}")
             print(f"     Store: {s.store_backend}")
-            print(f"     FB: {'✓ configured' if s.fb_page_id and s.fb_page_token else _colored('✗ incomplete', 'yellow')}")
-            print(f"     Telegram: {'✓ configured' if s.telegram_bot_token else _colored('✗ incomplete', 'yellow')}")
+            print(
+                f"     FB: {'✓ configured' if s.fb_page_id and s.fb_page_token else _colored('✗ incomplete', 'yellow')}"
+            )
+            print(
+                f"     Telegram: {'✓ configured' if s.telegram_bot_token else _colored('✗ incomplete', 'yellow')}"
+            )
         except Exception as e:
             print(f"     {_colored(f'✗ Load error: {e}', 'red')}")
     print()

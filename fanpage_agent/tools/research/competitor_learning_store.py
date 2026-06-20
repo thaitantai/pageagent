@@ -42,19 +42,23 @@ def insight_to_gaps(insight: Any) -> list[dict[str, Any]]:
     """Convert CrossCompetitorInsight to gap DB records."""
     gaps: list[dict[str, Any]] = []
     for g in insight.gap_products:
-        gaps.append({
-            "gap_type": "product",
-            "gap_name": g,
-            "description": f"Sản phẩm chưa đối thủ nào khai thác: {g}",
-            "opportunity_level": "high",
-        })
+        gaps.append(
+            {
+                "gap_type": "product",
+                "gap_name": g,
+                "description": f"Sản phẩm chưa đối thủ nào khai thác: {g}",
+                "opportunity_level": "high",
+            }
+        )
     for f in insight.underused_formats:
-        gaps.append({
-            "gap_type": "format",
-            "gap_name": f,
-            "description": f"Format nội dung chưa ai dùng: {f}",
-            "opportunity_level": "medium",
-        })
+        gaps.append(
+            {
+                "gap_type": "format",
+                "gap_name": f,
+                "description": f"Format nội dung chưa ai dùng: {f}",
+                "opportunity_level": "medium",
+            }
+        )
     return gaps
 
 
@@ -89,7 +93,7 @@ def extract_brand_names(
 
     # Pattern: "X vs Y" / "X hay Y" / "X và Y"
     comparison_matches = re.findall(
-        r'(?:vs|versus|hay|và|so sánh|comparison|vs\.)\s+([A-ZÀ-Ỹ][A-Za-zÀ-ỹ0-9\s]{2,30}?)',
+        r"(?:vs|versus|hay|và|so sánh|comparison|vs\.)\s+([A-ZÀ-Ỹ][A-Za-zÀ-ỹ0-9\s]{2,30}?)",
         text,
         re.IGNORECASE,
     )
@@ -100,7 +104,7 @@ def extract_brand_names(
 
     # Pattern: brand-like words (capitalized, 2+ words)
     brand_pattern = re.findall(
-        r'((?:[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s|$)){2,4})',
+        r"((?:[A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s|$)){2,4})",
         text,
     )
     seen: set[str] = set()

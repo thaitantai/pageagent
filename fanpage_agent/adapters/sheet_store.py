@@ -156,7 +156,9 @@ class LocalSheetStore:
         self._write_calendar_rows(rows)
         return row
 
-    def reject_calendar_item(self, calendar_id: str, reason: str, rejected_at: str) -> dict[str, str]:
+    def reject_calendar_item(
+        self, calendar_id: str, reason: str, rejected_at: str
+    ) -> dict[str, str]:
         rows = self._read_calendar_rows()
         row = self._find_calendar_row(rows, calendar_id)
         row["approval_status"] = "rejected"
@@ -186,7 +188,9 @@ class LocalSheetStore:
         self._append_history_entry(row)
         return row
 
-    def attach_draft_caption_ref(self, calendar_id: str, caption_ref: str, updated_at: str) -> dict[str, str]:
+    def attach_draft_caption_ref(
+        self, calendar_id: str, caption_ref: str, updated_at: str
+    ) -> dict[str, str]:
         rows = self._read_calendar_rows()
         row = self._find_calendar_row(rows, calendar_id)
         row["draft_caption_ref"] = caption_ref
@@ -222,7 +226,10 @@ class LocalSheetStore:
         metric_rows = self._read_metric_rows()
         updated = False
         for existing in metric_rows:
-            if existing.get("published_at") == metric_row["published_at"] and existing.get("topic") == metric_row["topic"]:
+            if (
+                existing.get("published_at") == metric_row["published_at"]
+                and existing.get("topic") == metric_row["topic"]
+            ):
                 existing.update(metric_row)
                 updated = True
                 break
@@ -301,11 +308,13 @@ class LocalSheetStore:
                 if gap_start is not None:
                     gap_days = (cursor - gap_start).days
                     if gap_days > max_gap_days:
-                        gaps.append({
-                            "start_date": gap_start.isoformat(),
-                            "end_date": (cursor - timedelta(days=1)).isoformat(),
-                            "gap_days": gap_days,
-                        })
+                        gaps.append(
+                            {
+                                "start_date": gap_start.isoformat(),
+                                "end_date": (cursor - timedelta(days=1)).isoformat(),
+                                "gap_days": gap_days,
+                            }
+                        )
                     gap_start = None
             cursor += timedelta(days=1)
 
@@ -313,11 +322,13 @@ class LocalSheetStore:
         if gap_start is not None:
             gap_days = (end - gap_start).days + 1
             if gap_days > max_gap_days:
-                gaps.append({
-                    "start_date": gap_start.isoformat(),
-                    "end_date": end.isoformat(),
-                    "gap_days": gap_days,
-                })
+                gaps.append(
+                    {
+                        "start_date": gap_start.isoformat(),
+                        "end_date": end.isoformat(),
+                        "gap_days": gap_days,
+                    }
+                )
 
         return gaps
 
@@ -359,7 +370,9 @@ class LocalSheetStore:
             for row in rows
         ]
 
-    def upsert_triage_items(self, brand_id: str, items: list[CommunityTriageItem]) -> list[dict[str, str]]:
+    def upsert_triage_items(
+        self, brand_id: str, items: list[CommunityTriageItem]
+    ) -> list[dict[str, str]]:
         rows = self._read_triage_rows()
         by_id = {row.get("triage_id"): row for row in rows}
         persisted: list[dict[str, str]] = []
@@ -424,7 +437,9 @@ class LocalSheetStore:
         self._write_triage_rows(rows)
         return row
 
-    def resolve_triage_item(self, triage_id: str, resolved_at: str, assigned_to: str = "") -> dict[str, str]:
+    def resolve_triage_item(
+        self, triage_id: str, resolved_at: str, assigned_to: str = ""
+    ) -> dict[str, str]:
         rows = self._read_triage_rows()
         row = self._find_triage_row(rows, triage_id)
         row["status"] = "resolved"
@@ -451,7 +466,9 @@ class LocalSheetStore:
         self._write_triage_rows(rows)
         return row
 
-    def reopen_triage_item(self, triage_id: str, reopened_at: str, assigned_to: str = "") -> dict[str, str]:
+    def reopen_triage_item(
+        self, triage_id: str, reopened_at: str, assigned_to: str = ""
+    ) -> dict[str, str]:
         rows = self._read_triage_rows()
         row = self._find_triage_row(rows, triage_id)
         row["status"] = "reopened"

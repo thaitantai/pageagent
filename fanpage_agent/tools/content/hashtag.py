@@ -55,7 +55,12 @@ class HashtagSet:
             "pillar": self.pillar,
             "objective": self.objective,
             "suggestions": [
-                {"tag": s.tag, "tier": s.tier, "relevance_score": s.relevance_score, "reason": s.reason}
+                {
+                    "tag": s.tag,
+                    "tier": s.tier,
+                    "relevance_score": s.relevance_score,
+                    "reason": s.reason,
+                }
                 for s in self.suggestions
             ],
             "recommended": self.recommended,
@@ -68,10 +73,7 @@ class HashtagSet:
             content_topic=d.get("content_topic", ""),
             pillar=d.get("pillar", ""),
             objective=d.get("objective", ""),
-            suggestions=[
-                HashtagSuggestion(**s)
-                for s in d.get("suggestions", [])
-            ],
+            suggestions=[HashtagSuggestion(**s) for s in d.get("suggestions", [])],
             recommended=d.get("recommended", []),
             generated_at=d.get("generated_at", ""),
         )
@@ -179,7 +181,13 @@ class HashtagTracker:
             if not tag:
                 continue
             if tag not in agg:
-                agg[tag] = {"tag": tag, "tier": r.get("tier", ""), "uses": 0, "total_reach": 0, "total_engagements": 0}
+                agg[tag] = {
+                    "tag": tag,
+                    "tier": r.get("tier", ""),
+                    "uses": 0,
+                    "total_reach": 0,
+                    "total_engagements": 0,
+                }
             agg[tag]["uses"] += 1
             agg[tag]["total_reach"] += int(r.get("reach", 0) or 0)
             agg[tag]["total_engagements"] += int(r.get("engagements", 0) or 0)
@@ -200,21 +208,42 @@ class HashtagTracker:
 
 
 DEFAULT_HIGH_VOLUME = [
-    "#skincare", "#skincareroutine", "#beauty", "#skincaretips",
-    "#glowingskin", "#facial", "#skincarecommunity", "#beautytips",
+    "#skincare",
+    "#skincareroutine",
+    "#beauty",
+    "#skincaretips",
+    "#glowingskin",
+    "#facial",
+    "#skincarecommunity",
+    "#beautytips",
 ]
 
 DEFAULT_MEDIUM_VOLUME = [
-    "#skincaretipsforbeginners", "#acnefreeroutine", "#skincaresecrets",
-    "#koreanskincare", "#skinbarrier", "#glassskin", "#hydrationstation",
-    "#sunscreeneveryday", "#skincareobsessed", "#morningroutine",
+    "#skincaretipsforbeginners",
+    "#acnefreeroutine",
+    "#skincaresecrets",
+    "#koreanskincare",
+    "#skinbarrier",
+    "#glassskin",
+    "#hydrationstation",
+    "#sunscreeneveryday",
+    "#skincareobsessed",
+    "#morningroutine",
 ]
 
 DEFAULT_LOW_VOLUME = [
-    "#skincaresimplified", "#dermatologistapproved", "#skinimalism",
-    "#nontoxicbeauty", "#cleanbeautyproducts", "#skincarescience",
-    "#skincareformom", "#affordableskincare", "#vitamincserum",
-    "#retinolbeginner", "#sensitivekincare", "#multisteproutine",
+    "#skincaresimplified",
+    "#dermatologistapproved",
+    "#skinimalism",
+    "#nontoxicbeauty",
+    "#cleanbeautyproducts",
+    "#skincarescience",
+    "#skincareformom",
+    "#affordableskincare",
+    "#vitamincserum",
+    "#retinolbeginner",
+    "#sensitivekincare",
+    "#multisteproutine",
 ]
 
 DEFAULT_BRANDED = [
@@ -308,9 +337,9 @@ class HashtagTool:
 Generate 15–18 hashtags ranked by relevance for the following content:
 
 TOPIC: {topic}
-PILLAR: {pillar or 'general'}
-OBJECTIVE: {objective or 'awareness'}
-ANGLE: {angle or 'educational'}
+PILLAR: {pillar or "general"}
+OBJECTIVE: {objective or "awareness"}
+ANGLE: {angle or "educational"}
 
 Organise into exactly four tiers:
 - high_volume (3–4 broad, competitive tags)
@@ -406,23 +435,27 @@ Include both "suggestions" and "recommended" keys.
                 if pillar and pillar.lower() in clean_tag:
                     score = min(1.0, score + 0.1)
 
-                suggestions.append(HashtagSuggestion(
-                    tag=clean_tag,
-                    tier=tier,
-                    relevance_score=round(score, 2),
-                    reason="pool match" if score == base_score else "keyword match",
-                ))
+                suggestions.append(
+                    HashtagSuggestion(
+                        tag=clean_tag,
+                        tier=tier,
+                        relevance_score=round(score, 2),
+                        reason="pool match" if score == base_score else "keyword match",
+                    )
+                )
 
         # Add branded tags
         for tag in DEFAULT_BRANDED:
             clean_tag = tag.lstrip("#")
             if clean_tag not in seen:
-                suggestions.append(HashtagSuggestion(
-                    tag=clean_tag,
-                    tier="branded",
-                    relevance_score=0.9,
-                    reason="brand hashtag",
-                ))
+                suggestions.append(
+                    HashtagSuggestion(
+                        tag=clean_tag,
+                        tier="branded",
+                        relevance_score=0.9,
+                        reason="brand hashtag",
+                    )
+                )
                 seen.add(clean_tag)
 
         # Top 8 by score
@@ -456,12 +489,14 @@ Include both "suggestions" and "recommended" keys.
             if clean in seen:
                 continue
             seen.add(clean)
-            suggestions.append(HashtagSuggestion(
-                tag=clean,
-                tier="medium_volume",
-                relevance_score=0.85,
-                reason="top performer from history",
-            ))
+            suggestions.append(
+                HashtagSuggestion(
+                    tag=clean,
+                    tier="medium_volume",
+                    relevance_score=0.85,
+                    reason="top performer from history",
+                )
+            )
 
         # Fill to 10 minimum with rule-based
         for pool_tags, tier, base_score in [
@@ -476,12 +511,14 @@ Include both "suggestions" and "recommended" keys.
                 if clean in seen:
                     continue
                 seen.add(clean)
-                suggestions.append(HashtagSuggestion(
-                    tag=clean,
-                    tier=tier,
-                    relevance_score=base_score,
-                    reason="pool fill",
-                ))
+                suggestions.append(
+                    HashtagSuggestion(
+                        tag=clean,
+                        tier=tier,
+                        relevance_score=base_score,
+                        reason="pool fill",
+                    )
+                )
 
         suggestions.sort(key=lambda s: s.relevance_score, reverse=True)
         recommended = [s.tag for s in suggestions[:8]]

@@ -88,9 +88,7 @@ class SlaDashboard:
             s.audit_entries_7d = len(all_7d)
             s.audit_errors_24h = sum(1 for e in all_24 if not e.success)
             if s.audit_entries_24h > 0:
-                s.audit_error_rate_pct = round(
-                    (s.audit_errors_24h / s.audit_entries_24h) * 100, 1
-                )
+                s.audit_error_rate_pct = round((s.audit_errors_24h / s.audit_entries_24h) * 100, 1)
         except Exception as exc:
             logger.warning("SLA: audit query failed: %s", exc)
 
@@ -131,9 +129,7 @@ class SlaDashboard:
 
             # We can't easily introspect a running FB client's token bucket,
             # but we report the configured capacity
-            s.fb_throttle_capacity = getattr(
-                FacebookClient, "_DEFAULT_RATE_LIMIT", 180
-            )
+            s.fb_throttle_capacity = getattr(FacebookClient, "_DEFAULT_RATE_LIMIT", 180)
         except Exception:
             pass
 
@@ -172,13 +168,17 @@ class SlaDashboard:
 
         lines.append("")
         lines.append("📈 **Audit**")
-        lines.append(f"• 24h: {s.audit_entries_24h} events ({s.audit_errors_24h} errors, {s.audit_error_rate_pct}%)")
+        lines.append(
+            f"• 24h: {s.audit_entries_24h} events ({s.audit_errors_24h} errors, {s.audit_error_rate_pct}%)"
+        )
         lines.append(f"• 7d:  {s.audit_entries_7d} events")
 
         lines.append("")
         lines.append("💾 **Backup & DB**")
         age_str = f"{s.last_backup_age_hours}h" if s.last_backup_age_hours is not None else "N/A"
-        lines.append(f"• Backup: {s.backup_dir_count} files, last {age_str} (retention {s.backup_retention})")
+        lines.append(
+            f"• Backup: {s.backup_dir_count} files, last {age_str} (retention {s.backup_retention})"
+        )
         lines.append(f"• DB: {s.db_size_mb}MB — {'OK' if s.db_integrity_ok else '⚠️ issues'}")
 
         lines.append("")

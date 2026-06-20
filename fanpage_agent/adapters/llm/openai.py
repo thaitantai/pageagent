@@ -81,7 +81,12 @@ class OpenAICompatibleClient:
                 raise
         raise RuntimeError("All models exhausted for generic completion")
 
-    def _complete_json(self, system_prompt: str, user_prompt: str, response_model: type[WeeklyPlan | CaptionPackage]) -> dict:
+    def _complete_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_model: type[WeeklyPlan | CaptionPackage],
+    ) -> dict:
         errors: list[str] = []
         for model in self._model_attempt_order():
             for _ in range(2):
@@ -111,7 +116,14 @@ class OpenAICompatibleClient:
             f"Errors: {' | '.join(errors)}"
         )
 
-    def _chat_completion(self, system_prompt: str, user_prompt: str, model: str, *, response_format: dict | None = None) -> str:
+    def _chat_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str,
+        *,
+        response_format: dict | None = None,
+    ) -> str:
         payload = {
             "model": model,
             "temperature": 0.2,
@@ -136,7 +148,9 @@ class OpenAICompatibleClient:
             with urlopen(request, timeout=60) as response:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            detail = (
+                exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            )
             raise RuntimeError(f"LLM HTTP error {exc.code}: {detail[:500]}") from exc
         except URLError as exc:
             raise RuntimeError(f"LLM connection error: {exc}") from exc
@@ -240,7 +254,10 @@ class OpenAICompatibleClient:
     def _model_attempt_order(self) -> list[str]:
         if self._preferred_model not in self._models:
             return list(self._models)
-        return [self._preferred_model, *[model for model in self._models if model != self._preferred_model]]
+        return [
+            self._preferred_model,
+            *[model for model in self._models if model != self._preferred_model],
+        ]
 
     @staticmethod
     def _should_try_next_model(error_text: str) -> bool:
@@ -279,11 +296,15 @@ class OpenAICompatibleClient:
         return [str(value)]
 
     @classmethod
-    def _normalize_payload(cls, payload: dict, response_model: type[WeeklyPlan | CaptionPackage]) -> dict:
+    def _normalize_payload(
+        cls, payload: dict, response_model: type[WeeklyPlan | CaptionPackage]
+    ) -> dict:
         if response_model is WeeklyPlan:
             normalized = dict(payload)
             normalized["strategy_notes"] = cls._ensure_list(normalized.get("strategy_notes"))
-            normalized["gaps_or_assumptions"] = cls._ensure_list(normalized.get("gaps_or_assumptions"))
+            normalized["gaps_or_assumptions"] = cls._ensure_list(
+                normalized.get("gaps_or_assumptions")
+            )
             raw_days = normalized.get("days")
             if isinstance(raw_days, list):
                 days = []
@@ -377,9 +398,7 @@ class OpenAICompatibleClient:
         if research_brief.trend_keywords:
             result["trend_keywords"] = research_brief.trend_keywords[:15]
         if research_brief.trend_clusters:
-            result["trend_clusters"] = dict(
-                list(research_brief.trend_clusters.items())[:5]
-            )
+            result["trend_clusters"] = dict(list(research_brief.trend_clusters.items())[:5])
         return result
 
     @staticmethod
@@ -417,7 +436,9 @@ class OpenAICompatibleClient:
             item for item in compact_profile["content_pillars"] if item["pillar_name"] == pillar
         ] or compact_profile["content_pillars"][:1]
         compact_profile["approved_cta_patterns"] = [
-            item for item in compact_profile["approved_cta_patterns"] if item["objective"] == objective
+            item
+            for item in compact_profile["approved_cta_patterns"]
+            if item["objective"] == objective
         ] or compact_profile["approved_cta_patterns"][:2]
         return PromptLoader.format(
             "caption_user.md",
@@ -427,7 +448,6 @@ class OpenAICompatibleClient:
             fmt=fmt,
             brand_context=json.dumps(compact_profile, ensure_ascii=False),
         )
-
 
     # ── tools / function calling ─────────────────────────────────
 
@@ -464,8 +484,7 @@ class OpenAICompatibleClient:
                     continue
                 raise
         raise RuntimeError(
-            f"All models exhausted for chat_with_tools. "
-            f"Errors: {' | '.join(errors[:3])}"
+            f"All models exhausted for chat_with_tools. Errors: {' | '.join(errors[:3])}"
         )
 
     def _tool_completion(
@@ -500,7 +519,9 @@ class OpenAICompatibleClient:
             with urlopen(request, timeout=90) as response:
                 body = response.read().decode("utf-8")
         except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            detail = (
+                exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            )
             raise RuntimeError(f"LLM HTTP error {exc.code}: {detail[:500]}") from exc
         except URLError as exc:
             raise RuntimeError(f"LLM connection error: {exc}") from exc
@@ -515,9 +536,7 @@ class OpenAICompatibleClient:
         # Normalise text content
         content = message.get("content")
         if isinstance(content, list):
-            text_parts = [
-                part.get("text", "") for part in content if isinstance(part, dict)
-            ]
+            text_parts = [part.get("text", "") for part in content if isinstance(part, dict)]
             message["content"] = "\n".join(p for p in text_parts if p)
 
         # Parse tool_calls
@@ -530,16 +549,16 @@ class OpenAICompatibleClient:
                     args = json.loads(fn.get("arguments", "{}"))
                 except (json.JSONDecodeError, TypeError):
                     args = {"raw": fn.get("arguments", "")}
-                parsed_calls.append({
-                    "id": tc.get("id", ""),
-                    "type": "function",
-                    "function": {
-                        "name": fn.get("name", ""),
-                        "arguments": args,
-                    },
-                })
+                parsed_calls.append(
+                    {
+                        "id": tc.get("id", ""),
+                        "type": "function",
+                        "function": {
+                            "name": fn.get("name", ""),
+                            "arguments": args,
+                        },
+                    }
+                )
             message["tool_calls"] = parsed_calls
 
         return message
-
-

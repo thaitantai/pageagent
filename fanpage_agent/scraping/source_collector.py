@@ -51,7 +51,9 @@ class ScraplingSourceCollector:
                 self._write_cache(document)
             except Exception as exc:
                 logger.warning("SourceCollector: skip %s — %s", source.source_id, exc)
-                documents.append(self._fallback_document(source, f"fetch_failed:{type(exc).__name__}"))
+                documents.append(
+                    self._fallback_document(source, f"fetch_failed:{type(exc).__name__}")
+                )
         return documents
 
     def _fetch_source(self, source: ResearchSource) -> SourceDocument:
@@ -70,7 +72,11 @@ class ScraplingSourceCollector:
             fetched_at=datetime.now(timezone.utc).isoformat(),
             trust_score=source.trust_score,
             freshness_score=1.0 if text else 0.0,
-            metadata={"topics": source.topics, "allowed_pages": source.allowed_pages, "fetch_status": "ok"},
+            metadata={
+                "topics": source.topics,
+                "allowed_pages": source.allowed_pages,
+                "fetch_status": "ok",
+            },
         )
 
     def _fallback_document(self, source: ResearchSource, reason: str) -> SourceDocument:
@@ -84,7 +90,11 @@ class ScraplingSourceCollector:
             fetched_at=datetime.now(timezone.utc).isoformat(),
             trust_score=source.trust_score,
             freshness_score=0.0,
-            metadata={"topics": source.topics, "allowed_pages": source.allowed_pages, "fetch_status": reason},
+            metadata={
+                "topics": source.topics,
+                "allowed_pages": source.allowed_pages,
+                "fetch_status": reason,
+            },
         )
 
     def _page_text(self, page) -> str:
@@ -119,9 +129,14 @@ class ScraplingSourceCollector:
         if not self.cache_dir:
             return
         cache_path = self._cache_path(
-            ResearchSource(source_id=document.source_id, name=document.source_name, url=document.url)
+            ResearchSource(
+                source_id=document.source_id, name=document.source_name, url=document.url
+            )
         )
         if not cache_path:
             return
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(document.model_dump(mode="json"), ensure_ascii=False, indent=2), encoding="utf-8")
+        cache_path.write_text(
+            json.dumps(document.model_dump(mode="json"), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )

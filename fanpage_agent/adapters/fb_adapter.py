@@ -73,16 +73,12 @@ class FacebookAdapter:
 
     # ── Insights ─────────────────────────────────────────────────
 
-    def get_post_insights(
-        self, fb_post_id: str, page_id: str | None = None
-    ) -> dict[str, Any]:
+    def get_post_insights(self, fb_post_id: str, page_id: str | None = None) -> dict[str, Any]:
         """Fetch reach, likes, comments, shares for a post."""
         client = self._get_client(page_id)
         return client.get_post_insights(fb_post_id)
 
-    def get_recent_posts(
-        self, limit: int = 25, page_id: str | None = None
-    ) -> list[dict[str, Any]]:
+    def get_recent_posts(self, limit: int = 25, page_id: str | None = None) -> list[dict[str, Any]]:
         """Return recent page posts with engagement data."""
         client = self._get_client(page_id)
         return client.get_page_posts(limit=limit)
@@ -112,9 +108,7 @@ class FacebookAdapter:
 
     # ── Delete ───────────────────────────────────────────────────
 
-    def delete_post(
-        self, fb_post_id: str, page_id: str | None = None
-    ) -> dict[str, Any]:
+    def delete_post(self, fb_post_id: str, page_id: str | None = None) -> dict[str, Any]:
         """Delete a post by its Graph ID."""
         client = self._get_client(page_id)
         return client.delete_post(fb_post_id)

@@ -126,7 +126,11 @@ class EvidenceExtractor:
         return sorted(set(sources))
 
     def _claims_from_document(self, document: SourceDocument, focus_terms: set[str]) -> list[str]:
-        candidates = [sentence.strip() for sentence in _SENTENCE_SPLIT_RE.split(document.content) if sentence.strip()]
+        candidates = [
+            sentence.strip()
+            for sentence in _SENTENCE_SPLIT_RE.split(document.content)
+            if sentence.strip()
+        ]
         if not candidates and document.title:
             candidates = [document.title]
         ranked = sorted(
@@ -162,7 +166,9 @@ class EvidenceExtractor:
     @staticmethod
     def _document_confidence(document: SourceDocument, claim: str) -> float:
         content_score = min(1.0, len(claim) / 160)
-        confidence = document.trust_score * 0.65 + document.freshness_score * 0.15 + content_score * 0.2
+        confidence = (
+            document.trust_score * 0.65 + document.freshness_score * 0.15 + content_score * 0.2
+        )
         if document.metadata.get("fetch_status") == "error":
             confidence -= 0.2
         return round(min(1.0, max(0.0, confidence)), 3)
@@ -183,14 +189,24 @@ class ResearchQualityGate:
         warnings: list[str] = []
 
         url_count = sum(1 for item in evidence if item.url)
-        sourced_claims = [item for item in evidence if item.evidence_type in {"source_claim", "external_source"}]
+        sourced_claims = [
+            item for item in evidence if item.evidence_type in {"source_claim", "external_source"}
+        ]
         corroborated_claims = [item for item in sourced_claims if item.support_count >= 2]
-        failed_fetches = [doc for doc in source_documents if doc.metadata.get("fetch_status") == "error"]
+        failed_fetches = [
+            doc for doc in source_documents if doc.metadata.get("fetch_status") == "error"
+        ]
         dominant_source = self._dominant_source(evidence)
-        diverse_source_names = {item.source for item in evidence if item.evidence_type in {"source_claim", "external_source"}}
+        diverse_source_names = {
+            item.source
+            for item in evidence
+            if item.evidence_type in {"source_claim", "external_source"}
+        }
 
         if not external_trends and not source_documents:
-            warnings.append("Không có external_trends hoặc source_documents; Research chỉ dựa vào dữ liệu nội bộ/operator.")
+            warnings.append(
+                "Không có external_trends hoặc source_documents; Research chỉ dựa vào dữ liệu nội bộ/operator."
+            )
         if len(diverse_source_names) < 2:
             warnings.append("Chưa đủ nguồn độc lập; cần ít nhất 2 nguồn ngoài cho evidence claim.")
         if len(sourced_claims) < 2:
@@ -200,7 +216,9 @@ class ResearchQualityGate:
         if url_count < 2:
             warnings.append("Cần ít nhất 2 URL nguồn để Writer trích dẫn hoặc kiểm chứng.")
         if failed_fetches:
-            warnings.append(f"Có {len(failed_fetches)} nguồn fetch thất bại; đang dùng fallback metadata.")
+            warnings.append(
+                f"Có {len(failed_fetches)} nguồn fetch thất bại; đang dùng fallback metadata."
+            )
         if dominant_source:
             warnings.append(f"Evidence phụ thuộc nhiều vào một nguồn: {dominant_source}.")
 
@@ -222,7 +240,11 @@ class ResearchQualityGate:
 
     @staticmethod
     def _dominant_source(evidence: list[ResearchEvidence]) -> str:
-        checkable = [item.source for item in evidence if item.source and item.evidence_type in {"source_claim", "external_source"}]
+        checkable = [
+            item.source
+            for item in evidence
+            if item.source and item.evidence_type in {"source_claim", "external_source"}
+        ]
         if len(checkable) < 3:
             return ""
         source, count = Counter(checkable).most_common(1)[0]

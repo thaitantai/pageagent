@@ -51,7 +51,9 @@ def build_research_packet(
         topics=[str(item) for item in topic_focus],
     )
     if fetch_source_documents:
-        registry_documents = ScraplingSourceCollector(cache_dir=source_cache_dir).collect(selected_sources)
+        registry_documents = ScraplingSourceCollector(cache_dir=source_cache_dir).collect(
+            selected_sources
+        )
     else:
         registry_documents = registry.to_documents(
             page_id=page_id or str(effective_page_context.get("page_id", "")),
@@ -62,9 +64,15 @@ def build_research_packet(
         discovery_queries = [str(item) for item in topic_focus if str(item).strip()]
         if not discovery_queries:
             content_pillars = effective_page_context.get("content_pillars", [])
-            discovery_queries = [str(item) for item in content_pillars if str(item).strip()] if isinstance(content_pillars, list) else []
+            discovery_queries = (
+                [str(item) for item in content_pillars if str(item).strip()]
+                if isinstance(content_pillars, list)
+                else []
+            )
         source_candidates = (
-            WebSourceDiscovery().discover(queries=discovery_queries, max_candidates=max_discovered_sources)
+            WebSourceDiscovery().discover(
+                queries=discovery_queries, max_candidates=max_discovered_sources
+            )
             if discovery_queries
             else []
         )
@@ -104,7 +112,9 @@ def build_research_packet(
     )
 
 
-def save_research_packet(packet: ResearchPacket, output_dir: str | Path = DEFAULT_RESEARCH_OUTPUT_DIR) -> Path:
+def save_research_packet(
+    packet: ResearchPacket, output_dir: str | Path = DEFAULT_RESEARCH_OUTPUT_DIR
+) -> Path:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     file_path = output_path / f"{packet.created_at[:10]}-{packet.job_id}-{packet.packet_id}.json"
@@ -158,7 +168,9 @@ def _is_affiliate_topic(item: Any) -> bool:
 
 
 def _has_affiliate_disclosure(brief: Any, affiliate_topics: list[Any]) -> bool:
-    for text in list(_field(brief, "recommendations", []) or []) + list(_field(brief, "quality_warnings", []) or []):
+    for text in list(_field(brief, "recommendations", []) or []) + list(
+        _field(brief, "quality_warnings", []) or []
+    ):
         lowered = str(text).lower()
         if "affiliate" in lowered or "tiếp thị liên kết" in lowered or "hoa hồng" in lowered:
             return True
@@ -174,7 +186,11 @@ def _affiliate_evidence_stats(brief: Any, affiliate_topics: list[Any]) -> dict[s
         claim = str(_field(item, "claim", "") or "").lower()
         source = str(_field(item, "source", "") or "")
         url = str(_field(item, "url", "") or "")
-        if not affiliate_topics or claim in topic_text or any(token and token in claim for token in topic_text.split()[:12]):
+        if (
+            not affiliate_topics
+            or claim in topic_text
+            or any(token and token in claim for token in topic_text.split()[:12])
+        ):
             matched_evidence.append(item)
         elif source or url:
             matched_evidence.append(item)
@@ -182,11 +198,19 @@ def _affiliate_evidence_stats(brief: Any, affiliate_topics: list[Any]) -> dict[s
     urls.update(str(_field(doc, "url", "") or "") for doc in source_documents)
     urls = {url for url in urls if url.startswith(("http://", "https://"))}
     source_keys = {
-        str(_field(item, "source_id", "") or _field(item, "source", "") or _normalised_domain(str(_field(item, "url", "") or "")))
+        str(
+            _field(item, "source_id", "")
+            or _field(item, "source", "")
+            or _normalised_domain(str(_field(item, "url", "") or ""))
+        )
         for item in matched_evidence
     }
     source_keys.update(
-        str(_field(doc, "source_id", "") or _field(doc, "source_name", "") or _normalised_domain(str(_field(doc, "url", "") or "")))
+        str(
+            _field(doc, "source_id", "")
+            or _field(doc, "source_name", "")
+            or _normalised_domain(str(_field(doc, "url", "") or ""))
+        )
         for doc in source_documents
     )
     domains = {_normalised_domain(url) for url in urls}
@@ -211,7 +235,9 @@ def research_handoff_policy(brief: Any) -> tuple[str, list[str], dict[str, objec
 
     affiliate_topics = [item for item in topic_scores if _is_affiliate_topic(item)]
     affiliate_stats = _affiliate_evidence_stats(brief, affiliate_topics) if affiliate_topics else {}
-    has_disclosure = _has_affiliate_disclosure(brief, affiliate_topics) if affiliate_topics else False
+    has_disclosure = (
+        _has_affiliate_disclosure(brief, affiliate_topics) if affiliate_topics else False
+    )
 
     gate_reasons: list[str] = []
     if confidence < 0.5:
@@ -222,7 +248,11 @@ def research_handoff_policy(brief: Any) -> tuple[str, list[str], dict[str, objec
         gate_reasons.append("chưa có source_documents đã kiểm chứng")
     if source_candidates:
         gate_reasons.append(f"có {len(source_candidates)} nguồn ứng viên chưa duyệt")
-    high_risk_topics = [str(_field(item, "topic", "")) for item in topic_scores if _field(item, "risk_level", "") == "high"]
+    high_risk_topics = [
+        str(_field(item, "topic", ""))
+        for item in topic_scores
+        if _field(item, "risk_level", "") == "high"
+    ]
     if high_risk_topics:
         gate_reasons.append(f"có {len(high_risk_topics)} topic high-risk cần duyệt evidence")
 
@@ -234,10 +264,15 @@ def research_handoff_policy(brief: Any) -> tuple[str, list[str], dict[str, objec
         if affiliate_stats.get("source_count", 0) < 2 or affiliate_stats.get("domain_count", 0) < 2:
             affiliate_blockers.append("affiliate recommendation cần tối thiểu 2 nguồn độc lập")
         if affiliate_stats.get("avg_confidence", 0.0) < 0.6:
-            affiliate_blockers.append(f"affiliate evidence confidence thấp ({affiliate_stats.get('avg_confidence', 0.0):.2f})")
+            affiliate_blockers.append(
+                f"affiliate evidence confidence thấp ({affiliate_stats.get('avg_confidence', 0.0):.2f})"
+            )
         if not has_disclosure:
             affiliate_blockers.append("affiliate recommendation thiếu disclosure")
-        if any("claim_guard_required" in (_field(item, "reason_codes", []) or []) for item in affiliate_topics):
+        if any(
+            "claim_guard_required" in (_field(item, "reason_codes", []) or [])
+            for item in affiliate_topics
+        ):
             affiliate_review.append("affiliate claim guard/pros-cons cần human review")
     gate_reasons.extend(affiliate_blockers)
     gate_reasons.extend(affiliate_review)

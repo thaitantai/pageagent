@@ -3,6 +3,7 @@
 Now uses LLM (via LLMAdapter) to generate real, brand-tailored strategies
 and content ideas. Falls back to templates if no LLM is configured.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -57,8 +58,11 @@ class StrategistAgent(BaseAgent):
         params = task.params
 
         if action == "plan_weekly":
-            result = self._plan_weekly(params.get("days", 7), params.get("existing_calendar", []),
-                                       params.get("research_brief", None))
+            result = self._plan_weekly(
+                params.get("days", 7),
+                params.get("existing_calendar", []),
+                params.get("research_brief", None),
+            )
             if result.success:
                 self._mark_shared_done(
                     processed_research_version=self._pipeline_version("researcher"),
@@ -89,10 +93,16 @@ class StrategistAgent(BaseAgent):
         # Check for new research data (choreography chain)
         if self._has_upstream_data("researcher", "processed_research_version"):
             research_brief = self._get_shared("researcher", {}).get("brief", {})
-            proposals.append(("plan_weekly", {
-                "days": 3,
-                "research_brief": research_brief,
-            }, ActionPriority.HIGH))
+            proposals.append(
+                (
+                    "plan_weekly",
+                    {
+                        "days": 3,
+                        "research_brief": research_brief,
+                    },
+                    ActionPriority.HIGH,
+                )
+            )
 
         # Periodic fallback: plan even without new research
         if not proposals and self._should_act("plan_weekly", 14400):
@@ -104,8 +114,9 @@ class StrategistAgent(BaseAgent):
 
         return proposals
 
-    def _plan_weekly(self, days: int, existing_calendar: list[dict],
-                     research_brief: dict | None = None) -> AgentResult:
+    def _plan_weekly(
+        self, days: int, existing_calendar: list[dict], research_brief: dict | None = None
+    ) -> AgentResult:
         """Create a weekly content schedule — LLM or template fallback.
 
         Args:
@@ -156,13 +167,13 @@ Thương hiệu: {self._brand_id}
 Số ngày: {days}
 
 Dữ liệu performance hiện tại:
-{pillar_stats or '  (chưa có dữ liệu)'}
+{pillar_stats or "  (chưa có dữ liệu)"}
 {research_section}
 Yêu cầu output JSON:
 {{
   "schedule": [
     {{
-      "day_offset": 0..{days-1},
+      "day_offset": 0..{days - 1},
       "pillar": "tên_pillar",
       "topic_template": "chủ đề cụ thể cho ngày này",
       "platform": "facebook"
@@ -183,7 +194,9 @@ Yêu cầu output JSON:
                         "brand_id": self._brand_id,
                         "schedule": data.get("schedule", []),
                         "pillar_distribution": data.get("pillar_distribution", {}),
-                        "recommended_posting_times": data.get("recommended_posting_times", ["09:00", "12:00", "20:00"]),
+                        "recommended_posting_times": data.get(
+                            "recommended_posting_times", ["09:00", "12:00", "20:00"]
+                        ),
                         "reasoning": data.get("reasoning", ""),
                         "research_priority_topics": research_context["priority_topics"],
                         "research_blocked_topics": research_context["blocked_topics"],
@@ -297,26 +310,32 @@ Yêu cầu output JSON:
         for item in brief.get("topic_scores", [])[:10]:
             if isinstance(item, dict) and item.get("topic"):
                 topic_guard = self._topic_guardrails(item, evidence_status)
-                priority_topics.append({
-                    "topic": str(item.get("topic", "")),
-                    "total_score": item.get("total_score", 0),
-                    "duplication_risk": item.get("duplication_risk", 0),
-                    "reason_codes": list(item.get("reason_codes", [])),
-                    "evidence_status": topic_guard["evidence_status"],
-                    "safe_use": topic_guard["safe_use"],
-                    "strategy_action": topic_guard["strategy_action"],
-                    "review_required": topic_guard["review_required"],
-                    "content_angle": topic_guard["content_angle"],
-                    "cta_policy": topic_guard["cta_policy"],
-                    "promise_boundaries": topic_guard["promise_boundaries"],
-                    "follow_up_questions": topic_guard["follow_up_questions"],
-                })
+                priority_topics.append(
+                    {
+                        "topic": str(item.get("topic", "")),
+                        "total_score": item.get("total_score", 0),
+                        "duplication_risk": item.get("duplication_risk", 0),
+                        "reason_codes": list(item.get("reason_codes", [])),
+                        "evidence_status": topic_guard["evidence_status"],
+                        "safe_use": topic_guard["safe_use"],
+                        "strategy_action": topic_guard["strategy_action"],
+                        "review_required": topic_guard["review_required"],
+                        "content_angle": topic_guard["content_angle"],
+                        "cta_policy": topic_guard["cta_policy"],
+                        "promise_boundaries": topic_guard["promise_boundaries"],
+                        "follow_up_questions": topic_guard["follow_up_questions"],
+                    }
+                )
 
         if not priority_topics:
-            priority_topics = [{"topic": t, "total_score": 0, "duplication_risk": 0} for t in brief.get("next_angles", [])[:10]]
+            priority_topics = [
+                {"topic": t, "total_score": 0, "duplication_risk": 0}
+                for t in brief.get("next_angles", [])[:10]
+            ]
 
         writable_topics = [
-            topic for topic in priority_topics
+            topic
+            for topic in priority_topics
             if topic.get("strategy_action") != "research_follow_up"
         ]
 
@@ -327,7 +346,8 @@ Yêu cầu output JSON:
         return {
             "priority_topics": writable_topics,
             "blocked_topics": [
-                topic for topic in priority_topics
+                topic
+                for topic in priority_topics
                 if topic.get("strategy_action") == "research_follow_up"
             ],
             "findings": findings,
@@ -366,7 +386,10 @@ Yêu cầu output JSON:
                 "review_required": True,
                 "content_angle": "research_follow_up",
                 "cta_policy": "no_public_cta",
-                "promise_boundaries": ["Khong viet khuyen mua", "Khong neu claim hieu qua khi chua du evidence"],
+                "promise_boundaries": [
+                    "Khong viet khuyen mua",
+                    "Khong neu claim hieu qua khi chua du evidence",
+                ],
                 "follow_up_questions": [
                     f"Can bo sung nguon doc lap nao de kiem chung '{topic_text}'?",
                     "Co du it nhat 2 URL evidence va 2 source/domain doc lap chua?",
@@ -381,7 +404,10 @@ Yêu cầu output JSON:
                 "review_required": True,
                 "content_angle": StrategistAgent._select_content_angle(topic, "human_review_only"),
                 "cta_policy": "soft_cta_review_required",
-                "promise_boundaries": ["Can disclosure neu co affiliate", "Khong cam ket ket qua san pham"],
+                "promise_boundaries": [
+                    "Can disclosure neu co affiliate",
+                    "Khong cam ket ket qua san pham",
+                ],
                 "follow_up_questions": [],
             }
         return {
@@ -407,7 +433,11 @@ Yêu cầu output JSON:
         if "checklist" in text or safe_use == "human_review_only":
             return "checklist"
         if any(code.startswith("affiliate") or code.startswith("product") for code in codes):
-            return "guarded_buying_guide" if score >= 0.8 and safe_use == "public_draft" else "checklist"
+            return (
+                "guarded_buying_guide"
+                if score >= 0.8 and safe_use == "public_draft"
+                else "checklist"
+            )
         if any(word in text for word in ["review", "top", "sản phẩm", "san pham"]):
             return "fair_comparison"
         return "education"
@@ -420,25 +450,29 @@ Yêu cầu output JSON:
     ) -> dict[str, Any]:
         approval_items = []
         for item in schedule:
-            needs_review = bool(item.get("review_required")) or item.get("safe_use") != "public_draft"
-            approval_items.append({
-                "day_offset": item.get("day_offset"),
-                "topic": item.get("topic_template"),
-                "pillar": item.get("pillar"),
-                "content_angle": item.get("content_angle"),
-                "selected_variant": item.get("selected_variant", {}),
-                "safe_use": item.get("safe_use"),
-                "strategy_action": item.get("strategy_action"),
-                "needs_human_review": needs_review,
-                "writer_brief": {
+            needs_review = (
+                bool(item.get("review_required")) or item.get("safe_use") != "public_draft"
+            )
+            approval_items.append(
+                {
+                    "day_offset": item.get("day_offset"),
                     "topic": item.get("topic_template"),
-                    "angle": item.get("content_angle"),
-                    "format": item.get("selected_variant", {}).get("format"),
-                    "cta_policy": item.get("cta_policy"),
-                    "promise_boundaries": item.get("promise_boundaries", []),
-                    "evidence_status": research_context.get("evidence_status", {}),
-                },
-            })
+                    "pillar": item.get("pillar"),
+                    "content_angle": item.get("content_angle"),
+                    "selected_variant": item.get("selected_variant", {}),
+                    "safe_use": item.get("safe_use"),
+                    "strategy_action": item.get("strategy_action"),
+                    "needs_human_review": needs_review,
+                    "writer_brief": {
+                        "topic": item.get("topic_template"),
+                        "angle": item.get("content_angle"),
+                        "format": item.get("selected_variant", {}).get("format"),
+                        "cta_policy": item.get("cta_policy"),
+                        "promise_boundaries": item.get("promise_boundaries", []),
+                        "evidence_status": research_context.get("evidence_status", {}),
+                    },
+                }
+            )
         return {
             "schema_version": "strategy_packet.v1",
             "brand_id": self._brand_id,
@@ -452,7 +486,11 @@ Yêu cầu output JSON:
 
     def _feedback_context(self) -> dict[str, Any]:
         if not self._memory:
-            return {"available": False, "signals": [], "notes": ["Chua co du lieu performance noi bo."]}
+            return {
+                "available": False,
+                "signals": [],
+                "notes": ["Chua co du lieu performance noi bo."],
+            }
         signals: list[dict[str, Any]] = []
         try:
             for row in self._memory.pillar_performance()[:3]:
@@ -460,21 +498,33 @@ Yêu cầu output JSON:
                 if not pillar:
                     continue
                 avg_engagement = row.get("avg_engagement", 0)
-                signals.append({
-                    "type": "pillar_performance",
-                    "pillar": pillar,
-                    "avg_engagement": avg_engagement,
-                    "format": "carousel" if "review" in pillar or "ingredient" in pillar else "text_image",
-                })
+                signals.append(
+                    {
+                        "type": "pillar_performance",
+                        "pillar": pillar,
+                        "avg_engagement": avg_engagement,
+                        "format": "carousel"
+                        if "review" in pillar or "ingredient" in pillar
+                        else "text_image",
+                    }
+                )
         except Exception:
-            return {"available": False, "signals": [], "notes": ["Khong doc duoc performance memory."]}
+            return {
+                "available": False,
+                "signals": [],
+                "notes": ["Khong doc duoc performance memory."],
+            }
         return {
             "available": bool(signals),
             "signals": signals,
-            "notes": ["Uu tien format/pillar tung co engagement tot."] if signals else ["Chua co pattern du manh."],
+            "notes": ["Uu tien format/pillar tung co engagement tot."]
+            if signals
+            else ["Chua co pattern du manh."],
         }
 
-    def _score_strategy_variants(self, item: dict[str, Any], feedback_context: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def _score_strategy_variants(
+        self, item: dict[str, Any], feedback_context: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         angle = str(item.get("content_angle") or "education")
         safe_use = str(item.get("safe_use") or "public_draft")
         review_required = bool(item.get("review_required"))
@@ -510,7 +560,10 @@ Yêu cầu output JSON:
         for candidate in candidates:
             if candidate["format"] in preferred_formats:
                 candidate["score"] += 0.07
-            if angle in {"checklist", "fair_comparison"} and candidate["name"] == "checklist_carousel":
+            if (
+                angle in {"checklist", "fair_comparison"}
+                and candidate["name"] == "checklist_carousel"
+            ):
                 candidate["score"] += 0.18
             if angle == "guarded_buying_guide" and candidate["name"] == "soft_buying_guide":
                 candidate["score"] += 0.22
@@ -565,7 +618,9 @@ Yêu cầu output JSON:
             if perf:
                 best = perf[0]
                 worst = perf[-1]
-                recs.append(f"Ưu tiên pillar '{best['pillar']}' (Ø{best['avg_engagement']:.0f} eng)")
+                recs.append(
+                    f"Ưu tiên pillar '{best['pillar']}' (Ø{best['avg_engagement']:.0f} eng)"
+                )
                 if worst["avg_engagement"] < 5:
                     recs.append(f"Cân nhắc giảm tần suất pillar '{worst['pillar']}'")
 
@@ -616,13 +671,15 @@ Output JSON:
         ]
         ideas = []
         for i in range(count):
-            ideas.append({
-                "id": f"idea-{pillar}-{i}",
-                "pillar": pillar,
-                "hook": random.choice(fallback_templates),
-                "format": random.choice(["carousel", "video", "text_image", "reel"]),
-                "tone": "thân thiện, chuyên môn",
-            })
+            ideas.append(
+                {
+                    "id": f"idea-{pillar}-{i}",
+                    "pillar": pillar,
+                    "hook": random.choice(fallback_templates),
+                    "format": random.choice(["carousel", "video", "text_image", "reel"]),
+                    "tone": "thân thiện, chuyên môn",
+                }
+            )
         return AgentResult(
             task_id=f"ideas-{pillar}",
             success=True,
@@ -632,8 +689,14 @@ Output JSON:
     def _analyse_trends(self, pillars: list[str]) -> AgentResult:
         """Analyse trends — LLM or stub."""
         if self._llm:
-            active = pillars or ["skincare_routine", "ingredient_deepdive", "myth_busting", "product_review", "genz_lifestyle"]
-            prompt = f"""Phân tích xu hướng skincare GenZ hiện tại cho các pillars: {', '.join(active)}.
+            active = pillars or [
+                "skincare_routine",
+                "ingredient_deepdive",
+                "myth_busting",
+                "product_review",
+                "genz_lifestyle",
+            ]
+            prompt = f"""Phân tích xu hướng skincare GenZ hiện tại cho các pillars: {", ".join(active)}.
 
 Output JSON:
 {{

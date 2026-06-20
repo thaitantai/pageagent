@@ -35,13 +35,10 @@ class AnalyticsTool:
         period_start = ref - timedelta(days=days)
 
         # Split into current and previous period
-        current_metrics = [
-            m for m in metrics if _parse_date(m.published_at) >= period_start
-        ]
+        current_metrics = [m for m in metrics if _parse_date(m.published_at) >= period_start]
         prev_start = period_start - timedelta(days=days)
         prev_metrics = [
-            m for m in metrics
-            if prev_start <= _parse_date(m.published_at) < period_start
+            m for m in metrics if prev_start <= _parse_date(m.published_at) < period_start
         ]
 
         # Current period aggregates
@@ -93,14 +90,20 @@ class AnalyticsTool:
         else:
             # WoW-based recs
             if wow.get("reach", 0) > 10:
-                recommendations.append(f"Reach tăng {wow['reach']:+.0f}% — giữ chất lượng nội dung hiện tại.")
+                recommendations.append(
+                    f"Reach tăng {wow['reach']:+.0f}% — giữ chất lượng nội dung hiện tại."
+                )
             elif wow.get("reach", 0) < -10:
                 recommendations.append(f"Reach giảm {wow['reach']:+.0f}% — refresh hook và visual.")
 
             if wow.get("engagement_rate", 0) < -10:
-                recommendations.append("Engagement rate giảm — kiểm tra lại CTA và tương tác đầu bài.")
+                recommendations.append(
+                    "Engagement rate giảm — kiểm tra lại CTA và tương tác đầu bài."
+                )
             elif wow.get("engagement_rate", 0) > 10:
-                recommendations.append("Engagement rate tăng — nội dung đang chạm đúng insight audience.")
+                recommendations.append(
+                    "Engagement rate tăng — nội dung đang chạm đúng insight audience."
+                )
 
             # Pillar-based recs
             if pillar_breakdown:
@@ -108,12 +111,18 @@ class AnalyticsTool:
                     pillar_breakdown.items(),
                     key=lambda kv: kv[1]["engagements"] / max(kv[1]["reach"], 1),
                 )[0]
-                recommendations.append(f"Nhân rộng pillar '{best_pillar}' — đang có engagement rate tốt nhất.")
+                recommendations.append(
+                    f"Nhân rộng pillar '{best_pillar}' — đang có engagement rate tốt nhất."
+                )
 
             if avg_engagement_rate < 0.03:
-                recommendations.append("Engagement rate trung bình dưới 3% — cần hook mạnh hơn và visual thu hút.")
+                recommendations.append(
+                    "Engagement rate trung bình dưới 3% — cần hook mạnh hơn và visual thu hút."
+                )
             elif avg_engagement_rate > 0.08:
-                recommendations.append("Engagement rate trên 8% — nội dung đang rất tốt, giữ vững phong độ!")
+                recommendations.append(
+                    "Engagement rate trên 8% — nội dung đang rất tốt, giữ vững phong độ!"
+                )
 
         return AnalyticsReport(
             summary=AnalyticsSummary(

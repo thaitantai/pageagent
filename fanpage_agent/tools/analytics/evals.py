@@ -67,9 +67,15 @@ class EvalTool:
             details.append(f"Campaign focus present: {brief.campaign_focus[0]}")
         return {"name": "research", "passed": passed, "details": details}
 
-    def _eval_planner(self, profile: BrandProfile, store: object, brief: ResearchBrief, start_date: str) -> dict:
-        plan = self.planner.plan_week(profile=profile, start_date=start_date, days=2, research_brief=brief)
-        verification = self.verifier.verify_plan(profile, plan, history=store.read_post_history(limit=30))
+    def _eval_planner(
+        self, profile: BrandProfile, store: object, brief: ResearchBrief, start_date: str
+    ) -> dict:
+        plan = self.planner.plan_week(
+            profile=profile, start_date=start_date, days=2, research_brief=brief
+        )
+        verification = self.verifier.verify_plan(
+            profile, plan, history=store.read_post_history(limit=30)
+        )
         has_campaign_focus_note = self._mentions_campaign_focus(plan.strategy_notes, brief)
         passed = len(plan.days) == 2 and verification.passed and has_campaign_focus_note
         details = [
@@ -88,7 +94,9 @@ class EvalTool:
             topic="Da thiếu nước thì nên bắt đầu treatment từ đâu?",
             pillar=profile.content_pillars[0].pillar_name,
             objective=objective,
-            fmt=profile.content_pillars[0].allowed_formats[0] if profile.content_pillars[0].allowed_formats else "post_short",
+            fmt=profile.content_pillars[0].allowed_formats[0]
+            if profile.content_pillars[0].allowed_formats
+            else "post_short",
         )
         verification = self.verifier.verify_caption_package(profile, package)
         expected_cta = self._expected_cta(profile, objective)
@@ -118,7 +126,9 @@ class EvalTool:
                     objective=self._pick_eval_objective(profile),
                     topic="Eval topic",
                     angle="Eval angle",
-                    format=profile.content_pillars[0].allowed_formats[0] if profile.content_pillars[0].allowed_formats else "post_short",
+                    format=profile.content_pillars[0].allowed_formats[0]
+                    if profile.content_pillars[0].allowed_formats
+                    else "post_short",
                     hook="Eval hook",
                     cta="",
                     visual_brief="Eval visual",
@@ -129,7 +139,9 @@ class EvalTool:
             gaps_or_assumptions=[],
         )
         result = self.verifier.verify_plan(profile, broken_plan, history=[])
-        passed = (not result.passed) and any("missing cta" in issue.lower() for issue in result.issues)
+        passed = (not result.passed) and any(
+            "missing cta" in issue.lower() for issue in result.issues
+        )
         details = result.issues or ["Verifier did not report issues"]
         return {"name": "verifier", "passed": passed, "details": details}
 

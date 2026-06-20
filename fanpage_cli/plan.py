@@ -53,10 +53,16 @@ def register_subcommand(subparsers) -> None:
     p.add_argument("--campaign-file", default=str(DEFAULT_CAMPAIGN_FILE))
     p.add_argument("--save", action="store_true")
     p.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
-    p.add_argument("--scan-competitor", action="store_true",
-        help="Enable competitor page analysis (reads competitor_page_names from brand profile)")
-    p.add_argument("--competitor-pages", nargs="*",
-        help="Override competitor page names (space-separated, overrides config)")
+    p.add_argument(
+        "--scan-competitor",
+        action="store_true",
+        help="Enable competitor page analysis (reads competitor_page_names from brand profile)",
+    )
+    p.add_argument(
+        "--competitor-pages",
+        nargs="*",
+        help="Override competitor page names (space-separated, overrides config)",
+    )
     add_store_backend_arg(p)
     p.set_defaults(_handler=cmd_research_brief)
 
@@ -112,7 +118,11 @@ def register_subcommand(subparsers) -> None:
     p = subparsers.add_parser("analytics-review")
     p.add_argument("--brand-file", required=True)
     p.add_argument("--days", type=int, default=7)
-    p.add_argument("--record", action="store_true", help="Write metrics to store (without --record, preview only)")
+    p.add_argument(
+        "--record",
+        action="store_true",
+        help="Write metrics to store (without --record, preview only)",
+    )
     p.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     p.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     p.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
@@ -125,7 +135,11 @@ def register_subcommand(subparsers) -> None:
     p = subparsers.add_parser("deliver-analytics-review")
     p.add_argument("--brand-file", required=True)
     p.add_argument("--days", type=int, default=7)
-    p.add_argument("--record", action="store_true", help="Write metrics to store (without --record, preview only)")
+    p.add_argument(
+        "--record",
+        action="store_true",
+        help="Write metrics to store (without --record, preview only)",
+    )
     p.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     p.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     p.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
@@ -136,12 +150,15 @@ def register_subcommand(subparsers) -> None:
     p.set_defaults(_handler=cmd_deliver_analytics_review)
 
     # ── init-sheets ──
-    p = subparsers.add_parser("init-sheets", help="Create all standard tabs + headers in the Google Sheet")
+    p = subparsers.add_parser(
+        "init-sheets", help="Create all standard tabs + headers in the Google Sheet"
+    )
     add_store_backend_arg(p)
     p.set_defaults(_handler=cmd_init_sheets)
 
 
 # ── Command handlers (copied verbatim from fanpage_agent/main.py) ──
+
 
 def cmd_plan_week(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -177,7 +194,9 @@ def cmd_deliver_research_brief(args: argparse.Namespace) -> int:
     payload = brief.model_dump(mode="json")
     if args.save:
         dump_json(settings.artifacts_dir / "research" / "research-brief.json", payload)
-    payload["delivery"] = DeliveryTool(settings).deliver_research_brief(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_research_brief(
+        payload, chat_id=args.chat_id
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -249,7 +268,9 @@ def cmd_deliver_weekly_report(args: argparse.Namespace) -> int:
     payload = AnalyticsTool().build_weekly_report(metrics).model_dump(mode="json")
     if args.save:
         dump_json(settings.artifacts_dir / "reports" / "weekly-report.json", payload)
-    payload["delivery"] = DeliveryTool(settings).deliver_weekly_report(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_weekly_report(
+        payload, chat_id=args.chat_id
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -280,6 +301,8 @@ def cmd_deliver_analytics_review(args: argparse.Namespace) -> int:
     payload = reviewer.run_review(store=store, days=args.days, record=args.record)
     if args.save:
         dump_json(settings.artifacts_dir / "reports" / "analytics-review.json", payload)
-    payload["delivery"] = DeliveryTool(settings).deliver_analytics_review(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_analytics_review(
+        payload, chat_id=args.chat_id
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0

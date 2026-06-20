@@ -15,27 +15,83 @@ logger = logging.getLogger(__name__)
 
 # Từ khóa gợi ý nội dung có tính affiliate/review/comparison
 _AFFILIATE_CLUE_WORDS: set[str] = {
-    "review", "đánh giá", "reviewed", "tốt nhất", "best",
-    "so sánh", "comparison", "vs", "versus",
-    "mua", "buy", "giá", "price", "rẻ nhất", "cheapest",
-    "top", "nên mua", "should buy", "recommend", "gợi ý",
-    "ưu đãi", "deal", "coupon", "giảm giá", "discount",
-    "trải nghiệm", "experience", "sau 30 ngày", "after 30 days",
-    "test", "thử nghiệm", "honest review",
+    "review",
+    "đánh giá",
+    "reviewed",
+    "tốt nhất",
+    "best",
+    "so sánh",
+    "comparison",
+    "vs",
+    "versus",
+    "mua",
+    "buy",
+    "giá",
+    "price",
+    "rẻ nhất",
+    "cheapest",
+    "top",
+    "nên mua",
+    "should buy",
+    "recommend",
+    "gợi ý",
+    "ưu đãi",
+    "deal",
+    "coupon",
+    "giảm giá",
+    "discount",
+    "trải nghiệm",
+    "experience",
+    "sau 30 ngày",
+    "after 30 days",
+    "test",
+    "thử nghiệm",
+    "honest review",
 }
 
 # Từ khóa sản phẩm phổ biến trong niche skincare/làm đẹp
 _NICHE_PRODUCT_MARKERS: set[str] = {
-    "serum", "retinol", "vitamin c", "niacinamide", "hyaluronic",
-    "sunscreen", "kem chống nắng", "moisturizer", "kem dưỡng",
-    "cleanser", "sữa rửa mặt", "toner", "nước hoa hồng",
-    "essence", "ampoule", "face mask", "mặt nạ",
-    "eye cream", "kem mắt", "exfoliator", "tẩy tế bào chết",
-    "sunscreen", "spf", "peptide", "aha", "bha", "pha",
-    "benzoyl peroxide", "salicylic acid", "glycolic acid",
-    "collagen", "snail mucin", "cica", "centella",
-    "probiotic", "ceramide", "squalane", "retinaldehyde",
-    "adapalene", "tretinoin", "azelaic",
+    "serum",
+    "retinol",
+    "vitamin c",
+    "niacinamide",
+    "hyaluronic",
+    "sunscreen",
+    "kem chống nắng",
+    "moisturizer",
+    "kem dưỡng",
+    "cleanser",
+    "sữa rửa mặt",
+    "toner",
+    "nước hoa hồng",
+    "essence",
+    "ampoule",
+    "face mask",
+    "mặt nạ",
+    "eye cream",
+    "kem mắt",
+    "exfoliator",
+    "tẩy tế bào chết",
+    "sunscreen",
+    "spf",
+    "peptide",
+    "aha",
+    "bha",
+    "pha",
+    "benzoyl peroxide",
+    "salicylic acid",
+    "glycolic acid",
+    "collagen",
+    "snail mucin",
+    "cica",
+    "centella",
+    "probiotic",
+    "ceramide",
+    "squalane",
+    "retinaldehyde",
+    "adapalene",
+    "tretinoin",
+    "azelaic",
 }
 
 # Threshold — tối thiểu clue words để coi là có affiliate potential
@@ -85,7 +141,7 @@ class OfferDiscoveryTool:
         raw_candidates: list[ProductTopicCandidate] = []
 
         # Quét source documents
-        for doc in (source_documents or []):
+        for doc in source_documents or []:
             candidates = self._scan_text(
                 text=doc.content,
                 title=doc.title,
@@ -98,7 +154,7 @@ class OfferDiscoveryTool:
                     existing.add(c.product_name)
 
         # Quét external trends
-        for item in (external_trends or []):
+        for item in external_trends or []:
             candidates = self._scan_text(
                 text=item.title,
                 title=item.title,

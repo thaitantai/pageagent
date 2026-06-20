@@ -76,10 +76,9 @@ class PerformancePredictor:
         preds_eng = [max(0, math.exp(p) - 1) for p in predictions_log]
 
         mae = sum(abs(preds_eng[i] - actuals_eng[i]) for i in range(n)) / n
-        mape = sum(
-            abs(preds_eng[i] - actuals_eng[i]) / max(1, actuals_eng[i])
-            for i in range(n)
-        ) / n
+        mape = (
+            sum(abs(preds_eng[i] - actuals_eng[i]) / max(1, actuals_eng[i]) for i in range(n)) / n
+        )
 
         mean_actual = sum(actuals_eng) / n
         ss_res = sum((actuals_eng[i] - preds_eng[i]) ** 2 for i in range(n))
@@ -96,7 +95,9 @@ class PerformancePredictor:
                 "r2": round(r2, 4),
             },
             "drift": drift,
-            "drift_message": "MAPE > 40% — consider tuning weights or recalibrating" if drift else None,
+            "drift_message": "MAPE > 40% — consider tuning weights or recalibrating"
+            if drift
+            else None,
             "sample_count": n,
             "trained_at": datetime.now(timezone.utc).isoformat(),
         }

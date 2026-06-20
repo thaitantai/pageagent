@@ -3,6 +3,7 @@
 Uses FacebookAdapter to post real content and records metrics
 for the PerformanceMemory system.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -71,12 +72,19 @@ class PublisherAgent(BaseAgent):
         params = task.params
 
         # Check FB availability for publish/track/delete actions
-        if action in ("publish_post", "publish_package", "publish_due",
-                       "track_performance", "delete_post", "fetch_metrics",
-                       "refresh_metrics"):
+        if action in (
+            "publish_post",
+            "publish_package",
+            "publish_due",
+            "track_performance",
+            "delete_post",
+            "fetch_metrics",
+            "refresh_metrics",
+        ):
             if self._fb is None:
                 return AgentResult(
-                    task_id=task.id, success=False,
+                    task_id=task.id,
+                    success=False,
                     error=f"FacebookAdapter unavailable: {self._fb_error or 'unknown'}",
                 )
 
@@ -137,9 +145,7 @@ class PublisherAgent(BaseAgent):
         elif action == "refresh_metrics":
             page_id = self._resolve_page_id(params)
             return self._refresh_metrics(limit=params.get("limit", 10), page_id=page_id)
-        return AgentResult(
-            task_id=task.id, success=False, error=f"Unknown action: {action}"
-        )
+        return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
     def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
         """Propose: publish designer's content, or periodic metrics refresh."""
@@ -147,16 +153,24 @@ class PublisherAgent(BaseAgent):
 
         # Check for new designer content (choreography chain)
         if self._has_upstream_data("designer", "processed_designer_version"):
-            proposals.append(("publish_due", {
-                "message": "Bài viết mới từ Fanpage Agent 🎉",
-            }, ActionPriority.HIGH))
+            proposals.append(
+                (
+                    "publish_due",
+                    {
+                        "message": "Bài viết mới từ Fanpage Agent 🎉",
+                    },
+                    ActionPriority.HIGH,
+                )
+            )
         elif self._should_act("refresh_metrics", 10800):
             proposals.append(("refresh_metrics", {"limit": 10}, ActionPriority.LOW))
 
         return proposals
 
     def _publish_post(
-        self, message: str, image_path: str | None = None,
+        self,
+        message: str,
+        image_path: str | None = None,
         record_memory: bool = True,
         page_id: str | None = None,
     ) -> AgentResult:
@@ -246,13 +260,12 @@ class PublisherAgent(BaseAgent):
             permalink=permalink,
         )
 
-    def _publish_package(self, package: ContentPackage | dict | None,
-                         page_id: str | None = None) -> AgentResult:
+    def _publish_package(
+        self, package: ContentPackage | dict | None, page_id: str | None = None
+    ) -> AgentResult:
         """Publish the best variant from a content package."""
         if package is None:
-            return AgentResult(
-                task_id="pub-pkg", success=False, error="No package provided"
-            )
+            return AgentResult(task_id="pub-pkg", success=False, error="No package provided")
         if isinstance(package, dict):
             # Reconstruct from dict if needed
             package = ContentPackage(**package)
@@ -272,9 +285,7 @@ class PublisherAgent(BaseAgent):
         if variant.cta:
             caption_parts.append(variant.cta)
         if variant.hashtags:
-            caption_parts.append(" ".join(
-                f"#{t.lstrip('#')}" for t in variant.hashtags
-            ))
+            caption_parts.append(" ".join(f"#{t.lstrip('#')}" for t in variant.hashtags))
 
         message = "\n\n".join(p for p in caption_parts if p)
 
@@ -318,14 +329,15 @@ class PublisherAgent(BaseAgent):
         )
 
     def _track_performance(
-        self, fb_post_id: str, variant_id: str, package_id: str | None = None,
+        self,
+        fb_post_id: str,
+        variant_id: str,
+        package_id: str | None = None,
         page_id: str | None = None,
     ) -> AgentResult:
         """Fetch and record post performance metrics from Facebook."""
         if not fb_post_id:
-            return AgentResult(
-                task_id="track", success=False, error="No fb_post_id provided"
-            )
+            return AgentResult(task_id="track", success=False, error="No fb_post_id provided")
 
         try:
             insights = self._fb.get_post_insights(fb_post_id, page_id=page_id)
@@ -430,6 +442,7 @@ class PublisherAgent(BaseAgent):
                 success=False,
                 error=f"Refresh metrics failed: {e}",
             )
+
     def _fetch_metrics(self, limit: int = 10, page_id: str | None = None) -> AgentResult:
         """Fetch recent page posts with engagement data."""
         try:

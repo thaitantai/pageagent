@@ -108,7 +108,9 @@ def cmd_triage_community(args: argparse.Namespace) -> int:
     payload = batch.model_dump(mode="json")
     if args.write_store:
         payload["store"] = {
-            "persisted": build_store(settings=settings, args=args).upsert_triage_items(profile.brand_id, batch.items)
+            "persisted": build_store(settings=settings, args=args).upsert_triage_items(
+                profile.brand_id, batch.items
+            )
         }
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)

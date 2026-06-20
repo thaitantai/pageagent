@@ -115,18 +115,22 @@ class CalendarGapTool:
 
             # Skip weekends and already-filled days
             if cursor.weekday() >= 5:  # Saturday=5, Sunday=6
-                result.skipped.append({
-                    "date": iso,
-                    "reason": "Weekend",
-                })
+                result.skipped.append(
+                    {
+                        "date": iso,
+                        "reason": "Weekend",
+                    }
+                )
                 cursor += timedelta(days=1)
                 continue
 
             if self._is_day_filled(day_rows):
-                result.skipped.append({
-                    "date": iso,
-                    "reason": f"Already has {len(day_rows)} item(s)",
-                })
+                result.skipped.append(
+                    {
+                        "date": iso,
+                        "reason": f"Already has {len(day_rows)} item(s)",
+                    }
+                )
                 cursor += timedelta(days=1)
                 continue
 
@@ -164,10 +168,12 @@ class CalendarGapTool:
                 days=1,
             )
             if not plan.days:
-                result.errors.append({
-                    "date": iso_date,
-                    "reason": "Planner returned no days",
-                })
+                result.errors.append(
+                    {
+                        "date": iso_date,
+                        "reason": "Planner returned no days",
+                    }
+                )
                 return
 
             day = plan.days[0]
@@ -190,7 +196,9 @@ class CalendarGapTool:
             caption_filename = f"daily-caption-auto-{safe_brand}-{iso_date}-1.json"
             caption_path = self.artifacts_dir / caption_filename
             caption_payload = caption_package.model_dump(mode="json")
-            caption_path.write_text(json.dumps(caption_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            caption_path.write_text(
+                json.dumps(caption_payload, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
             caption_ref = str(caption_path)
 
             # --- Step E: Attach draft caption ref ---
@@ -203,18 +211,22 @@ class CalendarGapTool:
             # --- Step F: Verify ---
             v_plan = self.verifier.verify_plan(profile, plan)
             if not v_plan.passed:
-                result.errors.append({
-                    "calendar_id": calendar_id,
-                    "reason": f"Plan verification failed: {'; '.join(v_plan.issues)}",
-                })
+                result.errors.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": f"Plan verification failed: {'; '.join(v_plan.issues)}",
+                    }
+                )
                 return
 
             v_caption = self.verifier.verify_caption_package(profile, caption_package)
             if not v_caption.passed:
-                result.errors.append({
-                    "calendar_id": calendar_id,
-                    "reason": f"Caption verification failed: {'; '.join(v_caption.issues)}",
-                })
+                result.errors.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": f"Caption verification failed: {'; '.join(v_caption.issues)}",
+                    }
+                )
                 return
 
             # --- Step G: Auto-approve ---
@@ -227,13 +239,15 @@ class CalendarGapTool:
             ar = engine.process_pending()
 
             if any(a.get("calendar_id") == calendar_id for a in ar.auto_approved):
-                result.filled.append({
-                    "calendar_id": calendar_id,
-                    "date": iso_date,
-                    "topic": day.topic,
-                    "pillar": day.pillar,
-                    "caption_ref": caption_ref,
-                })
+                result.filled.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "date": iso_date,
+                        "topic": day.topic,
+                        "pillar": day.pillar,
+                        "caption_ref": caption_ref,
+                    }
+                )
             else:
                 # If auto-approval skipped it, let's check why
                 skipped_reason = "Unknown"
@@ -241,13 +255,17 @@ class CalendarGapTool:
                     if s.get("calendar_id") == calendar_id:
                         skipped_reason = s.get("reason", "Unknown")
                         break
-                result.errors.append({
-                    "calendar_id": calendar_id,
-                    "reason": f"Auto-approval skipped: {skipped_reason}",
-                })
+                result.errors.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": f"Auto-approval skipped: {skipped_reason}",
+                    }
+                )
 
         except Exception as exc:
-            result.errors.append({
-                "date": iso_date,
-                "reason": f"Exception: {exc}",
-            })
+            result.errors.append(
+                {
+                    "date": iso_date,
+                    "reason": f"Exception: {exc}",
+                }
+            )

@@ -68,9 +68,7 @@ def run_daemon(
 
         try:
             result = orchestrator.run_tick(tick_num=tick)
-            actions = len(
-                [h for h in result.get("history", []) if h.get("type") == "tool_call"]
-            )
+            actions = len([h for h in result.get("history", []) if h.get("type") == "tool_call"])
             errors = result.get("errors", [])
             print(f"  Actions: {actions}  |  Errors: {len(errors)}")
             if errors:

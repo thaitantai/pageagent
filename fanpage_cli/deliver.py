@@ -74,7 +74,9 @@ def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
     approved_replies_parser.set_defaults(_handler=cmd_deliver_approved_triage_replies)
 
     dashboard_delivery_parser = subparsers.add_parser("deliver-dashboard")
-    dashboard_delivery_parser.add_argument("--brand-file", default=str(ROOT_DIR / "data" / "brand_profile.json"))
+    dashboard_delivery_parser.add_argument(
+        "--brand-file", default=str(ROOT_DIR / "data" / "brand_profile.json")
+    )
     dashboard_delivery_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     dashboard_delivery_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     dashboard_delivery_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
@@ -126,15 +128,21 @@ def cmd_deliver_triage_community(args: argparse.Namespace) -> int:
         payload = build_triage_store_payload(args)
     else:
         profile = load_brand_profile(args.brand_file)
-        batch = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=args.comment_file)
+        batch = CommunityTriageTool().triage_from_csv(
+            profile=profile, comment_csv=args.comment_file
+        )
         payload = batch.model_dump(mode="json")
         if args.write_store:
             payload["store"] = {
-                "persisted": build_store(settings=settings, args=args).upsert_triage_items(profile.brand_id, batch.items)
+                "persisted": build_store(settings=settings, args=args).upsert_triage_items(
+                    profile.brand_id, batch.items
+                )
             }
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)
-    payload["delivery"] = DeliveryTool(settings).deliver_community_triage(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_community_triage(
+        payload, chat_id=args.chat_id
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -144,7 +152,9 @@ def cmd_deliver_approved_triage_replies(args: argparse.Namespace) -> int:
     payload = build_triage_store_payload(args)
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "approved-triage-replies.json", payload)
-    payload["delivery"] = DeliveryTool(settings).deliver_approved_triage_replies(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approved_triage_replies(
+        payload, chat_id=args.chat_id
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

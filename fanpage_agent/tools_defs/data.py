@@ -77,10 +77,22 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "post_limit": {"type": "integer", "description": "Number of recent posts to fetch (default 90)"},
-                    "comment_posts": {"type": "integer", "description": "How many of those posts to fetch comments from (default 20)"},
-                    "comment_limit": {"type": "integer", "description": "Max comments per post (default 25)"},
-                    "skip_comments": {"type": "boolean", "description": "Skip comment fetch (default false)"},
+                    "post_limit": {
+                        "type": "integer",
+                        "description": "Number of recent posts to fetch (default 90)",
+                    },
+                    "comment_posts": {
+                        "type": "integer",
+                        "description": "How many of those posts to fetch comments from (default 20)",
+                    },
+                    "comment_limit": {
+                        "type": "integer",
+                        "description": "Max comments per post (default 25)",
+                    },
+                    "skip_comments": {
+                        "type": "boolean",
+                        "description": "Skip comment fetch (default false)",
+                    },
                 },
             },
         },
@@ -97,6 +109,9 @@ TOOL_DEFINITIONS = [
 
 REGISTRY_BUILDERS = {
     "fetch_fb_comments": (tool_fetch_fb_comments, {}),
-    "fetch_fb_data": (tool_fetch_fb_data, {"post_limit": 90, "comment_posts": 20, "comment_limit": 25, "skip_comments": False}),
+    "fetch_fb_data": (
+        tool_fetch_fb_data,
+        {"post_limit": 90, "comment_posts": 20, "comment_limit": 25, "skip_comments": False},
+    ),
     "record_post_metrics": (tool_record_post_metrics, {}),
 }

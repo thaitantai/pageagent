@@ -102,7 +102,9 @@ class ContentQueueTool:
                 # Extract first caption text for preview
                 variants = data.get("variants", []) or data.get("caption_ideas", [])
                 if variants:
-                    caption_preview = variants[0].get("caption_text", "") or variants[0].get("caption", "")
+                    caption_preview = variants[0].get("caption_text", "") or variants[0].get(
+                        "caption", ""
+                    )
                     caption_preview = caption_preview[:200]
             except (FileNotFoundError, json.JSONDecodeError, OSError):
                 pass
@@ -149,7 +151,8 @@ class ContentQueueTool:
     ) -> dict[str, Any]:
         """Approve a single queued item."""
         result = self.store.approve_queue_item(
-            calendar_id=calendar_id, approved_by=approved_by,
+            calendar_id=calendar_id,
+            approved_by=approved_by,
         )
         if not result or result.get("queue_status") != "approved":
             return {"error": f"Could not approve {calendar_id}", "approved": False}
@@ -170,7 +173,8 @@ class ContentQueueTool:
     ) -> dict[str, Any]:
         """Reject a single queued item."""
         result = self.store.reject_queue_item(
-            calendar_id=calendar_id, reason=reason,
+            calendar_id=calendar_id,
+            reason=reason,
         )
         if not result or result.get("queue_status") != "rejected":
             return {"error": f"Could not reject {calendar_id}", "rejected": False}
@@ -263,7 +267,9 @@ class ContentQueueTool:
                     data = json.load(f)
                 variants = data.get("variants", []) or data.get("caption_ideas", [])
                 if variants:
-                    caption_text = variants[0].get("caption_text", "") or variants[0].get("caption", "")
+                    caption_text = variants[0].get("caption_text", "") or variants[0].get(
+                        "caption", ""
+                    )
             except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
                 logger.warning("Could not load caption ref %s: %s", caption_ref_path, exc)
 
@@ -290,7 +296,9 @@ class ContentQueueTool:
             )
             # Also update calendar table
             now = datetime.now(timezone.utc).isoformat()
-            permalink = f"https://facebook.com/{self.fb_client.page_id}/posts/{fb_post_id.split('_')[-1]}"
+            permalink = (
+                f"https://facebook.com/{self.fb_client.page_id}/posts/{fb_post_id.split('_')[-1]}"
+            )
             self.store.publish_calendar_item(
                 calendar_id=calendar_id,
                 published_at=now,
@@ -320,7 +328,10 @@ class ContentQueueTool:
     ) -> ContentQueueResult:
         """Publish all approved queue items to Facebook."""
         items = self.store.batch_publish_queue(
-            brand_id=brand_id, pillar=pillar, topic=topic, limit=limit,
+            brand_id=brand_id,
+            pillar=pillar,
+            topic=topic,
+            limit=limit,
         )
         result = ContentQueueResult()
         for item in items:
@@ -328,25 +339,32 @@ class ContentQueueTool:
             if not cal_id:
                 continue
             pub_result = self.publish_to_facebook(
-                calendar_id=cal_id, dry_run=dry_run,
+                calendar_id=cal_id,
+                dry_run=dry_run,
             )
             if pub_result.get("published"):
-                result.published.append({
-                    "calendar_id": cal_id,
-                    "topic": item.get("topic", ""),
-                    "fb_post_id": pub_result.get("fb_post_id", ""),
-                    "permalink": pub_result.get("permalink", ""),
-                })
+                result.published.append(
+                    {
+                        "calendar_id": cal_id,
+                        "topic": item.get("topic", ""),
+                        "fb_post_id": pub_result.get("fb_post_id", ""),
+                        "permalink": pub_result.get("permalink", ""),
+                    }
+                )
             elif pub_result.get("error"):
-                result.failed.append({
-                    "calendar_id": cal_id,
-                    "topic": item.get("topic", ""),
-                    "error": pub_result["error"],
-                })
+                result.failed.append(
+                    {
+                        "calendar_id": cal_id,
+                        "topic": item.get("topic", ""),
+                        "error": pub_result["error"],
+                    }
+                )
             else:
-                result.skipped.append({
-                    "calendar_id": cal_id,
-                    "topic": item.get("topic", ""),
-                    "reason": "unexpected_state",
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": cal_id,
+                        "topic": item.get("topic", ""),
+                        "reason": "unexpected_state",
+                    }
+                )
         return result

@@ -55,7 +55,10 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "reason": {"type": "string", "description": "Why you're checking status (e.g. 'cycle start', 'after action')"},
+                    "reason": {
+                        "type": "string",
+                        "description": "Why you're checking status (e.g. 'cycle start', 'after action')",
+                    },
                 },
                 "required": ["reason"],
             },
