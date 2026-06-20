@@ -43,18 +43,49 @@ _REQUEST_TIMEOUT = 15.0
 
 _NICHE_KEYWORDS = [
     # Skincare & beauty (Vietnamese + English)
-    "mỹ phẩm", "skincare", "beauty", "làm đẹp", "dưỡng da",
-    "chăm sóc da", "serum", "kem chống nắng", "sữa rửa mặt",
-    "tẩy trang", "toner", "retinol", "vitamin c", "niacinamide",
-    "spf", "collagen", "tinh dầu", "dầu gội", "sữa tắm",
-    "nước hoa", "mascara", "son môi", "phấn mắt",
-    "thẩm mỹ", "ngọc dung", "watsons", "guardian",
-    "thefaceshop", "innisfree", "hasaki",
+    "mỹ phẩm",
+    "skincare",
+    "beauty",
+    "làm đẹp",
+    "dưỡng da",
+    "chăm sóc da",
+    "serum",
+    "kem chống nắng",
+    "sữa rửa mặt",
+    "tẩy trang",
+    "toner",
+    "retinol",
+    "vitamin c",
+    "niacinamide",
+    "spf",
+    "collagen",
+    "tinh dầu",
+    "dầu gội",
+    "sữa tắm",
+    "nước hoa",
+    "mascara",
+    "son môi",
+    "phấn mắt",
+    "thẩm mỹ",
+    "ngọc dung",
+    "watsons",
+    "guardian",
+    "thefaceshop",
+    "innisfree",
+    "hasaki",
     # Health & wellness
-    "sức khỏe", "vitamin", "thực phẩm chức năng", "tpc",
-    "traphaco", "suntory", "sachi",
+    "sức khỏe",
+    "vitamin",
+    "thực phẩm chức năng",
+    "tpc",
+    "traphaco",
+    "suntory",
+    "sachi",
     # General e-commerce platforms
-    "shopee", "lazada", "tiki", "sendo",
+    "shopee",
+    "lazada",
+    "tiki",
+    "sendo",
 ]
 
 # Category IDs that are likely e-commerce / beauty
@@ -161,8 +192,7 @@ class AccessTradeProvider:
         # Fallback: keyword didn't match any campaign name/merchant.
         # Use niche-based discovery for broader matching.
         logger.info(
-            "AccessTrade keyword '%s' matched 0 campaigns, "
-            "falling back to niche discovery",
+            "AccessTrade keyword '%s' matched 0 campaigns, falling back to niche discovery",
             keyword,
         )
         return self.discover_campaigns(max_results=max_results)
@@ -229,15 +259,11 @@ class AccessTradeProvider:
         }
 
         try:
-            resp = self._get_client().post(
-                _LINK_ENDPOINT, json=payload
-            )
+            resp = self._get_client().post(_LINK_ENDPOINT, json=payload)
             if resp.status_code == 200:
                 body = self._safe_json(resp)
                 if isinstance(body, dict):
-                    return str(
-                        body.get("short_url", body.get("url", body.get("data", "")))
-                    )
+                    return str(body.get("short_url", body.get("url", body.get("data", ""))))
             logger.info(
                 "Link gen returned %s for campaign %s, using campaign URL",
                 resp.status_code,
@@ -336,9 +362,7 @@ class AccessTradeProvider:
         """Convert a raw campaign dict into an AffiliateProduct."""
         campaign_id = str(campaign.get("id", ""))
         name = str(campaign.get("name", ""))
-        commission_rate, commission_str = _parse_commission(
-            campaign.get("max_com")
-        )
+        commission_rate, commission_str = _parse_commission(campaign.get("max_com"))
         category = str(campaign.get("category", ""))
         sub_category = str(campaign.get("sub_category", "") or "")
         full_category = f"{category}/{sub_category}" if sub_category else category

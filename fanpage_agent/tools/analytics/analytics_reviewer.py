@@ -46,8 +46,7 @@ class AnalyticsReviewer:
         # 1. Fetch FB posts
         fb_posts = self.fb_client.get_page_posts(limit=50)
         recent_fb_posts = [
-            p for p in fb_posts
-            if _parse_fb_datetime(p.get("created_time", "")) >= cutoff
+            p for p in fb_posts if _parse_fb_datetime(p.get("created_time", "")) >= cutoff
         ]
 
         # 2. Get published calendar items
@@ -68,9 +67,7 @@ class AnalyticsReviewer:
             fb_date = fb_post.get("created_time", "")[:10]  # "2026-06-01"
             fb_message = (fb_post.get("message") or "").strip().lower()
 
-            matched_cal_item = self._find_best_match(
-                fb_date, fb_message, cal_by_date
-            )
+            matched_cal_item = self._find_best_match(fb_date, fb_message, cal_by_date)
 
             if matched_cal_item:
                 reach = fb_post.get("reach", 0)
@@ -82,7 +79,8 @@ class AnalyticsReviewer:
                 entry = {
                     "fb_post_id": fb_post.get("id", ""),
                     "calendar_id": matched_cal_item.get("calendar_id", ""),
-                    "published_at": matched_cal_item.get("published_at", "") or matched_cal_item.get("date", ""),
+                    "published_at": matched_cal_item.get("published_at", "")
+                    or matched_cal_item.get("date", ""),
                     "topic": matched_cal_item.get("topic", ""),
                     "pillar": matched_cal_item.get("pillar", ""),
                     "objective": matched_cal_item.get("objective", ""),
@@ -112,14 +110,16 @@ class AnalyticsReviewer:
                 shares_converted = _parse_fb_shares(fb_post.get("shares", 0))
                 engagements_count = likes_converted + comments_converted + shares_converted
 
-                unmatched.append({
-                    "fb_post_id": fb_post.get("id", ""),
-                    "message_preview": (fb_post.get("message") or "")[:120],
-                    "created_time": fb_post.get("created_time", ""),
-                    "permalink": fb_post.get("permalink_url", ""),
-                    "reach": _parse_int(fb_post.get("reach", 0)),
-                    "engagements": engagements_count,
-                })
+                unmatched.append(
+                    {
+                        "fb_post_id": fb_post.get("id", ""),
+                        "message_preview": (fb_post.get("message") or "")[:120],
+                        "created_time": fb_post.get("created_time", ""),
+                        "permalink": fb_post.get("permalink_url", ""),
+                        "reach": _parse_int(fb_post.get("reach", 0)),
+                        "engagements": engagements_count,
+                    }
+                )
 
         # 4. Build summary metrics from ALL recorded + matched data
         all_metrics = list(store.read_post_metrics())

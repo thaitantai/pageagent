@@ -6,6 +6,7 @@ Usage::
     settings = get_settings()
     fb = FacebookAdapter(settings)
 """
+
 from __future__ import annotations
 
 from config import Settings as _Settings

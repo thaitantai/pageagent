@@ -78,47 +78,55 @@ class ScheduledPublishTool:
 
             # Skip already published
             if status == "published":
-                result.skipped.append({
-                    "calendar_id": calendar_id,
-                    "reason": "Already published",
-                    "reason_code": "already_published",
-                    "status": status,
-                    "approval_status": approval_status,
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": "Already published",
+                        "reason_code": "already_published",
+                        "status": status,
+                        "approval_status": approval_status,
+                    }
+                )
                 continue
 
             # Skip not-yet-approved items
             if approval_status not in ("approved", "auto_approved"):
-                result.skipped.append({
-                    "calendar_id": calendar_id,
-                    "reason": f"Not approved (status={approval_status})",
-                    "reason_code": "approval_status_not_approved",
-                    "status": status,
-                    "approval_status": approval_status,
-                    "next_step": "Approve the caption before scheduled-publish can publish it.",
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": f"Not approved (status={approval_status})",
+                        "reason_code": "approval_status_not_approved",
+                        "status": status,
+                        "approval_status": approval_status,
+                        "next_step": "Approve the caption before scheduled-publish can publish it.",
+                    }
+                )
                 continue
 
             if not row.get("final_caption_ref"):
-                result.skipped.append({
-                    "calendar_id": calendar_id,
-                    "reason": "Missing final caption reference",
-                    "reason_code": "missing_final_caption_ref",
-                    "status": status,
-                    "approval_status": approval_status,
-                    "next_step": "Run approve-caption so the approved caption artifact is recorded.",
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": "Missing final caption reference",
+                        "reason_code": "missing_final_caption_ref",
+                        "status": status,
+                        "approval_status": approval_status,
+                        "next_step": "Run approve-caption so the approved caption artifact is recorded.",
+                    }
+                )
                 continue
 
             # Skip future items
             if item_date > ref:
-                result.skipped.append({
-                    "calendar_id": calendar_id,
-                    "reason": f"Scheduled for {item_date}, reference is {ref}",
-                    "reason_code": "scheduled_for_future",
-                    "status": status,
-                    "approval_status": approval_status,
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": f"Scheduled for {item_date}, reference is {ref}",
+                        "reason_code": "scheduled_for_future",
+                        "status": status,
+                        "approval_status": approval_status,
+                    }
+                )
                 continue
 
             # Optional tone verification — defense in depth
@@ -131,16 +139,20 @@ class ScheduledPublishTool:
                             raw = json.loads(caption_path.read_text(encoding="utf-8"))
                             # Import only at runtime when needed
                             from fanpage_agent.models import CaptionPackage as _CaptionPackage
+
                             package = _CaptionPackage.model_validate(raw)
                             v_result = self.verifier.verify_caption_package(
-                                self.brand_profile, package,
+                                self.brand_profile,
+                                package,
                             )
                             if not v_result.passed:
                                 issues = "; ".join(v_result.issues[:3])
-                                result.skipped.append({
-                                    "calendar_id": calendar_id,
-                                    "reason": f"Tone verification failed: {issues}",
-                                })
+                                result.skipped.append(
+                                    {
+                                        "calendar_id": calendar_id,
+                                        "reason": f"Tone verification failed: {issues}",
+                                    }
+                                )
                                 continue
                         except Exception:
                             # Fail open — if file is unreadable, publish anyway
@@ -185,13 +197,9 @@ class ScheduledPublishTool:
             if self.image_service and visual_brief:
                 try:
                     image_path = self.image_service.generate(visual_brief)
-                    logger.info(
-                        "Generated image for %s: %s", calendar_id, image_path
-                    )
+                    logger.info("Generated image for %s: %s", calendar_id, image_path)
                 except Exception as exc:
-                    logger.error(
-                        "Image generation failed for %s: %s", calendar_id, exc
-                    )
+                    logger.error("Image generation failed for %s: %s", calendar_id, exc)
                     # Fail open — post without image
 
             # Post to Facebook if client is configured
@@ -200,9 +208,7 @@ class ScheduledPublishTool:
             if self.fb_client:
                 try:
                     if image_path:
-                        fb_resp = self.fb_client.post_photo(
-                            image_path=image_path, message=message
-                        )
+                        fb_resp = self.fb_client.post_photo(image_path=image_path, message=message)
                         # Graph API /photos returns post_id in the response
                         post_id = fb_resp.get("post_id", fb_resp.get("id", ""))
                     else:
@@ -211,19 +217,25 @@ class ScheduledPublishTool:
 
                     if post_id:
                         post_number = post_id.split("_", 1)[-1] if "_" in post_id else post_id
-                        post_permalink = f"https://facebook.com/{self.fb_client.page_id}/posts/{post_number}"
-                        logger.info("Published to Facebook: post_id=%s url=%s", post_id, post_permalink)
+                        post_permalink = (
+                            f"https://facebook.com/{self.fb_client.page_id}/posts/{post_number}"
+                        )
+                        logger.info(
+                            "Published to Facebook: post_id=%s url=%s", post_id, post_permalink
+                        )
                     else:
                         logger.warning("Facebook post succeeded but no post_id returned")
                 except Exception as exc:
                     logger.error("Facebook publish failed for %s: %s", calendar_id, exc)
                     # Fail open — still mark as published locally
-                    result.published.append({
-                        "calendar_id": calendar_id,
-                        "topic": row.get("topic", ""),
-                        "published_at": published_at,
-                        "error": str(exc),
-                    })
+                    result.published.append(
+                        {
+                            "calendar_id": calendar_id,
+                            "topic": row.get("topic", ""),
+                            "published_at": published_at,
+                            "error": str(exc),
+                        }
+                    )
                     continue
 
             self.store.publish_calendar_item(
@@ -236,6 +248,7 @@ class ScheduledPublishTool:
 
             # Auto-track hashtags from the published caption
             import re as _re
+
             found_tags = _re.findall(r"#\w+", message)
             if found_tags:
                 try:
@@ -248,12 +261,14 @@ class ScheduledPublishTool:
                     )
                 except Exception:
                     logger.warning("Failed to record hashtags for %s", calendar_id, exc_info=True)
-            result.published.append({
-                "calendar_id": calendar_id,
-                "topic": row.get("topic", ""),
-                "published_at": published_at,
-                "post_id": post_id,
-                "permalink": post_permalink,
-            })
+            result.published.append(
+                {
+                    "calendar_id": calendar_id,
+                    "topic": row.get("topic", ""),
+                    "published_at": published_at,
+                    "post_id": post_id,
+                    "permalink": post_permalink,
+                }
+            )
 
         return result

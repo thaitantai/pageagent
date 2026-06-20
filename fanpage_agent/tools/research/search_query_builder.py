@@ -64,7 +64,7 @@ def build_search_queries(
     Returns deduplicated list, max ``_MAX_QUERIES`` items.
     """
     if override_queries:
-        return override_queries[: _MAX_QUERIES]
+        return override_queries[:_MAX_QUERIES]
 
     seen: set[str] = set()
     queries: list[str] = []
@@ -158,7 +158,7 @@ def build_search_queries(
                     seen.add(fb)
                     queries.append(fb)
 
-    return queries[: _MAX_QUERIES]
+    return queries[:_MAX_QUERIES]
 
 
 # ──────────────────────────────────────────────

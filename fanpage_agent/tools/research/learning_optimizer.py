@@ -106,14 +106,16 @@ class WeightOptimizer:
 
             if new_weight != current:
                 self._store.update_weight(name, new_weight, correlation_7d=corr)
-                changes.append({
-                    "weight_name": name,
-                    "from": current,
-                    "to": new_weight,
-                    "correlation": corr,
-                    "sample_size": sample_size,
-                    "delta": round(new_weight - current, 4),
-                })
+                changes.append(
+                    {
+                        "weight_name": name,
+                        "from": current,
+                        "to": new_weight,
+                        "correlation": corr,
+                        "sample_size": sample_size,
+                        "delta": round(new_weight - current, 4),
+                    }
+                )
 
         # Audit log
         self._store.log_learning_run(
@@ -199,7 +201,11 @@ class GoalWeightOptimizer:
 
         analysis = self._store.get_goal_weight_variance_analysis(goal_type)
         if not analysis:
-            return {"status": "skipped", "reason": f"insufficient data for goal '{goal_type}'", "changes": []}
+            return {
+                "status": "skipped",
+                "reason": f"insufficient data for goal '{goal_type}'",
+                "changes": [],
+            }
 
         changes: list[dict[str, Any]] = []
         limits = _GOAL_WEIGHT_LIMITS.get(goal_type, _GOAL_WEIGHT_LIMITS["balanced"])
@@ -225,15 +231,17 @@ class GoalWeightOptimizer:
 
             if new_weight != current:
                 self._store.update_goal_weight(goal_type, name, new_weight, correlation_7d=corr)
-                changes.append({
-                    "weight_name": name,
-                    "from": current,
-                    "to": new_weight,
-                    "correlation": corr,
-                    "sample_size": sample_size,
-                    "goal_type": goal_type,
-                    "delta": round(new_weight - current, 4),
-                })
+                changes.append(
+                    {
+                        "weight_name": name,
+                        "from": current,
+                        "to": new_weight,
+                        "correlation": corr,
+                        "sample_size": sample_size,
+                        "goal_type": goal_type,
+                        "delta": round(new_weight - current, 4),
+                    }
+                )
 
         # Audit log
         self._store.log_learning_run(

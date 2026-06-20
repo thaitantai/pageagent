@@ -32,7 +32,11 @@ class MockLLMClient:
         objectives = self._build_objective_lane(profile, research_brief)
         pillars = self._build_pillar_lane(profile, research_brief, strategy)
         angles = self._build_angle_lane(profile, research_brief)
-        first_question = research_brief.frequent_questions[0] if research_brief and research_brief.frequent_questions else None
+        first_question = (
+            research_brief.frequent_questions[0]
+            if research_brief and research_brief.frequent_questions
+            else None
+        )
 
         for index in range(days):
             pillar_name = pillars[index % len(pillars)]
@@ -90,12 +94,26 @@ class MockLLMClient:
         rules = profile.tone_of_voice.writing_rules
         avoid = profile.tone_of_voice.things_to_avoid
 
-        dos_rules = list(rules) if rules else ["Giữ câu ngắn", "Nhấn lợi ích thực tế", "Dùng CTA đã duyệt"]
-        donts_rules = list(avoid) if avoid else ["Không claim tuyệt đối", "Không giật gân", "Không dùng banned phrases"]
+        dos_rules = (
+            list(rules) if rules else ["Giữ câu ngắn", "Nhấn lợi ích thực tế", "Dùng CTA đã duyệt"]
+        )
+        donts_rules = (
+            list(avoid)
+            if avoid
+            else ["Không claim tuyệt đối", "Không giật gân", "Không dùng banned phrases"]
+        )
 
         tone_a = [traits[0], traits[1 % len(traits)]] if traits else ["rõ ràng"]
-        tone_b = [traits[1 % len(traits)], traits[2 % len(traits)]] if len(traits) >= 2 else (traits[:1] + ["rõ ràng"])[:2]
-        tone_c = [traits[2 % len(traits)], traits[3 % len(traits)]] if len(traits) >= 3 else (traits[:1] + [traits[-1]])[:2]
+        tone_b = (
+            [traits[1 % len(traits)], traits[2 % len(traits)]]
+            if len(traits) >= 2
+            else (traits[:1] + ["rõ ràng"])[:2]
+        )
+        tone_c = (
+            [traits[2 % len(traits)], traits[3 % len(traits)]]
+            if len(traits) >= 3
+            else (traits[:1] + [traits[-1]])[:2]
+        )
 
         hook_a = f"Về {topic}, có một điều ít ai nói đến"
         hook_b = f"{topic} — bạn đã thử cách này chưa?"
@@ -108,12 +126,30 @@ class MockLLMClient:
         return CaptionPackage(
             topic=topic,
             variants=[
-                CaptionVariant(label="A", hook=hook_a, caption=caption_a, cta=cta, tone_tags=tone_a,
-                    visual_brief=f"{fmt} với headline ngắn, làm rõ chủ đề {topic}. Tone: {', '.join(tone_a)}."),
-                CaptionVariant(label="B", hook=hook_b, caption=caption_b, cta=cta, tone_tags=tone_b,
-                    visual_brief=f"{fmt} so sánh before/after theo hướng giáo dục. Tone: {', '.join(tone_b)}."),
-                CaptionVariant(label="C", hook=hook_c, caption=caption_c, cta=cta, tone_tags=tone_c,
-                    visual_brief=f"{fmt} dạng checklist, ưu tiên dễ đọc trên mobile. Tone: {', '.join(tone_c)}."),
+                CaptionVariant(
+                    label="A",
+                    hook=hook_a,
+                    caption=caption_a,
+                    cta=cta,
+                    tone_tags=tone_a,
+                    visual_brief=f"{fmt} với headline ngắn, làm rõ chủ đề {topic}. Tone: {', '.join(tone_a)}.",
+                ),
+                CaptionVariant(
+                    label="B",
+                    hook=hook_b,
+                    caption=caption_b,
+                    cta=cta,
+                    tone_tags=tone_b,
+                    visual_brief=f"{fmt} so sánh before/after theo hướng giáo dục. Tone: {', '.join(tone_b)}.",
+                ),
+                CaptionVariant(
+                    label="C",
+                    hook=hook_c,
+                    caption=caption_c,
+                    cta=cta,
+                    tone_tags=tone_c,
+                    visual_brief=f"{fmt} dạng checklist, ưu tiên dễ đọc trên mobile. Tone: {', '.join(tone_c)}.",
+                ),
             ],
             dos=dos_rules[:5],
             donts=donts_rules[:5],
@@ -131,24 +167,60 @@ class MockLLMClient:
 
     def complete(self, prompt: str, *, system_prompt: str = "", max_tokens: int = 2000) -> str:
         """Mock generic completion — returns a placeholder JSON hashtag response."""
-        return json.dumps({
-            "suggestions": [
-                {"tag": "#mock_skincare", "tier": "high_volume", "relevance_score": 0.95, "reason": "mock fallback"},
-                {"tag": "#mock_routine", "tier": "high_volume", "relevance_score": 0.90, "reason": "mock fallback"},
-                {"tag": "#mock_tips", "tier": "medium_volume", "relevance_score": 0.85, "reason": "mock fallback"},
-                {"tag": "#mock_glow", "tier": "medium_volume", "relevance_score": 0.80, "reason": "mock fallback"},
-                {"tag": "#mock_acne_free", "tier": "low_volume", "relevance_score": 0.75, "reason": "mock fallback"},
-                {"tag": "#mock_genz", "tier": "branded", "relevance_score": 0.70, "reason": "mock fallback"},
-            ],
-            "recommended": ["#mock_skincare", "#mock_routine", "#mock_tips", "#mock_glow"],
-        })
+        return json.dumps(
+            {
+                "suggestions": [
+                    {
+                        "tag": "#mock_skincare",
+                        "tier": "high_volume",
+                        "relevance_score": 0.95,
+                        "reason": "mock fallback",
+                    },
+                    {
+                        "tag": "#mock_routine",
+                        "tier": "high_volume",
+                        "relevance_score": 0.90,
+                        "reason": "mock fallback",
+                    },
+                    {
+                        "tag": "#mock_tips",
+                        "tier": "medium_volume",
+                        "relevance_score": 0.85,
+                        "reason": "mock fallback",
+                    },
+                    {
+                        "tag": "#mock_glow",
+                        "tier": "medium_volume",
+                        "relevance_score": 0.80,
+                        "reason": "mock fallback",
+                    },
+                    {
+                        "tag": "#mock_acne_free",
+                        "tier": "low_volume",
+                        "relevance_score": 0.75,
+                        "reason": "mock fallback",
+                    },
+                    {
+                        "tag": "#mock_genz",
+                        "tier": "branded",
+                        "relevance_score": 0.70,
+                        "reason": "mock fallback",
+                    },
+                ],
+                "recommended": ["#mock_skincare", "#mock_routine", "#mock_tips", "#mock_glow"],
+            }
+        )
 
     @staticmethod
     def _pick_cta(profile: BrandProfile, objective: str) -> str:
         for item in profile.approved_cta_patterns:
             if item.objective == objective:
                 return item.cta_text
-        return profile.approved_cta_patterns[0].cta_text if profile.approved_cta_patterns else "Lưu lại khi cần"
+        return (
+            profile.approved_cta_patterns[0].cta_text
+            if profile.approved_cta_patterns
+            else "Lưu lại khi cần"
+        )
 
     @staticmethod
     def _resolve_pillar(profile: BrandProfile, pillar_name: str):
@@ -158,14 +230,19 @@ class MockLLMClient:
         return profile.content_pillars[0]
 
     @staticmethod
-    def _build_objective_lane(profile: BrandProfile, research_brief: ResearchBrief | None) -> list[str]:
+    def _build_objective_lane(
+        profile: BrandProfile, research_brief: ResearchBrief | None
+    ) -> list[str]:
         if research_brief and research_brief.recommended_objectives:
             return research_brief.recommended_objectives
         return profile.fanpage_goals or ["reach"]
 
     @staticmethod
-    def _build_pillar_lane(profile: BrandProfile, research_brief: ResearchBrief | None = None,
-                           strategy: ContentStrategy | None = None) -> list[str]:
+    def _build_pillar_lane(
+        profile: BrandProfile,
+        research_brief: ResearchBrief | None = None,
+        strategy: ContentStrategy | None = None,
+    ) -> list[str]:
         if strategy and strategy.recommended_pillar_mix:
             # Sort pillars by recommended mix (highest first)
             sorted_pillars = sorted(

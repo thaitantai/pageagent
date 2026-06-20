@@ -230,9 +230,7 @@ class ResearchAgent(BaseAgent):
             return self._crawl_source(params.get("url", ""))
         elif action == "get_source_list":
             return self._get_source_list()
-        return AgentResult(
-            task_id=task.id, success=False, error=f"Unknown action: {action}"
-        )
+        return AgentResult(task_id=task.id, success=False, error=f"Unknown action: {action}")
 
     def self_driving_tick(self) -> list[tuple[str, dict, ActionPriority]]:
         """Propose research every 2 hours, or when pipeline trigger is active."""
@@ -284,25 +282,28 @@ class ResearchAgent(BaseAgent):
                 for url in new_articles:
                     self._seen_articles.add(url)
 
-                to_crawl = new_articles[:min(self._max_per_pillar, MAX_URLS_PER_PILLAR_PER_TICK)]
+                to_crawl = new_articles[: min(self._max_per_pillar, MAX_URLS_PER_PILLAR_PER_TICK)]
 
                 for url in to_crawl:
                     content = self._fetch_text(url)
-                    brief["sources_checked"].append({
-                        "url": url,
-                        "pillar": pillar,
-                        "fetched": content is not None,
-                        "length": len(content) if content else 0,
-                        "from_cache": self._is_from_cache(url),
-                        "from_discovery": True,
-                    })
+                    brief["sources_checked"].append(
+                        {
+                            "url": url,
+                            "pillar": pillar,
+                            "fetched": content is not None,
+                            "length": len(content) if content else 0,
+                            "from_cache": self._is_from_cache(url),
+                            "from_discovery": True,
+                        }
+                    )
                     if content:
                         extracted = self._extract_findings(content, pillar)
                         brief["findings"].extend(extracted)
 
             # Step 3: Fallback — if nothing crawled from discovery, use fallback pool
-            pillar_fetched = [s for s in brief["sources_checked"]
-                              if s["pillar"] == pillar and s["fetched"]]
+            pillar_fetched = [
+                s for s in brief["sources_checked"] if s["pillar"] == pillar and s["fetched"]
+            ]
             if not pillar_fetched:
                 fallback_urls = self._fallback.get(pillar, [])
                 if fallback_urls:
@@ -317,14 +318,16 @@ class ResearchAgent(BaseAgent):
                             continue
                         content = self._fetch_text(url)
                         self._seen_articles.add(url)
-                        brief["sources_checked"].append({
-                            "url": url,
-                            "pillar": pillar,
-                            "fetched": content is not None,
-                            "length": len(content) if content else 0,
-                            "from_cache": self._is_from_cache(url),
-                            "from_discovery": False,
-                        })
+                        brief["sources_checked"].append(
+                            {
+                                "url": url,
+                                "pillar": pillar,
+                                "fetched": content is not None,
+                                "length": len(content) if content else 0,
+                                "from_cache": self._is_from_cache(url),
+                                "from_discovery": False,
+                            }
+                        )
                         tried += 1
                         if content:
                             extracted = self._extract_findings(content, pillar)
@@ -433,7 +436,9 @@ class ResearchAgent(BaseAgent):
                 tag_title = f"{{{ns}}}title" if "{" in root.tag else "title"
                 for entry in root.iter(tag_entry):
                     # Atom: <link href="..." />
-                    link_elem = entry.find(f"{{{ns}}}link") if "{" in root.tag else entry.find("link")
+                    link_elem = (
+                        entry.find(f"{{{ns}}}link") if "{" in root.tag else entry.find("link")
+                    )
                     title_elem = entry.find(tag_title)
                     if link_elem is not None and title_elem is not None:
                         href = link_elem.get("href")
@@ -463,13 +468,16 @@ class ResearchAgent(BaseAgent):
         articles: list[tuple[str, str]] = []
         try:
             from scrapling import Selector
+
             doc = Selector(content=raw)
             seen_urls: set[str] = set()
 
             def _extract_from_elements(container) -> list[tuple[str, str]]:
                 """Extract (url, title) from link elements inside a container."""
                 result = []
-                links = container.css("a") if hasattr(container, "css") else container.find("a") or []
+                links = (
+                    container.css("a") if hasattr(container, "css") else container.find("a") or []
+                )
                 if not isinstance(links, list):
                     links = [links]
                 for a in links:
@@ -477,7 +485,11 @@ class ResearchAgent(BaseAgent):
                     text = (a.text or "").strip()
                     if not text and hasattr(a, "css"):
                         # Fallback: get text from direct children (no <a> wrapper case)
-                        children_text = [c.strip() for c in (a.css("::text") if hasattr(a, "css") else []) if isinstance(c, str) and c.strip()]
+                        children_text = [
+                            c.strip()
+                            for c in (a.css("::text") if hasattr(a, "css") else [])
+                            if isinstance(c, str) and c.strip()
+                        ]
                         text = " ".join(children_text) if children_text else ""
                     if href and text and len(text) > 10:
                         full_url = self._resolve_url(category_url, href)
@@ -495,10 +507,18 @@ class ResearchAgent(BaseAgent):
 
             # Strategy 2: common post container CSS selectors
             for selector in [
-                ".post-item", ".entry-title", ".card",
-                ".post-title", ".post-link", ".article-item",
-                ".news-item", ".list-item", ".story",
-                ".item", "h2", "h3",
+                ".post-item",
+                ".entry-title",
+                ".card",
+                ".post-title",
+                ".post-link",
+                ".article-item",
+                ".news-item",
+                ".list-item",
+                ".story",
+                ".item",
+                "h2",
+                "h3",
             ]:
                 elems = doc.css(selector)
                 for elem in elems:
@@ -523,20 +543,34 @@ class ResearchAgent(BaseAgent):
             # Strategy 3: any link with article-like URL patterns
             if not articles:
                 article_patterns = [
-                    "/bai-viet/", "/article", "/bai-viet",
-                    "/cham-soc-da", "/cham-soc-dep",
-                    "/lam-dep", "/my-pham",
-                    "/skincare", "-skin-", "skin-care",
-                    "/suc-khoe", "/song-khoe",
-                    "/dep/", "/tips-",
-                    ".chn", ".html", ".htm",  # Vietnamese article extensions
+                    "/bai-viet/",
+                    "/article",
+                    "/bai-viet",
+                    "/cham-soc-da",
+                    "/cham-soc-dep",
+                    "/lam-dep",
+                    "/my-pham",
+                    "/skincare",
+                    "-skin-",
+                    "skin-care",
+                    "/suc-khoe",
+                    "/song-khoe",
+                    "/dep/",
+                    "/tips-",
+                    ".chn",
+                    ".html",
+                    ".htm",  # Vietnamese article extensions
                 ]
                 all_links = doc.css("a")
                 for a in all_links:
                     href = a.attrib.get("href", "")
                     text = (a.text or "").strip()
                     if not text and hasattr(a, "css"):
-                        children_text = [c.strip() for c in (a.css("::text") if hasattr(a, "css") else []) if isinstance(c, str) and c.strip()]
+                        children_text = [
+                            c.strip()
+                            for c in (a.css("::text") if hasattr(a, "css") else [])
+                            if isinstance(c, str) and c.strip()
+                        ]
                         text = " ".join(children_text) if children_text else ""
                     if href and text and len(text) > 10:
                         full_url = self._resolve_url(category_url, href)
@@ -578,6 +612,7 @@ class ResearchAgent(BaseAgent):
             return href.split("?")[0].split("#")[0]
         # Relative URL — join with base
         from urllib.parse import urljoin
+
         result = urljoin(base, href)
         return result.split("?")[0].split("#")[0] if result else None
 
@@ -614,6 +649,7 @@ class ResearchAgent(BaseAgent):
             return None
         try:
             import scrapling  # type: ignore[import-untyped]
+
             time.sleep(REQUEST_DELAY)
             p = scrapling.Fetcher.get(url, timeout=timeout)
             if p.status == 200 and len(p.body) > 200:
@@ -629,6 +665,7 @@ class ResearchAgent(BaseAgent):
         if not self._scrapling_available:
             try:
                 import scrapling  # noqa: F401
+
                 self._scrapling_available = True
             except ImportError:
                 self._scrapling_available = False
@@ -649,8 +686,7 @@ class ResearchAgent(BaseAgent):
         }
         if len(self._cache) > 100:
             now = time.time()
-            stale = [k for k, v in self._cache.items()
-                     if (now - v["fetched_at"]) > CACHE_TTL]
+            stale = [k for k, v in self._cache.items() if (now - v["fetched_at"]) > CACHE_TTL]
             for k in stale:
                 del self._cache[k]
 
@@ -670,6 +706,7 @@ class ResearchAgent(BaseAgent):
             return None
         try:
             import scrapling  # type: ignore[import-untyped]
+
             time.sleep(REQUEST_DELAY)
             p = scrapling.Fetcher.get(url, timeout=15)
             if p.status == 200 and len(p.body) > 200:
@@ -700,8 +737,10 @@ class ResearchAgent(BaseAgent):
                 pillar=pillar,
             )
             data = self._llm.generate_json(
-                system_prompt, user_prompt,
-                max_tokens=1000, temperature=0.3,
+                system_prompt,
+                user_prompt,
+                max_tokens=1000,
+                temperature=0.3,
             )
             findings = data.get("findings", [])
             for f in findings:
@@ -714,18 +753,41 @@ class ResearchAgent(BaseAgent):
         findings: list[dict[str, str | int]] = []
         lines = text.split("\n")
         ingredients = [
-            "vitamin c", "retinol", "niacinamide", "hyaluronic",
-            "aha", "bha", "salicylic", "glycolic", "peptide",
-            "ceramide", "sunscreen", "kem chống nắng",
-            "dưỡng ẩm", "moisturizer", "serum",
-            "tretinoin", "azelaic", "benzoyl peroxide",
-            "squalane", "niacinamid", "alpha arbutin",
+            "vitamin c",
+            "retinol",
+            "niacinamide",
+            "hyaluronic",
+            "aha",
+            "bha",
+            "salicylic",
+            "glycolic",
+            "peptide",
+            "ceramide",
+            "sunscreen",
+            "kem chống nắng",
+            "dưỡng ẩm",
+            "moisturizer",
+            "serum",
+            "tretinoin",
+            "azelaic",
+            "benzoyl peroxide",
+            "squalane",
+            "niacinamid",
+            "alpha arbutin",
         ]
         skip_words = [
-            "đăng ký", "subscribe", "đăng nhập",
-            "tất cả", "xem thêm", "xem tất",
-            "quảng cáo", "advertisement", "cookie",
-            "để lại", "bình luận", "comment",
+            "đăng ký",
+            "subscribe",
+            "đăng nhập",
+            "tất cả",
+            "xem thêm",
+            "xem tất",
+            "quảng cáo",
+            "advertisement",
+            "cookie",
+            "để lại",
+            "bình luận",
+            "comment",
         ]
         for line in lines:
             line = line.strip()
@@ -734,13 +796,41 @@ class ResearchAgent(BaseAgent):
             if any(skip in line.lower() for skip in skip_words):
                 continue
             if line.endswith(("?", "!", ":", "…", ".")):
-                findings.append({"pillar": pillar, "topic": line[:120], "source_type": "headline", "relevance": 3})
+                findings.append(
+                    {
+                        "pillar": pillar,
+                        "topic": line[:120],
+                        "source_type": "headline",
+                        "relevance": 3,
+                    }
+                )
                 continue
             if any(ing in line.lower() for ing in ingredients):
-                findings.append({"pillar": pillar, "topic": line[:120], "source_type": "ingredient_mention", "relevance": 4})
+                findings.append(
+                    {
+                        "pillar": pillar,
+                        "topic": line[:120],
+                        "source_type": "ingredient_mention",
+                        "relevance": 4,
+                    }
+                )
                 continue
-            if re.search(r"\d+", line) and any(kw in line.lower() for kw in ["cách", "bước", "lợi ích", "tác dụng", "mẹo", "tips", "bí quyết", "nguyên nhân"]):
-                findings.append({"pillar": pillar, "topic": line[:120], "source_type": "tip", "relevance": 3})
+            if re.search(r"\d+", line) and any(
+                kw in line.lower()
+                for kw in [
+                    "cách",
+                    "bước",
+                    "lợi ích",
+                    "tác dụng",
+                    "mẹo",
+                    "tips",
+                    "bí quyết",
+                    "nguyên nhân",
+                ]
+            ):
+                findings.append(
+                    {"pillar": pillar, "topic": line[:120], "source_type": "tip", "relevance": 3}
+                )
         seen: set[str] = set()
         unique = []
         for f in findings[:20]:
@@ -784,8 +874,7 @@ class ResearchAgent(BaseAgent):
     def get_cache_stats(self) -> dict[str, Any]:
         now = time.time()
         entries = len(self._cache)
-        fresh = sum(1 for v in self._cache.values()
-                    if (now - v["fetched_at"]) < CACHE_TTL)
+        fresh = sum(1 for v in self._cache.values() if (now - v["fetched_at"]) < CACHE_TTL)
         return {
             "total_entries": entries,
             "fresh_entries": fresh,

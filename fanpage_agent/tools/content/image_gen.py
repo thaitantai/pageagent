@@ -29,8 +29,7 @@ class ImageTool(ABC):
     """Generate an image from a text brief, returning a local file path."""
 
     @abstractmethod
-    def generate(self, prompt: str, output_dir: str | Path | None = None) -> str:
-        ...
+    def generate(self, prompt: str, output_dir: str | Path | None = None) -> str: ...
 
 
 # ---------------------------------------------------------------------------
@@ -110,11 +109,17 @@ class MockImageTool(ImageTool):
 
         # ── Bottom decorative band ──
         draw.rectangle([(0, self.HEIGHT - band_h), (self.WIDTH, self.HEIGHT)], fill=palette["band"])
-        draw.rectangle([(0, self.HEIGHT - band_h - 4), (self.WIDTH, self.HEIGHT - band_h)], fill=palette["accent"])
+        draw.rectangle(
+            [(0, self.HEIGHT - band_h - 4), (self.WIDTH, self.HEIGHT - band_h)],
+            fill=palette["accent"],
+        )
 
         # ── Side accent stripe ──
         stripe_w = 16
-        draw.rectangle([(stripe_w, band_h + 4), (stripe_w + 6, self.HEIGHT - band_h - 4)], fill=palette["accent"])
+        draw.rectangle(
+            [(stripe_w, band_h + 4), (stripe_w + 6, self.HEIGHT - band_h - 4)],
+            fill=palette["accent"],
+        )
 
         # ── Brand name in band ──
         brand_font = self._find_font(size=22)
@@ -153,8 +158,14 @@ class MockImageTool(ImageTool):
 
         # ── Decorative circles (fashion vibe) ──
         # Small circles in the corners
-        draw.ellipse([(40, content_top + 30), (70, content_top + 60)], fill=palette["accent"], outline=None)
-        draw.ellipse([(self.WIDTH - 90, content_bottom - 50), (self.WIDTH - 60, content_bottom - 20)], fill=palette["accent"], outline=None)
+        draw.ellipse(
+            [(40, content_top + 30), (70, content_top + 60)], fill=palette["accent"], outline=None
+        )
+        draw.ellipse(
+            [(self.WIDTH - 90, content_bottom - 50), (self.WIDTH - 60, content_bottom - 20)],
+            fill=palette["accent"],
+            outline=None,
+        )
 
         slug = re.sub(r"[^a-z0-9]+", "_", prompt.lower()[:40]).strip("_") or "untitled"
         filename = f"{slug}_{uuid.uuid4().hex[:8]}.png"
@@ -246,9 +257,7 @@ class OpenAIImageTool(ImageTool):
 
         image_url = data.get("data", [{}])[0].get("url", "")
         if not image_url:
-            raise RuntimeError(
-                f"OpenAI image API returned no url: {json.dumps(data)[:300]}"
-            )
+            raise RuntimeError(f"OpenAI image API returned no url: {json.dumps(data)[:300]}")
 
         return self._download(image_url, output_dir)
 

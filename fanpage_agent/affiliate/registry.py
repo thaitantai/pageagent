@@ -61,12 +61,7 @@ class AffiliateRegistry:
 
     def is_enabled(self) -> bool:
         """Return True if at least one provider is configured."""
-        return (
-            self._settings.enabled
-            and any(
-                p.is_configured() for p in self._providers
-            )
-        )
+        return self._settings.enabled and any(p.is_configured() for p in self._providers)
 
     def search_all(
         self,
@@ -101,9 +96,7 @@ class AffiliateRegistry:
             return []
 
         threshold = (
-            min_commission
-            if min_commission is not None
-            else self._settings.min_commission_rate
+            min_commission if min_commission is not None else self._settings.min_commission_rate
         )
         all_products: list[AffiliateProduct] = []
         seen_names: set[str] = set()
@@ -127,9 +120,7 @@ class AffiliateRegistry:
                 continue
 
             for p in products:
-                name_normalized = self._normalize_name(
-                    p.product_name
-                )
+                name_normalized = self._normalize_name(p.product_name)
                 if name_normalized in seen_names:
                     continue
                 if p.commission_rate < threshold:
@@ -137,9 +128,7 @@ class AffiliateRegistry:
                 seen_names.add(name_normalized)
                 all_products.append(p)
 
-        all_products.sort(
-            key=lambda p: p.commission_rate, reverse=True
-        )
+        all_products.sort(key=lambda p: p.commission_rate, reverse=True)
         return all_products
 
     def search_skincare_products(
@@ -177,9 +166,7 @@ class AffiliateRegistry:
                     seen_names.add(name_norm)
                     all_products.append(p)
 
-        all_products.sort(
-            key=lambda p: p.commission_rate, reverse=True
-        )
+        all_products.sort(key=lambda p: p.commission_rate, reverse=True)
         return all_products
 
     def discover_all(
@@ -254,9 +241,7 @@ class AffiliateRegistry:
             # Determine risk: expensive or medical-adjacent = medium
             risk = self._estimate_risk(product)
             relevance = self._estimate_relevance(product)
-            customer_val = self._estimate_customer_value(
-                product
-            )
+            customer_val = self._estimate_customer_value(product)
 
             # Reason codes
             reason_codes = [
@@ -265,41 +250,28 @@ class AffiliateRegistry:
                 f"commission:{product.commission_rate:.2f}",
             ]
             if product.network_label:
-                reason_codes.append(
-                    f"src_network:{product.network}"
-                )
+                reason_codes.append(f"src_network:{product.network}")
             if product.category:
-                reason_codes.append(
-                    f"category:{product.category}"
-                )
-            if (
-                product.effective_price
-                and product.effective_price
-                > _MAX_AFFORDABLE_PRICE_VND
-            ):
+                reason_codes.append(f"category:{product.category}")
+            if product.effective_price and product.effective_price > _MAX_AFFORDABLE_PRICE_VND:
                 reason_codes.append("premium_price")
 
             commission_note = (
                 product.commission_note
-                or f"{product.network_label} "
-                f"{product.commission_rate * 100:.1f}%"
+                or f"{product.network_label} {product.commission_rate * 100:.1f}%"
             )
 
-            research_query = (
-                f"{name} {niche} review {commission_note}"
-            )
+            research_query = f"{name} {niche} review {commission_note}"
 
             # Generate 2 angles
             for angle in ["education", "buying_guide"]:
                 if angle == "education":
                     topic_name = (
-                        f"{name}: {name} có thực sự hiệu quả cho {niche}? "
-                        f"[{product.network_label}]"
+                        f"{name}: {name} có thực sự hiệu quả cho {niche}? [{product.network_label}]"
                     )
                 else:
                     topic_name = (
-                        f"Cách chọn {name} phù hợp: review từ chuyên gia "
-                        f"[{product.network_label}]"
+                        f"Cách chọn {name} phù hợp: review từ chuyên gia [{product.network_label}]"
                     )
 
                 candidates.append(
@@ -307,13 +279,9 @@ class AffiliateRegistry:
                         topic=topic_name,
                         angle=angle,
                         product_name=name,
-                        customer_pain=self._infer_pain_point(
-                            name, product.category
-                        ),
+                        customer_pain=self._infer_pain_point(name, product.category),
                         research_query=research_query,
-                        product_relevance=round(
-                            relevance, 3
-                        ),
+                        product_relevance=round(relevance, 3),
                         customer_value=round(customer_val, 3),
                         risk_level=risk,
                         reason_codes=list(reason_codes),
@@ -330,22 +298,15 @@ class AffiliateRegistry:
             return
 
         if self._settings.access_trade.is_configured():
-            self._providers.append(
-                AccessTradeProvider(
-                    self._settings.access_trade
-                )
-            )
+            self._providers.append(AccessTradeProvider(self._settings.access_trade))
 
         if self._settings.shopee.is_configured():
-            self._providers.append(
-                ShopeeProvider(self._settings.shopee)
-            )
+            self._providers.append(ShopeeProvider(self._settings.shopee))
 
         # Custom providers (future extensibility)
         for name, raw in self._settings.custom_providers.items():
             logger.info(
-                "Custom affiliate provider '%s' registered "
-                "but no factory available",
+                "Custom affiliate provider '%s' registered but no factory available",
                 name,
             )
 
@@ -361,9 +322,7 @@ class AffiliateRegistry:
         """Normalize product name for dedup comparison."""
         normalized = name.lower().strip()
         # Remove common suffixes like "(chính hãng)", "(xịn)"
-        normalized = re.sub(
-            r"\(.*?\)", "", normalized
-        ).strip()
+        normalized = re.sub(r"\(.*?\)", "", normalized).strip()
         # Collapse whitespace
         normalized = re.sub(r"\s+", " ", normalized)
         return normalized
@@ -375,8 +334,14 @@ class AffiliateRegistry:
             return "medium"  # Expensive products need more careful claims
         name_lower = product.product_name.lower()
         high_risk_markers = [
-            "retinol", "tretinoin", "adapalene", "acid",
-            "peel", "lột", "trị mụn", "vitamin a",
+            "retinol",
+            "tretinoin",
+            "adapalene",
+            "acid",
+            "peel",
+            "lột",
+            "trị mụn",
+            "vitamin a",
         ]
         if any(m in name_lower for m in high_risk_markers):
             return "medium"
@@ -387,14 +352,31 @@ class AffiliateRegistry:
         """Estimate niche relevance from product name + category."""
         name_lower = f"{product.product_name} {product.category}".lower()
         high_relevance = [
-            "skincare", "chăm sóc da", "dưỡng da", "serum",
-            "retinol", "vitamin c", "kem chống nắng", "sunscreen",
-            "moisturizer", "kem dưỡng", "cleanser", "sữa rửa mặt",
-            "toner", "mặt nạ", "face mask", "niacinamide",
+            "skincare",
+            "chăm sóc da",
+            "dưỡng da",
+            "serum",
+            "retinol",
+            "vitamin c",
+            "kem chống nắng",
+            "sunscreen",
+            "moisturizer",
+            "kem dưỡng",
+            "cleanser",
+            "sữa rửa mặt",
+            "toner",
+            "mặt nạ",
+            "face mask",
+            "niacinamide",
         ]
         medium_relevance = [
-            "mỹ phẩm", "cosmetic", "làm đẹp", "beauty",
-            "dưỡng trắng", "chống lão hóa", "anti-aging",
+            "mỹ phẩm",
+            "cosmetic",
+            "làm đẹp",
+            "beauty",
+            "dưỡng trắng",
+            "chống lão hóa",
+            "anti-aging",
         ]
         for marker in high_relevance:
             if marker in name_lower:
@@ -425,9 +407,7 @@ class AffiliateRegistry:
         return 0.65
 
     @staticmethod
-    def _infer_pain_point(
-        product_name: str, category: str
-    ) -> str:
+    def _infer_pain_point(product_name: str, category: str) -> str:
         """Infer a customer pain point from product name and category."""
         text = f"{product_name} {category}".lower()
         pain_map: list[tuple[str, str]] = [

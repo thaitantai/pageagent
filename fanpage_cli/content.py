@@ -111,7 +111,9 @@ def register_subcommand(subparsers) -> None:
     p.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     p.add_argument("--brand-id", help="Filter by brand_id")
     p.add_argument("--status", help="Filter by status (planned/approved/published)")
-    p.add_argument("--approval-status", help="Filter by approval_status (pending/approved/rejected)")
+    p.add_argument(
+        "--approval-status", help="Filter by approval_status (pending/approved/rejected)"
+    )
     p.add_argument("--date", help="Filter by exact date (YYYY-MM-DD)")
     p.add_argument("--limit", type=int, default=20, help="Max items to show")
     p.add_argument("--json", action="store_true", help="Output raw JSON")
@@ -171,6 +173,7 @@ def register_subcommand(subparsers) -> None:
 
 
 # ── Command handlers (copied verbatim from fanpage_agent/main.py) ──
+
 
 def cmd_write_caption(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -265,6 +268,7 @@ def cmd_scheduled_publish(args: argparse.Namespace) -> int:
 
     # Build image service (generates images from visual_brief)
     from fanpage_agent.tools.content.image_gen import build_image_service
+
     image_service = build_image_service(settings)
 
     service = ScheduledPublishTool(
@@ -343,6 +347,7 @@ def cmd_approve_calendar_item(args: argparse.Namespace) -> int:
         history_csv=args.history_file,
     )
     from datetime import datetime as _dt
+
     now = _dt.now(timezone.utc).isoformat()
     result = store.approve_calendar_item(
         calendar_id=args.calendar_id,
@@ -361,6 +366,7 @@ def cmd_reject_calendar_item(args: argparse.Namespace) -> int:
         history_csv=args.history_file,
     )
     from datetime import datetime as _dt
+
     now = _dt.now(timezone.utc).isoformat()
     result = store.reject_calendar_item(
         calendar_id=args.calendar_id,
@@ -390,7 +396,9 @@ def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
         print("\u2705 No significant gaps found.")
     else:
         for g in gaps:
-            print(f"  \u26a0\ufe0f  Gap: {g['start_date']} \u2192 {g['end_date']} ({g['gap_days']} days)")
+            print(
+                f"  \u26a0\ufe0f  Gap: {g['start_date']} \u2192 {g['end_date']} ({g['gap_days']} days)"
+            )
     return 0
 
 

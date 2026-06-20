@@ -122,9 +122,7 @@ class ShopeeProvider:
 
         data = self._query(_PRODUCT_SEARCH_QUERY, variables)
         products_raw = (
-            data.get("productSearch", {}).get("products", [])
-            if isinstance(data, dict)
-            else []
+            data.get("productSearch", {}).get("products", []) if isinstance(data, dict) else []
         )
         return self._parse_products(products_raw)
 
@@ -200,9 +198,7 @@ class ShopeeProvider:
             result_raw = resp.json()
             result: dict = result_raw if isinstance(result_raw, dict) else {}
             if "errors" in result:
-                logger.warning(
-                    "Shopee GraphQL errors: %s", result["errors"]
-                )
+                logger.warning("Shopee GraphQL errors: %s", result["errors"])
                 return {}
             return result.get("data", {})
         except httpx.HTTPStatusError as exc:
@@ -212,9 +208,7 @@ class ShopeeProvider:
                 exc,
             )
         except Exception as exc:
-            logger.warning(
-                "Shopee GraphQL request error: %s", exc
-            )
+            logger.warning("Shopee GraphQL request error: %s", exc)
         return {}
 
     # ── Auth helpers ───────────────────────────────────────────────────
@@ -245,9 +239,7 @@ class ShopeeProvider:
 
     # ── Response parsing ───────────────────────────────────────────────
 
-    def _parse_products(
-        self, raw_list: list[dict]
-    ) -> list[AffiliateProduct]:
+    def _parse_products(self, raw_list: list[dict]) -> list[AffiliateProduct]:
         """Convert Shopee API product list into AffiliateProduct list."""
         products: list[AffiliateProduct] = []
         for raw in raw_list:
@@ -259,9 +251,7 @@ class ShopeeProvider:
             if not pid or not name:
                 continue
 
-            commission_rate = float(
-                raw.get("commissionRate", raw.get("commission", 0.0))
-            )
+            commission_rate = float(raw.get("commissionRate", raw.get("commission", 0.0)))
             # Shopee returns commission_rate as decimal (e.g. 0.10 = 10%)
             commission_pct = commission_rate * 100
 
@@ -270,34 +260,18 @@ class ShopeeProvider:
                     product_id=pid,
                     product_name=name.strip(),
                     network=AffiliateNetwork.SHOPEE.value,
-                    category=str(
-                        raw.get("categoryName", "")
-                    ),
-                    price=self._to_float(
-                        raw.get("price")
-                    ),
-                    sale_price=self._to_float(
-                        raw.get("salePrice")
-                    ),
+                    category=str(raw.get("categoryName", "")),
+                    price=self._to_float(raw.get("price")),
+                    sale_price=self._to_float(raw.get("salePrice")),
                     commission_rate=commission_rate,
                     commission_note=f"Shopee {commission_pct:.1f}%",
-                    affiliate_url=str(
-                        raw.get("affiliateUrl", "")
-                    ),
-                    image_url=str(
-                        raw.get("imageUrl", "")
-                    ),
-                    product_url=str(
-                        raw.get("productUrl", "")
-                    ),
-                    currency=str(
-                        raw.get("currency", "VND")
-                    ),
+                    affiliate_url=str(raw.get("affiliateUrl", "")),
+                    image_url=str(raw.get("imageUrl", "")),
+                    product_url=str(raw.get("productUrl", "")),
+                    currency=str(raw.get("currency", "VND")),
                     metadata={
                         "original_price": raw.get("price"),
-                        "sale_price_raw": raw.get(
-                            "salePrice"
-                        ),
+                        "sale_price_raw": raw.get("salePrice"),
                     },
                 )
             )

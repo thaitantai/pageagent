@@ -111,10 +111,14 @@ def _latest_artifact(
                 "reason": "missing",
             },
         }
-    return _artifact_status(name, matches[0], now_timestamp=now_timestamp, max_age_hours=max_age_hours)
+    return _artifact_status(
+        name, matches[0], now_timestamp=now_timestamp, max_age_hours=max_age_hours
+    )
 
 
-def _runtime_check(name: str, ok: bool, reason_codes: list[str], next_step: str, **details: Any) -> dict:
+def _runtime_check(
+    name: str, ok: bool, reason_codes: list[str], next_step: str, **details: Any
+) -> dict:
     return {
         "name": name,
         "ok": ok,
@@ -125,12 +129,18 @@ def _runtime_check(name: str, ok: bool, reason_codes: list[str], next_step: str,
 
 
 def build_runtime_config_status(settings: Settings) -> dict:
-    google_account = Path(settings.google_service_account_file) if settings.google_service_account_file else None
+    google_account = (
+        Path(settings.google_service_account_file) if settings.google_service_account_file else None
+    )
     checks = [
         _runtime_check(
             "telegram_delivery",
             bool(settings.telegram_bot_token and settings.telegram_chat_id),
-            ["missing_telegram_bot_token" if not settings.telegram_bot_token else "missing_telegram_chat_id"],
+            [
+                "missing_telegram_bot_token"
+                if not settings.telegram_bot_token
+                else "missing_telegram_chat_id"
+            ],
             "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, then run send-telegram-preview.",
             configured=bool(settings.telegram_bot_token and settings.telegram_chat_id),
             base_url_configured=bool(settings.telegram_base_url),
@@ -147,15 +157,16 @@ def build_runtime_config_status(settings: Settings) -> dict:
             "google_store",
             settings.store_backend != "google"
             or bool(
-                settings.google_sheets_id
-                and google_account is not None
-                and google_account.exists()
+                settings.google_sheets_id and google_account is not None and google_account.exists()
             ),
             [
                 reason
                 for reason, missing in (
                     ("missing_google_sheets_id", not settings.google_sheets_id),
-                    ("missing_google_service_account_file", not settings.google_service_account_file),
+                    (
+                        "missing_google_service_account_file",
+                        not settings.google_service_account_file,
+                    ),
                     (
                         "google_service_account_file_not_found",
                         bool(google_account is not None and not google_account.exists()),
@@ -166,7 +177,9 @@ def build_runtime_config_status(settings: Settings) -> dict:
             "Use --store-backend local for pilot, or configure Google Sheets ID and service account file.",
             store_backend=settings.store_backend,
             service_account_file_configured=bool(settings.google_service_account_file),
-            service_account_file_exists=bool(google_account is not None and google_account.exists()),
+            service_account_file_exists=bool(
+                google_account is not None and google_account.exists()
+            ),
         ),
         _runtime_check(
             "llm_generation",
@@ -256,8 +269,12 @@ def build_ops_status_payload(
         ),
     ]
     existing = sum(1 for item in artifacts if item["exists"])
-    stale = sum(1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale"))
-    fresh = sum(1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale"))
+    stale = sum(
+        1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale")
+    )
+    fresh = sum(
+        1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale")
+    )
     runtime_config = build_runtime_config_status(settings)
     cron_status = None
     cron_failed = 0
@@ -337,8 +354,7 @@ def _check_wrapper(wrapper_path: Path, project_script: str) -> dict:
     text = wrapper_path.read_text(encoding="utf-8") if wrapper_exists else ""
     targets_project_script = project_script in text
     executable = wrapper_exists and (
-        wrapper_path.stat().st_mode & 0o111 != 0
-        or (os.name == "nt" and targets_project_script)
+        wrapper_path.stat().st_mode & 0o111 != 0 or (os.name == "nt" and targets_project_script)
     )
     status = {
         "path": str(wrapper_path),
@@ -349,7 +365,9 @@ def _check_wrapper(wrapper_path: Path, project_script: str) -> dict:
     return status
 
 
-def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expected_workdir: str) -> dict:
+def build_hermes_cron_status_payload(
+    jobs_file: Path, scripts_dir: Path, expected_workdir: str
+) -> dict:
     jobs = _load_hermes_jobs(jobs_file)
     jobs_by_name = {str(job.get("name", "")): job for job in jobs}
     checks = []
@@ -393,14 +411,16 @@ def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expecte
             errors.append("wrapper_not_executable")
         if wrapper["exists"] and not wrapper["targets_project_script"]:
             errors.append("wrapper_wrong_target")
-        checks.append({
-            "name": name,
-            "expected": expected,
-            "actual": actual,
-            "wrapper": wrapper,
-            "ok": not errors,
-            "errors": errors,
-        })
+        checks.append(
+            {
+                "name": name,
+                "expected": expected,
+                "actual": actual,
+                "wrapper": wrapper,
+                "ok": not errors,
+                "errors": errors,
+            }
+        )
     ok_count = sum(1 for item in checks if item["ok"])
     return {
         "jobs_file": str(jobs_file),

@@ -38,12 +38,19 @@ class CommunityTriageTool:
     )
     QUESTION_KEYWORDS = ("?", "là gì", "khi nào", "như thế nào", "có nên", "ở đâu")
 
-    def triage_from_csv(self, profile: BrandProfile, comment_csv: str | Path | None = None) -> CommunityTriageBatch:
+    def triage_from_csv(
+        self, profile: BrandProfile, comment_csv: str | Path | None = None
+    ) -> CommunityTriageBatch:
         entries = ResearchTool._read_comments(comment_csv)
         return self.triage_entries(profile=profile, entries=entries)
 
-    def triage_entries(self, profile: BrandProfile, entries: list[CommentInboxEntry]) -> CommunityTriageBatch:
-        items = [self._triage_entry(profile, entry, index=index) for index, entry in enumerate(entries, start=1)]
+    def triage_entries(
+        self, profile: BrandProfile, entries: list[CommentInboxEntry]
+    ) -> CommunityTriageBatch:
+        items = [
+            self._triage_entry(profile, entry, index=index)
+            for index, entry in enumerate(entries, start=1)
+        ]
         category_counts = Counter(item.category for item in items)
         priority_counts = Counter(item.priority for item in items)
         summary = {
@@ -55,9 +62,15 @@ class CommunityTriageTool:
         }
         return CommunityTriageBatch(items=items, summary=summary)
 
-    def _triage_entry(self, profile: BrandProfile, entry: CommentInboxEntry, index: int) -> CommunityTriageItem:
+    def _triage_entry(
+        self, profile: BrandProfile, entry: CommentInboxEntry, index: int
+    ) -> CommunityTriageItem:
         normalized = entry.message.lower().strip()
-        escalation_terms = [rule for rule in profile.approval_flow.escalation_rules if rule and rule.lower() in normalized]
+        escalation_terms = [
+            rule
+            for rule in profile.approval_flow.escalation_rules
+            if rule and rule.lower() in normalized
+        ]
 
         if self._contains_any(normalized, self.SPAM_KEYWORDS):
             category = "spam"
@@ -146,7 +159,10 @@ class CommunityTriageTool:
 
     def _build_lead_reply(self, profile: BrandProfile) -> str:
         opening = self._opening_phrase(profile)
-        lead_cta = next((item.cta_text for item in profile.approved_cta_patterns if item.objective == "lead"), "Nhắn tin để được tư vấn kỹ hơn")
+        lead_cta = next(
+            (item.cta_text for item in profile.approved_cta_patterns if item.objective == "lead"),
+            "Nhắn tin để được tư vấn kỹ hơn",
+        )
         return (
             f"{opening}, để tư vấn đúng tình trạng và báo thông tin phù hợp hơn, "
             f"bạn có thể {lead_cta.lower()}. Bên mình sẽ hỗ trợ theo hướng rõ ràng và thực tế hơn cho bạn."

@@ -327,30 +327,79 @@ class UnifiedStore:
 
     # Same HEADERS as LocalSheetStore for consistency
     HEADERS = [
-        "brand_id", "calendar_id", "date", "pillar", "objective", "topic",
-        "angle", "format", "hook", "cta", "visual_brief", "status",
-        "approval_status", "approved_by", "final_caption_ref", "draft_caption_ref",
-        "campaign_tag", "notes", "last_updated", "published_at", "permalink",
-        "reach", "engagement_rate",
+        "brand_id",
+        "calendar_id",
+        "date",
+        "pillar",
+        "objective",
+        "topic",
+        "angle",
+        "format",
+        "hook",
+        "cta",
+        "visual_brief",
+        "status",
+        "approval_status",
+        "approved_by",
+        "final_caption_ref",
+        "draft_caption_ref",
+        "campaign_tag",
+        "notes",
+        "last_updated",
+        "published_at",
+        "permalink",
+        "reach",
+        "engagement_rate",
     ]
     TRIAGE_HEADERS = [
-        "triage_id", "brand_id", "created_at", "source", "message", "category",
-        "priority", "recommended_action", "draft_reply", "escalation_required",
-        "requires_human_approval", "matched_rules", "status", "assigned_to",
-        "approved_by", "rejected_reason", "reply_sent_at", "reply_permalink",
-        "resolved_at", "last_updated",
+        "triage_id",
+        "brand_id",
+        "created_at",
+        "source",
+        "message",
+        "category",
+        "priority",
+        "recommended_action",
+        "draft_reply",
+        "escalation_required",
+        "requires_human_approval",
+        "matched_rules",
+        "status",
+        "assigned_to",
+        "approved_by",
+        "rejected_reason",
+        "reply_sent_at",
+        "reply_permalink",
+        "resolved_at",
+        "last_updated",
     ]
     HISTORY_HEADERS = [
-        "published_at", "topic", "hook", "pillar", "objective",
-        "permalink", "reach", "engagement_rate",
+        "published_at",
+        "topic",
+        "hook",
+        "pillar",
+        "objective",
+        "permalink",
+        "reach",
+        "engagement_rate",
     ]
     METRICS_HEADERS = [
-        "published_at", "topic", "pillar", "objective",
-        "reach", "engagements", "leads",
+        "published_at",
+        "topic",
+        "pillar",
+        "objective",
+        "reach",
+        "engagements",
+        "leads",
     ]
     HASHTAG_HEADERS = [
-        "calendar_id", "brand_id", "topic", "hashtags",
-        "reach", "engagements", "recorded_at",
+        "calendar_id",
+        "brand_id",
+        "topic",
+        "hashtags",
+        "reach",
+        "engagements",
+        "recorded_at",
     ]
 
     def __init__(self, db_path: str | Path | None = None) -> None:
@@ -381,7 +430,9 @@ class UnifiedStore:
     def _migrate_schema(self, conn: sqlite3.Connection) -> None:
         """Add columns that may be missing on older databases."""
         try:
-            conn.execute("ALTER TABLE research_briefs ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
+            conn.execute(
+                "ALTER TABLE research_briefs ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))"
+            )
         except sqlite3.OperationalError:
             pass  # column already exists
 
@@ -413,27 +464,47 @@ class UnifiedStore:
     def _GOAL_WEIGHT_DEFAULTS() -> dict[str, dict[str, float]]:
         return {
             "reach": {
-                "brand_relevance": 0.22, "novelty": 0.20, "content_potential": 0.16,
-                "source_confidence": 0.12, "fanpage_fit": 0.14, "customer_value": 0.08,
-                "duplication_risk_penalty": 0.02, "evidence_confidence_floor": 0.45,
+                "brand_relevance": 0.22,
+                "novelty": 0.20,
+                "content_potential": 0.16,
+                "source_confidence": 0.12,
+                "fanpage_fit": 0.14,
+                "customer_value": 0.08,
+                "duplication_risk_penalty": 0.02,
+                "evidence_confidence_floor": 0.45,
                 "engagement_baseline": 50.0,
             },
             "engagement": {
-                "brand_relevance": 0.26, "novelty": 0.14, "content_potential": 0.22,
-                "source_confidence": 0.16, "fanpage_fit": 0.16, "customer_value": 0.12,
-                "duplication_risk_penalty": 0.04, "evidence_confidence_floor": 0.45,
+                "brand_relevance": 0.26,
+                "novelty": 0.14,
+                "content_potential": 0.22,
+                "source_confidence": 0.16,
+                "fanpage_fit": 0.16,
+                "customer_value": 0.12,
+                "duplication_risk_penalty": 0.04,
+                "evidence_confidence_floor": 0.45,
                 "engagement_baseline": 50.0,
             },
             "conversion": {
-                "brand_relevance": 0.26, "novelty": 0.10, "content_potential": 0.16,
-                "source_confidence": 0.18, "fanpage_fit": 0.16, "customer_value": 0.18,
-                "duplication_risk_penalty": 0.06, "evidence_confidence_floor": 0.50,
+                "brand_relevance": 0.26,
+                "novelty": 0.10,
+                "content_potential": 0.16,
+                "source_confidence": 0.18,
+                "fanpage_fit": 0.16,
+                "customer_value": 0.18,
+                "duplication_risk_penalty": 0.06,
+                "evidence_confidence_floor": 0.50,
                 "engagement_baseline": 50.0,
             },
             "balanced": {
-                "brand_relevance": 0.25, "novelty": 0.16, "content_potential": 0.18,
-                "source_confidence": 0.14, "fanpage_fit": 0.14, "customer_value": 0.10,
-                "duplication_risk_penalty": 0.03, "evidence_confidence_floor": 0.45,
+                "brand_relevance": 0.25,
+                "novelty": 0.16,
+                "content_potential": 0.18,
+                "source_confidence": 0.14,
+                "fanpage_fit": 0.14,
+                "customer_value": 0.10,
+                "duplication_risk_penalty": 0.03,
+                "evidence_confidence_floor": 0.45,
                 "engagement_baseline": 50.0,
             },
         }
@@ -455,21 +526,23 @@ class UnifiedStore:
     def append_plan(self, brand_id: str, plan: WeeklyPlan) -> None:
         rows: list[dict[str, str | int | float]] = []
         for index, day in enumerate(plan.days, start=1):
-            rows.append({
-                "calendar_id": f"{plan.plan_title}-{index}",
-                "brand_id": brand_id,
-                "date": day.date,
-                "pillar": day.pillar,
-                "objective": day.objective,
-                "topic": day.topic,
-                "angle": day.angle,
-                "format": day.format,
-                "hook": day.hook,
-                "cta": day.cta,
-                "visual_brief": day.visual_brief,
-                "status": "planned",
-                "approval_status": "pending",
-            })
+            rows.append(
+                {
+                    "calendar_id": f"{plan.plan_title}-{index}",
+                    "brand_id": brand_id,
+                    "date": day.date,
+                    "pillar": day.pillar,
+                    "objective": day.objective,
+                    "topic": day.topic,
+                    "angle": day.angle,
+                    "format": day.format,
+                    "hook": day.hook,
+                    "cta": day.cta,
+                    "visual_brief": day.visual_brief,
+                    "status": "planned",
+                    "approval_status": "pending",
+                }
+            )
         now = datetime.now(timezone.utc).isoformat()
         with self._conn() as conn:
             for row in rows:
@@ -480,10 +553,19 @@ class UnifiedStore:
                         status, approval_status, updated_at)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        row["calendar_id"], row["brand_id"], row["date"],
-                        row["pillar"], row["objective"], row["topic"],
-                        row["angle"], row["format"], row["hook"], row["cta"],
-                        row["visual_brief"], row["status"], row["approval_status"],
+                        row["calendar_id"],
+                        row["brand_id"],
+                        row["date"],
+                        row["pillar"],
+                        row["objective"],
+                        row["topic"],
+                        row["angle"],
+                        row["format"],
+                        row["hook"],
+                        row["cta"],
+                        row["visual_brief"],
+                        row["status"],
+                        row["approval_status"],
                         now,
                     ),
                 )
@@ -529,12 +611,19 @@ class UnifiedStore:
         approved_at: str,
     ) -> dict[str, str]:
         return self._update_calendar_status(
-            calendar_id, approved_by, final_caption_ref, approved_at,
-            approval_status="approved", status="approved",
+            calendar_id,
+            approved_by,
+            final_caption_ref,
+            approved_at,
+            approval_status="approved",
+            status="approved",
         )
 
     def reject_calendar_item(
-        self, calendar_id: str, reason: str, rejected_at: str,
+        self,
+        calendar_id: str,
+        reason: str,
+        rejected_at: str,
     ) -> dict[str, str]:
         with self._conn() as conn:
             conn.execute(
@@ -561,8 +650,7 @@ class UnifiedStore:
                 """UPDATE calendar SET status='published', published_at=?,
                    permalink=?, reach=?, engagement_rate=?, updated_at=?
                    WHERE calendar_id=?""",
-                (published_at, permalink, reach, engagement_rate,
-                 published_at, calendar_id),
+                (published_at, permalink, reach, engagement_rate, published_at, calendar_id),
             )
             row = conn.execute(
                 "SELECT * FROM calendar WHERE calendar_id=?", (calendar_id,)
@@ -572,7 +660,10 @@ class UnifiedStore:
         return dict(row) if row else {}
 
     def attach_draft_caption_ref(
-        self, calendar_id: str, caption_ref: str, updated_at: str,
+        self,
+        calendar_id: str,
+        caption_ref: str,
+        updated_at: str,
     ) -> dict[str, str]:
         with self._conn() as conn:
             conn.execute(
@@ -631,35 +722,43 @@ class UnifiedStore:
                 if gap_start is not None:
                     gap_days = (cursor - gap_start).days
                     if gap_days > max_gap_days:
-                        gaps.append({
-                            "start_date": gap_start.isoformat(),
-                            "end_date": (cursor - timedelta(days=1)).isoformat(),
-                            "gap_days": gap_days,
-                        })
+                        gaps.append(
+                            {
+                                "start_date": gap_start.isoformat(),
+                                "end_date": (cursor - timedelta(days=1)).isoformat(),
+                                "gap_days": gap_days,
+                            }
+                        )
                     gap_start = None
             cursor += timedelta(days=1)
 
         if gap_start is not None:
             gap_days = (end - gap_start).days + 1
             if gap_days > max_gap_days:
-                gaps.append({
-                    "start_date": gap_start.isoformat(),
-                    "end_date": end.isoformat(),
-                    "gap_days": gap_days,
-                })
+                gaps.append(
+                    {
+                        "start_date": gap_start.isoformat(),
+                        "end_date": end.isoformat(),
+                        "gap_days": gap_days,
+                    }
+                )
         return gaps
 
     def _update_calendar_status(
-        self, calendar_id, approved_by, final_caption_ref, approved_at,
-        approval_status="approved", status="approved",
+        self,
+        calendar_id,
+        approved_by,
+        final_caption_ref,
+        approved_at,
+        approval_status="approved",
+        status="approved",
     ) -> dict[str, str]:
         with self._conn() as conn:
             conn.execute(
                 """UPDATE calendar SET approval_status=?, status=?,
                    approved_by=?, final_caption_ref=?, updated_at=?
                    WHERE calendar_id=?""",
-                (approval_status, status, approved_by, final_caption_ref,
-                 approved_at, calendar_id),
+                (approval_status, status, approved_by, final_caption_ref, approved_at, calendar_id),
             )
             row = conn.execute(
                 "SELECT * FROM calendar WHERE calendar_id=?", (calendar_id,)
@@ -691,7 +790,9 @@ class UnifiedStore:
         ]
 
     def _append_history_entry(
-        self, row: dict[str, Any], conn: sqlite3.Connection | None = None,
+        self,
+        row: dict[str, Any],
+        conn: sqlite3.Connection | None = None,
     ) -> None:
         executor = conn if conn else self._conn()
         close = conn is None
@@ -721,9 +822,7 @@ class UnifiedStore:
 
     def read_post_metrics(self) -> list[PostMetric]:
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM post_metrics ORDER BY published_at DESC"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM post_metrics ORDER BY published_at DESC").fetchall()
         return [
             PostMetric(
                 published_at=r["published_at"],
@@ -816,8 +915,14 @@ class UnifiedStore:
                        total_posts=total_posts+1, avg_engagement_rate=?,
                        recent_engagement=?, updated_at=?
                    WHERE topic=?""",
-                (max(0, reach), max(0, engagements), new_avg, engagement_rate,
-                 datetime.now(timezone.utc).isoformat(), topic),
+                (
+                    max(0, reach),
+                    max(0, engagements),
+                    new_avg,
+                    engagement_rate,
+                    datetime.now(timezone.utc).isoformat(),
+                    topic,
+                ),
             )
         else:
             conn.execute(
@@ -825,14 +930,17 @@ class UnifiedStore:
                    (topic, total_reach, total_engagements, total_posts,
                     avg_engagement_rate, recent_engagement, updated_at)
                    VALUES (?, ?, ?, 1, ?, ?, ?)""",
-                (topic, max(0, reach), max(0, engagements),
-                 engagement_rate, engagement_rate,
-                 datetime.now(timezone.utc).isoformat()),
+                (
+                    topic,
+                    max(0, reach),
+                    max(0, engagements),
+                    engagement_rate,
+                    engagement_rate,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
             )
         # Also update lifecycle tracking (inline in same transaction)
-        lifecycle = conn.execute(
-            "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
-        ).fetchone()
+        lifecycle = conn.execute("SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)).fetchone()
         now = datetime.now(timezone.utc).isoformat()
         if not lifecycle:
             conn.execute(
@@ -898,6 +1006,7 @@ class UnifiedStore:
         if last_run:
             try:
                 from datetime import datetime
+
                 last_dt = datetime.fromisoformat(last_run["executed_at"])
                 if (datetime.now(timezone.utc) - last_dt).total_seconds() < 3600:
                     return  # within cooldown
@@ -917,11 +1026,14 @@ class UnifiedStore:
                 ConfidenceCalibrator,
                 WeightOptimizer,
             )
+
             optimizer = WeightOptimizer(self)
             optimizer.run()
             calibrator = ConfidenceCalibrator(self)
             calibrator.run()
-            logger.info("Auto-learning: weights + calibration updated (%d published briefs)", brief_count)
+            logger.info(
+                "Auto-learning: weights + calibration updated (%d published briefs)", brief_count
+            )
         except Exception as exc:
             logger.warning("Auto-learning trigger failed: %s", exc)
 
@@ -946,9 +1058,7 @@ class UnifiedStore:
                     (f"-{since_days} days",),
                 ).fetchone()
             else:
-                row = conn.execute(
-                    "SELECT COUNT(*) as c FROM post_metrics"
-                ).fetchone()
+                row = conn.execute("SELECT COUNT(*) as c FROM post_metrics").fetchone()
         return row["c"] if row else 0
 
     # ═══════════════════════════════════════════════════════════════
@@ -982,7 +1092,9 @@ class UnifiedStore:
         return [dict(r) for r in rows]
 
     def upsert_triage_items(
-        self, brand_id: str, items: list[CommunityTriageItem],
+        self,
+        brand_id: str,
+        items: list[CommunityTriageItem],
     ) -> list[dict[str, str]]:
         now = datetime.now(timezone.utc).isoformat()
         persisted: list[dict[str, str]] = []
@@ -992,7 +1104,11 @@ class UnifiedStore:
                     "SELECT * FROM triage_items WHERE triage_id=?",
                     (item.triage_id,),
                 ).fetchone()
-                status = existing["status"] if existing and existing["status"] not in ("", None) else "new"
+                status = (
+                    existing["status"]
+                    if existing and existing["status"] not in ("", None)
+                    else "new"
+                )
                 conn.execute(
                     """INSERT OR REPLACE INTO triage_items
                        (triage_id, brand_id, created_at, source, message, category,
@@ -1002,13 +1118,26 @@ class UnifiedStore:
                         reply_sent_at, reply_permalink, resolved_at, updated_at)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        item.triage_id, brand_id, item.created_at,
-                        item.source, item.message, item.category,
-                        item.priority, item.recommended_action, item.draft_reply,
+                        item.triage_id,
+                        brand_id,
+                        item.created_at,
+                        item.source,
+                        item.message,
+                        item.category,
+                        item.priority,
+                        item.recommended_action,
+                        item.draft_reply,
                         1 if item.escalation_required else 0,
                         1 if item.requires_human_approval else 0,
                         "|".join(item.matched_rules),
-                        status, "", "", "", "", "", "", now,
+                        status,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        now,
                     ),
                 )
                 row = conn.execute(
@@ -1019,16 +1148,25 @@ class UnifiedStore:
         return persisted
 
     def approve_triage_reply(
-        self, triage_id: str, approved_by: str, approved_at: str,
+        self,
+        triage_id: str,
+        approved_by: str,
+        approved_at: str,
         assigned_to: str = "",
     ) -> dict[str, str]:
         return self._update_triage_status(
-            triage_id, approved_at, status="approved", approved_by=approved_by,
+            triage_id,
+            approved_at,
+            status="approved",
+            approved_by=approved_by,
             assigned_to=assigned_to,
         )
 
     def reject_triage_reply(
-        self, triage_id: str, reason: str, rejected_at: str,
+        self,
+        triage_id: str,
+        reason: str,
+        rejected_at: str,
         assigned_to: str = "",
     ) -> dict[str, str]:
         with self._conn() as conn:
@@ -1049,33 +1187,55 @@ class UnifiedStore:
         return dict(row) if row else {}
 
     def resolve_triage_item(
-        self, triage_id: str, resolved_at: str, assigned_to: str = "",
-    ) -> dict[str, str]:
-        return self._update_triage_status(
-            triage_id, resolved_at, status="resolved",
-            resolved_at=resolved_at, assigned_to=assigned_to,
-        )
-
-    def mark_triage_reply_sent(
-        self, triage_id: str, sent_at: str, reply_permalink: str,
+        self,
+        triage_id: str,
+        resolved_at: str,
         assigned_to: str = "",
     ) -> dict[str, str]:
         return self._update_triage_status(
-            triage_id, sent_at, status="replied",
-            reply_sent_at=sent_at, reply_permalink=reply_permalink,
+            triage_id,
+            resolved_at,
+            status="resolved",
+            resolved_at=resolved_at,
+            assigned_to=assigned_to,
+        )
+
+    def mark_triage_reply_sent(
+        self,
+        triage_id: str,
+        sent_at: str,
+        reply_permalink: str,
+        assigned_to: str = "",
+    ) -> dict[str, str]:
+        return self._update_triage_status(
+            triage_id,
+            sent_at,
+            status="replied",
+            reply_sent_at=sent_at,
+            reply_permalink=reply_permalink,
             assigned_to=assigned_to,
         )
 
     def reopen_triage_item(
-        self, triage_id: str, reopened_at: str, assigned_to: str = "",
+        self,
+        triage_id: str,
+        reopened_at: str,
+        assigned_to: str = "",
     ) -> dict[str, str]:
         return self._update_triage_status(
-            triage_id, reopened_at, status="reopened",
-            resolved_at="", assigned_to=assigned_to,
+            triage_id,
+            reopened_at,
+            status="reopened",
+            resolved_at="",
+            assigned_to=assigned_to,
         )
 
     def _update_triage_status(
-        self, triage_id, updated_at, status=None, **extra,
+        self,
+        triage_id,
+        updated_at,
+        status=None,
+        **extra,
     ) -> dict[str, str]:
         sets = ["updated_at=?"]
         params: list[Any] = [updated_at]
@@ -1137,9 +1297,7 @@ class UnifiedStore:
     def get_topic_boost(self, topic: str, default: float = 0.0) -> float:
         """Boost factor (0-0.15) if topic has performed well before."""
         with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM topic_performance WHERE topic=?", (topic,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM topic_performance WHERE topic=?", (topic,)).fetchone()
         if not row:
             return default
         # Same scoring as TopicPerformanceRecord.score
@@ -1147,8 +1305,7 @@ class UnifiedStore:
         reach_score = min(1.0, avg_reach / 2000.0)
         engagement_score = min(1.0, row["avg_engagement_rate"] / 0.08)
         recency_bonus = min(0.1, row["recent_engagement"] * 0.02)
-        score = max(0.0, min(1.0,
-            reach_score * 0.45 + engagement_score * 0.35 + recency_bonus))
+        score = max(0.0, min(1.0, reach_score * 0.45 + engagement_score * 0.35 + recency_bonus))
         return min(0.15, score * 0.15)
 
     def get_top_topics(self, limit: int = 5, min_score: float = 0.3) -> list[str]:
@@ -1175,9 +1332,7 @@ class UnifiedStore:
             ).fetchone()
             if existing:
                 tp = existing["total_posts"]
-                new_avg = (
-                    (existing["avg_engagement_rate"] * tp + engagement_rate) / (tp + 1)
-                )
+                new_avg = (existing["avg_engagement_rate"] * tp + engagement_rate) / (tp + 1)
                 conn.execute(
                     """UPDATE topic_performance
                        SET total_reach=total_reach+?, total_engagements=total_engagements+?,
@@ -1192,7 +1347,14 @@ class UnifiedStore:
                        (topic, total_reach, total_engagements, total_posts,
                         avg_engagement_rate, recent_engagement, updated_at)
                        VALUES (?, ?, ?, 1, ?, ?, ?)""",
-                    (topic, max(0, reach), max(0, engagements), engagement_rate, engagement_rate, now),
+                    (
+                        topic,
+                        max(0, reach),
+                        max(0, engagements),
+                        engagement_rate,
+                        engagement_rate,
+                        now,
+                    ),
                 )
 
     # ═══════════════════════════════════════════════════════════════
@@ -1223,10 +1385,20 @@ class UnifiedStore:
                     content_potential, source_confidence, fanpage_fit,
                     customer_value, risk_penalty)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (generated_at, brand_id, calendar_id, topic,
-                 total_score, brand_relevance, novelty,
-                 content_potential, source_confidence, fanpage_fit,
-                 customer_value, risk_penalty),
+                (
+                    generated_at,
+                    brand_id,
+                    calendar_id,
+                    topic,
+                    total_score,
+                    brand_relevance,
+                    novelty,
+                    content_potential,
+                    source_confidence,
+                    fanpage_fit,
+                    customer_value,
+                    risk_penalty,
+                ),
             )
             return cursor.lastrowid or 0
 
@@ -1239,7 +1411,8 @@ class UnifiedStore:
             )
 
     def get_brief_feedback(
-        self, since_days: int = 30,
+        self,
+        since_days: int = 30,
     ) -> list[dict[str, Any]]:
         """Get brief scores + actual performance for variance analysis."""
         with self._conn() as conn:
@@ -1291,7 +1464,9 @@ class UnifiedStore:
         return {r["weight_name"]: r["current_weight"] for r in rows}
 
     def update_weight(
-        self, weight_name: str, new_weight: float,
+        self,
+        weight_name: str,
+        new_weight: float,
         correlation_7d: float | None = None,
         correlation_30d: float | None = None,
     ) -> None:
@@ -1320,8 +1495,12 @@ class UnifiedStore:
         weights = self.get_weights()
         result = []
         for weight_name in [
-            "brand_relevance", "novelty", "content_potential",
-            "source_confidence", "fanpage_fit", "customer_value",
+            "brand_relevance",
+            "novelty",
+            "content_potential",
+            "source_confidence",
+            "fanpage_fit",
+            "customer_value",
         ]:
             # Simple correlation: does this sub-score predict performance?
             scores = []
@@ -1347,17 +1526,17 @@ class UnifiedStore:
             )
             corr = round(num / den, 4) if den > 0 else 0
             current_w = weights.get(weight_name, 0.15)
-            result.append({
-                "weight_name": weight_name,
-                "current_weight": current_w,
-                "correlation": corr,
-                "sample_size": n,
-                "suggested_adjustment": (
-                    "increase" if corr > 0.3 else
-                    "decrease" if corr < -0.1 else
-                    "stable"
-                ),
-            })
+            result.append(
+                {
+                    "weight_name": weight_name,
+                    "current_weight": current_w,
+                    "correlation": corr,
+                    "sample_size": n,
+                    "suggested_adjustment": (
+                        "increase" if corr > 0.3 else "decrease" if corr < -0.1 else "stable"
+                    ),
+                }
+            )
         return sorted(result, key=lambda x: abs(x["correlation"]), reverse=True)
 
     # ═══════════════════════════════════════════════════════════════
@@ -1384,7 +1563,10 @@ class UnifiedStore:
         return {r["weight_name"]: r["current_weight"] for r in rows}
 
     def update_goal_weight(
-        self, goal_type: str, weight_name: str, new_weight: float,
+        self,
+        goal_type: str,
+        weight_name: str,
+        new_weight: float,
         correlation_7d: float | None = None,
         correlation_30d: float | None = None,
     ) -> None:
@@ -1416,8 +1598,12 @@ class UnifiedStore:
         weights = self.get_weights_for_goal(goal_type)
         result = []
         for weight_name in [
-            "brand_relevance", "novelty", "content_potential",
-            "source_confidence", "fanpage_fit", "customer_value",
+            "brand_relevance",
+            "novelty",
+            "content_potential",
+            "source_confidence",
+            "fanpage_fit",
+            "customer_value",
         ]:
             scores = []
             actuals: list[float] = []
@@ -1441,22 +1627,24 @@ class UnifiedStore:
             )
             corr = round(num / den, 4) if den > 0 else 0
             current_w = weights.get(weight_name, 0.15)
-            result.append({
-                "weight_name": weight_name,
-                "current_weight": current_w,
-                "correlation": corr,
-                "sample_size": n,
-                "goal_type": goal_type,
-                "suggested_adjustment": (
-                    "increase" if corr > 0.3 else
-                    "decrease" if corr < -0.05 else
-                    "stable"
-                ),
-            })
+            result.append(
+                {
+                    "weight_name": weight_name,
+                    "current_weight": current_w,
+                    "correlation": corr,
+                    "sample_size": n,
+                    "goal_type": goal_type,
+                    "suggested_adjustment": (
+                        "increase" if corr > 0.3 else "decrease" if corr < -0.05 else "stable"
+                    ),
+                }
+            )
         return sorted(result, key=lambda x: abs(x["correlation"]), reverse=True)
 
     def get_brief_feedback_by_goal(
-        self, goal_type: str, since_days: int = 30,
+        self,
+        goal_type: str,
+        since_days: int = 30,
     ) -> list[dict[str, Any]]:
         """Get scored briefs + actual performance for topics in a specific goal."""
         with self._conn() as conn:
@@ -1568,9 +1756,7 @@ class UnifiedStore:
                    WHERE topic=?""",
                 (stage, now, now, topic),
             )
-            row = conn.execute(
-                "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)).fetchone()
         return dict(row) if row else {"topic": topic, "stage": stage}
 
     def record_topic_publish_for_lifecycle(self, topic: str) -> dict[str, Any]:
@@ -1584,9 +1770,7 @@ class UnifiedStore:
         now = datetime.now(timezone.utc).isoformat()
         self.ensure_topic_lifecycle(topic)
         with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM topic_lifecycle WHERE topic=?", (topic,)).fetchone()
             if not row:
                 return {"topic": topic, "stage": "explore"}
 
@@ -1682,14 +1866,16 @@ class UnifiedStore:
                            WHERE topic=?""",
                         (new_stage, entered, entered, topic),
                     )
-                transitions.append({
-                    "topic": topic,
-                    "from": stage,
-                    "to": new_stage,
-                    "reason": reason,
-                    "total_posts": rec["total_posts"],
-                    "days_since_last_publish": days_since,
-                })
+                transitions.append(
+                    {
+                        "topic": topic,
+                        "from": stage,
+                        "to": new_stage,
+                        "reason": reason,
+                        "total_posts": rec["total_posts"],
+                        "days_since_last_publish": days_since,
+                    }
+                )
 
         return transitions
 
@@ -1706,8 +1892,13 @@ class UnifiedStore:
         rec = self.ensure_topic_lifecycle(topic)
         stage = rec["stage"]
 
-        base = {"stage": stage, "novelty_boost": 0.0, "conversion_boost": 0.0,
-                "penalty": 0.0, "frequency_mod": 1.0}
+        base = {
+            "stage": stage,
+            "novelty_boost": 0.0,
+            "conversion_boost": 0.0,
+            "penalty": 0.0,
+            "frequency_mod": 1.0,
+        }
 
         if stage == "explore":
             base["novelty_boost"] = 0.10
@@ -1737,7 +1928,9 @@ class UnifiedStore:
             return cursor.lastrowid or 0
 
     def get_learning_runs(
-        self, run_type: str | None = None, limit: int = 20,
+        self,
+        run_type: str | None = None,
+        limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Get recent learning run history."""
         with self._conn() as conn:
@@ -1765,9 +1958,7 @@ class UnifiedStore:
         """Save or update predictor trained state (stored in learning_runs)."""
         with self._conn() as conn:
             # Remove previous predictor_state runs
-            conn.execute(
-                "DELETE FROM learning_runs WHERE run_type = 'predictor_state'"
-            )
+            conn.execute("DELETE FROM learning_runs WHERE run_type = 'predictor_state'")
             conn.execute(
                 "INSERT INTO learning_runs (run_type, summary) VALUES (?, ?)",
                 ("predictor_state", json.dumps(state, ensure_ascii=False)),
@@ -1797,7 +1988,10 @@ class UnifiedStore:
         return [dict(r) for r in rows]
 
     def update_topic_performance_decay(
-        self, topic: str, new_avg_rate: float, decay_factor: float,
+        self,
+        topic: str,
+        new_avg_rate: float,
+        decay_factor: float,
     ) -> None:
         """Apply time-decay to a topic's engagement rate."""
         with self._conn() as conn:
@@ -1835,8 +2029,18 @@ class UnifiedStore:
                        caption_preview=?, topic=?, pillar=?, objective=?,
                        scheduled_for=?, batch_id=?, updated_at=?
                        WHERE calendar_id=?""",
-                    (brand_id, caption_ref, caption_preview, topic,
-                     pillar, objective, scheduled_for, batch_id, now, calendar_id),
+                    (
+                        brand_id,
+                        caption_ref,
+                        caption_preview,
+                        topic,
+                        pillar,
+                        objective,
+                        scheduled_for,
+                        batch_id,
+                        now,
+                        calendar_id,
+                    ),
                 )
             else:
                 conn.execute(
@@ -1844,8 +2048,17 @@ class UnifiedStore:
                        (calendar_id, brand_id, caption_ref, caption_preview,
                         topic, pillar, objective, scheduled_for, batch_id)
                        VALUES (?,?,?,?,?,?,?,?,?)""",
-                    (calendar_id, brand_id, caption_ref, caption_preview,
-                     topic, pillar, objective, scheduled_for, batch_id),
+                    (
+                        calendar_id,
+                        brand_id,
+                        caption_ref,
+                        caption_preview,
+                        topic,
+                        pillar,
+                        objective,
+                        scheduled_for,
+                        batch_id,
+                    ),
                 )
             row = conn.execute(
                 "SELECT * FROM content_queue WHERE calendar_id=?", (calendar_id,)
@@ -2046,8 +2259,11 @@ class UnifiedStore:
     # ═══════════════════════════════════════════════════════════════
 
     def upsert_competitor(
-        self, name: str, auto_discovered: bool = False,
-        discovery_query: str = "", discovery_score: float = 0.0,
+        self,
+        name: str,
+        auto_discovered: bool = False,
+        discovery_query: str = "",
+        discovery_score: float = 0.0,
     ) -> dict[str, Any]:
         """Register or update a competitor."""
         normalized = name.strip().lower()
@@ -2069,8 +2285,15 @@ class UnifiedStore:
                     """INSERT INTO competitors
                        (name, normalized_name, auto_discovered, discovery_query, discovery_score, first_seen, last_scanned)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (name.strip(), normalized, int(auto_discovered),
-                     discovery_query, discovery_score, now, now),
+                    (
+                        name.strip(),
+                        normalized,
+                        int(auto_discovered),
+                        discovery_query,
+                        discovery_score,
+                        now,
+                        now,
+                    ),
                 )
             row = conn.execute(
                 "SELECT * FROM competitors WHERE normalized_name=?", (normalized,)
@@ -2087,7 +2310,9 @@ class UnifiedStore:
         return dict(row) if row else None
 
     def list_competitors(
-        self, active_only: bool = True, auto_only: bool = False,
+        self,
+        active_only: bool = True,
+        auto_only: bool = False,
     ) -> list[dict[str, Any]]:
         """List all competitors."""
         conditions: list[str] = []
@@ -2112,8 +2337,11 @@ class UnifiedStore:
             )
 
     def save_competitor_snapshot(
-        self, competitor_name: str, profile: dict[str, Any],
-        products: list[str], next_topics: list[str],
+        self,
+        competitor_name: str,
+        profile: dict[str, Any],
+        products: list[str],
+        next_topics: list[str],
     ) -> int:
         """Save a per-scan snapshot of competitor analysis."""
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -2142,7 +2370,9 @@ class UnifiedStore:
             return cursor.lastrowid or 0
 
     def get_competitor_snapshots(
-        self, name: str, limit: int = 10,
+        self,
+        name: str,
+        limit: int = 10,
     ) -> list[dict[str, Any]]:
         """Get scan history for a competitor."""
         normalized = name.strip().lower()
@@ -2155,8 +2385,12 @@ class UnifiedStore:
         result = []
         for r in rows:
             entry = dict(r)
-            for key in ("products_json", "top_products_json",
-                         "search_urls_json", "next_topics_json"):
+            for key in (
+                "products_json",
+                "top_products_json",
+                "search_urls_json",
+                "next_topics_json",
+            ):
                 try:
                     entry[key] = json.loads(entry[key])
                 except (json.JSONDecodeError, TypeError):
@@ -2165,7 +2399,10 @@ class UnifiedStore:
         return result
 
     def record_competitor_product(
-        self, competitor_name: str, product_name: str, relevance: float = 0.5,
+        self,
+        competitor_name: str,
+        product_name: str,
+        relevance: float = 0.5,
     ) -> None:
         """Record a product detected for a competitor (aggregated)."""
         normalized = competitor_name.strip().lower()
@@ -2178,7 +2415,11 @@ class UnifiedStore:
             ).fetchone()
             if existing:
                 old_rel = existing["avg_relevance"]
-                new_rel = round((old_rel * existing["detection_count"] + relevance) / (existing["detection_count"] + 1), 3)
+                new_rel = round(
+                    (old_rel * existing["detection_count"] + relevance)
+                    / (existing["detection_count"] + 1),
+                    3,
+                )
                 conn.execute(
                     """UPDATE competitor_products SET last_detected=?,
                        detection_count=detection_count+1, avg_relevance=?
@@ -2192,7 +2433,9 @@ class UnifiedStore:
                 )
 
     def get_competitor_products(
-        self, name: str, min_detections: int = 1,
+        self,
+        name: str,
+        min_detections: int = 1,
     ) -> list[dict[str, Any]]:
         """Get all products detected for a competitor."""
         normalized = name.strip().lower()
@@ -2205,7 +2448,8 @@ class UnifiedStore:
         return [dict(r) for r in rows]
 
     def get_top_competitor_products(
-        self, limit: int = 20,
+        self,
+        limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Get most-frequently detected products across all competitors."""
         with self._conn() as conn:
@@ -2225,8 +2469,11 @@ class UnifiedStore:
     # ── Candidate discovery ──────────────────────────────────
 
     def upsert_competitor_candidate(
-        self, candidate_name: str, score: float,
-        source_scan: str = "", source_query: str = "",
+        self,
+        candidate_name: str,
+        score: float,
+        source_scan: str = "",
+        source_query: str = "",
     ) -> dict[str, Any]:
         """Add or update a candidate competitor (auto-discovered)."""
         normalized = candidate_name.strip().lower()
@@ -2244,8 +2491,15 @@ class UnifiedStore:
                        source_scan=CASE WHEN ?!='' THEN ? ELSE source_scan END,
                        source_query=CASE WHEN ?!='' THEN ? ELSE source_query END
                        WHERE normalized_name=?""",
-                    (new_score, now, source_scan, source_scan,
-                     source_query, source_query, normalized),
+                    (
+                        new_score,
+                        now,
+                        source_scan,
+                        source_scan,
+                        source_query,
+                        source_query,
+                        normalized,
+                    ),
                 )
             else:
                 conn.execute(
@@ -2261,7 +2515,9 @@ class UnifiedStore:
         return dict(row) if row else {}
 
     def list_competitor_candidates(
-        self, min_score: float = 1.0, limit: int = 20,
+        self,
+        min_score: float = 1.0,
+        limit: int = 20,
     ) -> list[dict[str, Any]]:
         """List auto-discovered candidates sorted by score."""
         with self._conn() as conn:
@@ -2286,7 +2542,8 @@ class UnifiedStore:
                 return {"error": "candidate not found"}
             # Check if already exists as competitor
             existing = conn.execute(
-                "SELECT id FROM competitors WHERE normalized_name=?", (normalized,),
+                "SELECT id FROM competitors WHERE normalized_name=?",
+                (normalized,),
             ).fetchone()
             if existing:
                 # Already tracked, just remove from candidates
@@ -2300,15 +2557,15 @@ class UnifiedStore:
                 """INSERT INTO competitors
                    (name, normalized_name, auto_discovered, discovery_query, discovery_score)
                    VALUES (?, ?, 1, ?, ?)""",
-                (cand["candidate_name"], normalized,
-                 cand["source_query"], cand["total_score"]),
+                (cand["candidate_name"], normalized, cand["source_query"], cand["total_score"]),
             )
             conn.execute(
                 "DELETE FROM competitor_candidates WHERE normalized_name=?",
                 (normalized,),
             )
             row = conn.execute(
-                "SELECT * FROM competitors WHERE normalized_name=?", (normalized,),
+                "SELECT * FROM competitors WHERE normalized_name=?",
+                (normalized,),
             ).fetchone()
         return dict(row) if row else {}
 
@@ -2324,10 +2581,13 @@ class UnifiedStore:
                     """INSERT INTO competitor_gaps
                        (scanned_at, gap_type, gap_name, description, opportunity_level)
                        VALUES (?, ?, ?, ?, ?)""",
-                    (now, g.get("gap_type", "product"),
-                     g.get("gap_name", ""),
-                     g.get("description", ""),
-                     g.get("opportunity_level", "medium")),
+                    (
+                        now,
+                        g.get("gap_type", "product"),
+                        g.get("gap_name", ""),
+                        g.get("description", ""),
+                        g.get("opportunity_level", "medium"),
+                    ),
                 )
                 count += 1
         return count
@@ -2344,7 +2604,9 @@ class UnifiedStore:
     # ── History / trends ─────────────────────────────────────
 
     def get_competitor_trend(
-        self, name: str, since_days: int = 30,
+        self,
+        name: str,
+        since_days: int = 30,
     ) -> dict[str, Any]:
         """Get a competitor's trend over time: products, formats, angles."""
         normalized = name.strip().lower()
@@ -2361,10 +2623,7 @@ class UnifiedStore:
             "recent_snapshots": snapshots[:5],
             "products_tracked": len(products),
             "top_products": [p["product_name"] for p in products[:10]],
-            "new_products": [
-                p for p in products
-                if p["detection_count"] <= 1
-            ],
+            "new_products": [p for p in products if p["detection_count"] <= 1],
         }
 
     def export_csv(self, table: str) -> str:

@@ -125,12 +125,15 @@ class OrchestratorAgent(BaseAgent):
 
         # ── Phase 1: Gather state + broadcast heartbeat ──────────
         pipeline_state = self._gather_state()
-        self._bus.update_shared_state(AgentRole.ORCHESTRATOR, {
-            "heartbeat": time.time(),
-            "tick_count": self._tick_count,
-            "state": pipeline_state.to_dict(),
-            "current_page_id": page_id,
-        })
+        self._bus.update_shared_state(
+            AgentRole.ORCHESTRATOR,
+            {
+                "heartbeat": time.time(),
+                "tick_count": self._tick_count,
+                "state": pipeline_state.to_dict(),
+                "current_page_id": page_id,
+            },
+        )
 
         # ── Phase 2a: Set pipeline trigger if content is needed ──
         # Agents self-coordinate via shared_state (choreography chain)
@@ -144,7 +147,7 @@ class OrchestratorAgent(BaseAgent):
         for agent in self._bus._agents.values():
             if agent.role == AgentRole.ORCHESTRATOR:
                 continue
-            if not hasattr(agent, 'self_driving_tick'):
+            if not hasattr(agent, "self_driving_tick"):
                 continue
             try:
                 proposals = agent.self_driving_tick()
@@ -172,10 +175,7 @@ class OrchestratorAgent(BaseAgent):
             "page_id": page_id,
             "elapsed_ms": int(elapsed * 1000),
             "state": pipeline_state.to_dict(),
-            "actions_taken": [
-                {"action": r.task_id, "success": r.success}
-                for r in results if r
-            ],
+            "actions_taken": [{"action": r.task_id, "success": r.success} for r in results if r],
             "state_path": str(self._state_path),
         }
 
@@ -207,9 +207,9 @@ class OrchestratorAgent(BaseAgent):
 
         for step in steps:
             if step == "research":
-                r = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.RESEARCHER, "research_trends", {"pillars": []}
-                ))
+                r = self._bus.dispatch(
+                    self._bus.create_task(AgentRole.RESEARCHER, "research_trends", {"pillars": []})
+                )
                 if r.success and r.data:
                     research_data = r.data.get("brief")
                 results.append(r)
@@ -217,9 +217,9 @@ class OrchestratorAgent(BaseAgent):
                 params: dict = {"days": 1}
                 if research_data:
                     params["research_brief"] = research_data
-                r = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.STRATEGIST, "plan_weekly", params
-                ))
+                r = self._bus.dispatch(
+                    self._bus.create_task(AgentRole.STRATEGIST, "plan_weekly", params)
+                )
                 if r.success and r.data:
                     strategist_data = r.data
                 results.append(r)
@@ -234,17 +234,22 @@ class OrchestratorAgent(BaseAgent):
                 # Fallback if strategist returned empty topics — use seasonal engine
                 if not topic.strip():
                     topic, pillar = self._seasonal_topic_and_pillar(pillar)
-                r = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.WRITER, "write_variants",
-                    {"variants": 2, "topic": topic, "pillar": pillar},
-                ))
+                r = self._bus.dispatch(
+                    self._bus.create_task(
+                        AgentRole.WRITER,
+                        "write_variants",
+                        {"variants": 2, "topic": topic, "pillar": pillar},
+                    )
+                )
                 if r.success and r.data:
                     writer_package = r.data  # ContentPackage dataclass
                 results.append(r)
             elif step == "design":
-                r = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.DESIGNER, "generate_brief", {"format": "text_image"}
-                ))
+                r = self._bus.dispatch(
+                    self._bus.create_task(
+                        AgentRole.DESIGNER, "generate_brief", {"format": "text_image"}
+                    )
+                )
                 results.append(r)
             elif step == "publish":
                 # Compose message from writer's best variant
@@ -252,21 +257,33 @@ class OrchestratorAgent(BaseAgent):
                 pub_params: dict[str, Any] = {"message": message, "image_path": image_path}
                 if page_id is not None:
                     pub_params["page_id"] = page_id
-                pub_result = self._bus.dispatch(self._bus.create_task(
-                    AgentRole.PUBLISHER, "publish_due", pub_params,
-                ))
+                pub_result = self._bus.dispatch(
+                    self._bus.create_task(
+                        AgentRole.PUBLISHER,
+                        "publish_due",
+                        pub_params,
+                    )
+                )
                 results.append(pub_result)
 
                 # ── Self-reply on new post for early engagement ──
                 fb_post_id = pub_result.data.get("fb_post_id", "") if pub_result.success else ""
                 if fb_post_id:
-                    topic = writer_package.best_variant().topic if writer_package and hasattr(writer_package, 'best_variant') else ""
+                    topic = (
+                        writer_package.best_variant().topic
+                        if writer_package and hasattr(writer_package, "best_variant")
+                        else ""
+                    )
                     self_reply_params: dict[str, Any] = {"fb_post_id": fb_post_id, "topic": topic}
                     if page_id is not None:
                         self_reply_params["page_id"] = page_id
-                    self_reply = self._bus.dispatch(self._bus.create_task(
-                        AgentRole.COMMUNITY, "self_reply_post", self_reply_params,
-                    ))
+                    self_reply = self._bus.dispatch(
+                        self._bus.create_task(
+                            AgentRole.COMMUNITY,
+                            "self_reply_post",
+                            self_reply_params,
+                        )
+                    )
                     results.append(self_reply)
 
                 # ── Track performance after publish ──
@@ -280,12 +297,20 @@ class OrchestratorAgent(BaseAgent):
                                 variant_id = v.variant_id
                         if hasattr(writer_package, "package_id"):
                             pkg_id = writer_package.package_id
-                    track_params: dict[str, Any] = {"fb_post_id": fb_post_id, "variant_id": variant_id, "package_id": pkg_id}
+                    track_params: dict[str, Any] = {
+                        "fb_post_id": fb_post_id,
+                        "variant_id": variant_id,
+                        "package_id": pkg_id,
+                    }
                     if page_id is not None:
                         track_params["page_id"] = page_id
-                    track_result = self._bus.dispatch(self._bus.create_task(
-                        AgentRole.PUBLISHER, "track_performance", track_params,
-                    ))
+                    track_result = self._bus.dispatch(
+                        self._bus.create_task(
+                            AgentRole.PUBLISHER,
+                            "track_performance",
+                            track_params,
+                        )
+                    )
                     results.append(track_result)
 
         return AgentResult(
@@ -356,10 +381,13 @@ class OrchestratorAgent(BaseAgent):
         state = PipelineState()
 
         # Analyst state
-        analyst_result = self._bus.dispatch(self._bus.create_task(
-            AgentRole.ANALYST, "weekly_report",
-            priority=ActionPriority.LOW,
-        ))
+        analyst_result = self._bus.dispatch(
+            self._bus.create_task(
+                AgentRole.ANALYST,
+                "weekly_report",
+                priority=ActionPriority.LOW,
+            )
+        )
         if analyst_result and analyst_result.success and isinstance(analyst_result.data, dict):
             state.weekly_post_count = analyst_result.data.get("total_posts", 0)
             state.avg_reach_7d = analyst_result.data.get("avg_reach", 0)
@@ -381,52 +409,87 @@ class OrchestratorAgent(BaseAgent):
 
         # Priority 1: Check if publishing is due
         if state.approved_ready > 0 or state.next_publish_due:
-            actions.append((ActionPriority.CRITICAL, {
-                "agent": AgentRole.PUBLISHER,
-                "action": "publish_due",
-            }))
+            actions.append(
+                (
+                    ActionPriority.CRITICAL,
+                    {
+                        "agent": AgentRole.PUBLISHER,
+                        "action": "publish_due",
+                    },
+                )
+            )
 
         # Community: fetch + triage (every 3 ticks when FB adapter available)
         if self._tick_count % 3 == 1:  # tick #1, #4, #7, ...
-            actions.append((ActionPriority.HIGH, {
-                "agent": AgentRole.COMMUNITY,
-                "action": "fetch_and_triage",
-                "params": {"limit": 50},
-            }))
+            actions.append(
+                (
+                    ActionPriority.HIGH,
+                    {
+                        "agent": AgentRole.COMMUNITY,
+                        "action": "fetch_and_triage",
+                        "params": {"limit": 50},
+                    },
+                )
+            )
             # Auto-reply after fetch (limit to 5 per tick to be safe)
-            actions.append((ActionPriority.HIGH, {
-                "agent": AgentRole.COMMUNITY,
-                "action": "auto_reply",
-                "params": {"limit": 5, "max_replies": 3},
-            }))
+            actions.append(
+                (
+                    ActionPriority.HIGH,
+                    {
+                        "agent": AgentRole.COMMUNITY,
+                        "action": "auto_reply",
+                        "params": {"limit": 5, "max_replies": 3},
+                    },
+                )
+            )
         elif state.pending_triage > 0 or state.new_comments_24h > 0:
-            actions.append((ActionPriority.HIGH, {
-                "agent": AgentRole.COMMUNITY,
-                "action": "triage_comments",
-                "params": {"limit": 20},
-            }))
+            actions.append(
+                (
+                    ActionPriority.HIGH,
+                    {
+                        "agent": AgentRole.COMMUNITY,
+                        "action": "triage_comments",
+                        "params": {"limit": 20},
+                    },
+                )
+            )
 
         # Priority 2: Content planning if calendar has gaps
         if state.calendar_gap_days:
-            actions.append((ActionPriority.MEDIUM, {
-                "agent": AgentRole.STRATEGIST,
-                "action": "plan_weekly",
-                "params": {"days": 3},
-            }))
+            actions.append(
+                (
+                    ActionPriority.MEDIUM,
+                    {
+                        "agent": AgentRole.STRATEGIST,
+                        "action": "plan_weekly",
+                        "params": {"days": 3},
+                    },
+                )
+            )
 
         # Priority 3: Analytics (every tick)
-        actions.append((ActionPriority.LOW, {
-            "agent": AgentRole.ANALYST,
-            "action": "weekly_report",
-        }))
+        actions.append(
+            (
+                ActionPriority.LOW,
+                {
+                    "agent": AgentRole.ANALYST,
+                    "action": "weekly_report",
+                },
+            )
+        )
 
         # Periodic metric refresh every 3 ticks
         if self._tick_count > 0 and self._tick_count % 3 == 0:
-            actions.append((ActionPriority.LOW, {
-                "agent": AgentRole.PUBLISHER,
-                "action": "refresh_metrics",
-                "params": {"limit": 10},
-            }))
+            actions.append(
+                (
+                    ActionPriority.LOW,
+                    {
+                        "agent": AgentRole.PUBLISHER,
+                        "action": "refresh_metrics",
+                        "params": {"limit": 10},
+                    },
+                )
+            )
 
         return actions
 
@@ -511,12 +574,14 @@ class OrchestratorAgent(BaseAgent):
             pillar = "review"
 
         import random
+
         topic = random.choice(topics)
         return topic, pillar
 
     def _save_state(self, state: PipelineState) -> None:
         """Persist pipeline state to disk."""
         import json
+
         try:
             data = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),

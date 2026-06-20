@@ -16,7 +16,15 @@ from fanpage_agent.models import CommunityTriageItem, PostHistoryEntry, PostMetr
 
 
 class GoogleSheetsStore:
-    METRICS_HEADERS = ["published_at", "topic", "pillar", "objective", "reach", "engagements", "leads"]
+    METRICS_HEADERS = [
+        "published_at",
+        "topic",
+        "pillar",
+        "objective",
+        "reach",
+        "engagements",
+        "leads",
+    ]
 
     def __init__(self, settings: Settings, service: Any | None = None) -> None:
         if not settings.google_sheets_id:
@@ -78,7 +86,9 @@ class GoogleSheetsStore:
         self._update_calendar_row(row_number, row)
         return row
 
-    def reject_calendar_item(self, calendar_id: str, reason: str, rejected_at: str) -> dict[str, str]:
+    def reject_calendar_item(
+        self, calendar_id: str, reason: str, rejected_at: str
+    ) -> dict[str, str]:
         rows, row_number = self._find_calendar_row(calendar_id)
         row = rows[row_number - 2]
         row["approval_status"] = "rejected"
@@ -108,7 +118,9 @@ class GoogleSheetsStore:
         self._append_history_entry(row)
         return row
 
-    def attach_draft_caption_ref(self, calendar_id: str, caption_ref: str, updated_at: str) -> dict[str, str]:
+    def attach_draft_caption_ref(
+        self, calendar_id: str, caption_ref: str, updated_at: str
+    ) -> dict[str, str]:
         rows, row_number = self._find_calendar_row(calendar_id)
         row = rows[row_number - 2]
         row["draft_caption_ref"] = caption_ref
@@ -144,7 +156,10 @@ class GoogleSheetsStore:
         metric_rows = self._read_tab_as_dicts(self._tab_name("post_metrics"), self.METRICS_HEADERS)
         updated = False
         for existing in metric_rows:
-            if existing.get("published_at") == metric_row["published_at"] and existing.get("topic") == metric_row["topic"]:
+            if (
+                existing.get("published_at") == metric_row["published_at"]
+                and existing.get("topic") == metric_row["topic"]
+            ):
                 existing.update(metric_row)
                 updated = True
                 break
@@ -178,7 +193,9 @@ class GoogleSheetsStore:
         return filtered
 
     def read_post_history(self, limit: int = 30) -> list[PostHistoryEntry]:
-        rows = self._read_tab_as_dicts(self._tab_name("post_history"), LocalSheetStore.HISTORY_HEADERS)
+        rows = self._read_tab_as_dicts(
+            self._tab_name("post_history"), LocalSheetStore.HISTORY_HEADERS
+        )
         selected = rows[-limit:]
         return [
             PostHistoryEntry(
@@ -273,7 +290,9 @@ class GoogleSheetsStore:
             for tag, stats in sorted_tags[:limit]
         ]
 
-    def upsert_triage_items(self, brand_id: str, items: list[CommunityTriageItem]) -> list[dict[str, str]]:
+    def upsert_triage_items(
+        self, brand_id: str, items: list[CommunityTriageItem]
+    ) -> list[dict[str, str]]:
         tab_name = self._tab_name("comment_triage")
         headers = LocalSheetStore.TRIAGE_HEADERS
         self._ensure_headers(tab_name, headers)
@@ -342,7 +361,9 @@ class GoogleSheetsStore:
         self._update_triage_row(row_number, row)
         return row
 
-    def resolve_triage_item(self, triage_id: str, resolved_at: str, assigned_to: str = "") -> dict[str, str]:
+    def resolve_triage_item(
+        self, triage_id: str, resolved_at: str, assigned_to: str = ""
+    ) -> dict[str, str]:
         rows, row_number = self._find_triage_row(triage_id)
         row = rows[row_number - 2]
         row["status"] = "resolved"
@@ -369,7 +390,9 @@ class GoogleSheetsStore:
         self._update_triage_row(row_number, row)
         return row
 
-    def reopen_triage_item(self, triage_id: str, reopened_at: str, assigned_to: str = "") -> dict[str, str]:
+    def reopen_triage_item(
+        self, triage_id: str, reopened_at: str, assigned_to: str = ""
+    ) -> dict[str, str]:
         rows, row_number = self._find_triage_row(triage_id)
         row = rows[row_number - 2]
         row["status"] = "reopened"
@@ -386,7 +409,9 @@ class GoogleSheetsStore:
         assigned_to: str | None = None,
         limit: int | None = None,
     ) -> list[dict[str, str]]:
-        rows = self._read_tab_as_dicts(self._tab_name("comment_triage"), LocalSheetStore.TRIAGE_HEADERS)
+        rows = self._read_tab_as_dicts(
+            self._tab_name("comment_triage"), LocalSheetStore.TRIAGE_HEADERS
+        )
         filtered = [
             row
             for row in rows
@@ -426,7 +451,9 @@ class GoogleSheetsStore:
         raise KeyError(f"calendar_id not found: {calendar_id}")
 
     def _find_triage_row(self, triage_id: str) -> tuple[list[dict[str, str]], int]:
-        rows = self._read_tab_as_dicts(self._tab_name("comment_triage"), LocalSheetStore.TRIAGE_HEADERS)
+        rows = self._read_tab_as_dicts(
+            self._tab_name("comment_triage"), LocalSheetStore.TRIAGE_HEADERS
+        )
         for index, row in enumerate(rows, start=2):
             if row.get("triage_id") == triage_id:
                 return rows, index
@@ -461,7 +488,9 @@ class GoogleSheetsStore:
             body={"values": values},
         ).execute()
 
-    def _replace_tab_rows(self, tab_name: str, headers: list[str], rows: list[dict[str, str]]) -> None:
+    def _replace_tab_rows(
+        self, tab_name: str, headers: list[str], rows: list[dict[str, str]]
+    ) -> None:
         values = [headers] + [[row.get(header, "") for header in headers] for row in rows]
         end_column = chr(ord("A") + max(len(headers) - 1, 0))
         range_name = f"{tab_name}!A1:{end_column}{len(values)}"
@@ -495,14 +524,24 @@ class GoogleSheetsStore:
         data_rows = values[1:] if header_row == headers else values
         normalized: list[dict[str, str]] = []
         for raw_row in data_rows:
-            normalized.append({header: raw_row[index] if index < len(raw_row) else "" for index, header in enumerate(headers)})
+            normalized.append(
+                {
+                    header: raw_row[index] if index < len(raw_row) else ""
+                    for index, header in enumerate(headers)
+                }
+            )
         return normalized
 
     def _get_values(self, tab_name: str) -> list[list[str]]:
-        response = self.service.spreadsheets().values().get(
-            spreadsheetId=self.spreadsheet_id,
-            range=f"{tab_name}!A:Z",
-        ).execute()
+        response = (
+            self.service.spreadsheets()
+            .values()
+            .get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{tab_name}!A:Z",
+            )
+            .execute()
+        )
         return response.get("values", [])
 
     def _append_rows(self, tab_name: str, rows: list[list[str]]) -> None:
@@ -517,9 +556,13 @@ class GoogleSheetsStore:
 
     def get_tab_names(self) -> list[str]:
         """Return list of all tab/sheet names in the spreadsheet."""
-        meta = self.service.spreadsheets().get(
-            spreadsheetId=self.spreadsheet_id,
-        ).execute()
+        meta = (
+            self.service.spreadsheets()
+            .get(
+                spreadsheetId=self.spreadsheet_id,
+            )
+            .execute()
+        )
         return [s["properties"]["title"] for s in meta.get("sheets", [])]
 
     def ensure_tab(self, tab_name: str) -> bool:

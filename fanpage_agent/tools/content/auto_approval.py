@@ -69,25 +69,29 @@ class AutoApprovalEngine:
             # Skip already-finalised items
             if approval_status in ("approved", "auto_approved") or status == "published":
                 reason_code = "already_published" if status == "published" else "already_finalized"
-                result.skipped.append({
-                    "calendar_id": calendar_id,
-                    "reason": f"Already {approval_status if approval_status != 'pending' else 'published'}",
-                    "reason_code": reason_code,
-                    "status": status,
-                    "approval_status": approval_status,
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": f"Already {approval_status if approval_status != 'pending' else 'published'}",
+                        "reason_code": reason_code,
+                        "status": status,
+                        "approval_status": approval_status,
+                    }
+                )
                 continue
 
             # Must have a caption
             if not row.get("draft_caption_ref", "").strip():
-                result.skipped.append({
-                    "calendar_id": calendar_id,
-                    "reason": "No draft caption ref",
-                    "reason_code": "missing_draft_caption_ref",
-                    "status": status,
-                    "approval_status": approval_status,
-                    "next_step": "Generate or attach a draft caption before process-pending.",
-                })
+                result.skipped.append(
+                    {
+                        "calendar_id": calendar_id,
+                        "reason": "No draft caption ref",
+                        "reason_code": "missing_draft_caption_ref",
+                        "status": status,
+                        "approval_status": approval_status,
+                        "next_step": "Generate or attach a draft caption before process-pending.",
+                    }
+                )
                 continue
 
             # Check banned phrases
@@ -99,13 +103,15 @@ class AutoApprovalEngine:
                         if phrase.lower() in val.lower():
                             banned_issues.append(f"Contains banned phrase: {phrase}")
                 if banned_issues:
-                    result.skipped.append({
-                        "calendar_id": calendar_id,
-                        "reason": "; ".join(banned_issues),
-                        "reason_code": "banned_phrase_detected",
-                        "status": status,
-                        "approval_status": approval_status,
-                    })
+                    result.skipped.append(
+                        {
+                            "calendar_id": calendar_id,
+                            "reason": "; ".join(banned_issues),
+                            "reason_code": "banned_phrase_detected",
+                            "status": status,
+                            "approval_status": approval_status,
+                        }
+                    )
                     continue
 
             # Check duplicate topics against history
@@ -113,13 +119,15 @@ class AutoApprovalEngine:
                 normalized_topic = VerifierTool._normalize(row.get("topic", ""))
                 recent_topics = {VerifierTool._normalize(h.topic) for h in history}
                 if normalized_topic in recent_topics:
-                    result.skipped.append({
-                        "calendar_id": calendar_id,
-                        "reason": f"Duplicate topic with recent history: {row.get('topic', '')}",
-                        "reason_code": "duplicate_topic",
-                        "status": status,
-                        "approval_status": approval_status,
-                    })
+                    result.skipped.append(
+                        {
+                            "calendar_id": calendar_id,
+                            "reason": f"Duplicate topic with recent history: {row.get('topic', '')}",
+                            "reason_code": "duplicate_topic",
+                            "status": status,
+                            "approval_status": approval_status,
+                        }
+                    )
                     continue
 
             # Verification check
@@ -142,13 +150,15 @@ class AutoApprovalEngine:
                 v_result = self.verifier.verify_plan(self.profile, plan, history)
 
                 if not v_result.passed:
-                    result.skipped.append({
-                        "calendar_id": calendar_id,
-                        "reason": "; ".join(v_result.issues),
-                        "reason_code": "verification_failed",
-                        "status": status,
-                        "approval_status": approval_status,
-                    })
+                    result.skipped.append(
+                        {
+                            "calendar_id": calendar_id,
+                            "reason": "; ".join(v_result.issues),
+                            "reason_code": "verification_failed",
+                            "status": status,
+                            "approval_status": approval_status,
+                        }
+                    )
                     continue
 
             # All checks passed — auto-approve
@@ -159,9 +169,11 @@ class AutoApprovalEngine:
                 approved_at="",
                 approval_status="auto_approved",
             )
-            result.auto_approved.append({
-                "calendar_id": calendar_id,
-                "topic": row.get("topic", ""),
-            })
+            result.auto_approved.append(
+                {
+                    "calendar_id": calendar_id,
+                    "topic": row.get("topic", ""),
+                }
+            )
 
         return result

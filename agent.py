@@ -160,7 +160,7 @@ class Orchestrator:
                     llm_error = str(exc)
                     if attempt < 2:
                         wait = (attempt + 1) * 5
-                        err_msg = f"LLM call failed (attempt {attempt+1}/3): {exc} — retrying in {wait}s"
+                        err_msg = f"LLM call failed (attempt {attempt + 1}/3): {exc} — retrying in {wait}s"
                         errors.append(err_msg)
                         time.sleep(wait)
                     else:
@@ -188,7 +188,9 @@ class Orchestrator:
                         "type": "function",
                         "function": {
                             "name": tc.get("function", {}).get("name", ""),
-                            "arguments": json.dumps(tc.get("function", {}).get("arguments", {}), ensure_ascii=False),
+                            "arguments": json.dumps(
+                                tc.get("function", {}).get("arguments", {}), ensure_ascii=False
+                            ),
                         },
                     }
                     for tc in tool_calls
@@ -205,11 +207,13 @@ class Orchestrator:
                 if self.config.allowed_actions and name not in self.config.allowed_actions:
                     err_msg = f"Action {name} not in allowed_actions"
                     errors.append(err_msg)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.get("id", ""),
-                        "content": json.dumps({"error": err_msg}, ensure_ascii=False),
-                    })
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.get("id", ""),
+                            "content": json.dumps({"error": err_msg}, ensure_ascii=False),
+                        }
+                    )
                     continue
 
                 self.tick_calls += 1
@@ -225,23 +229,27 @@ class Orchestrator:
                 result["_exec_time_ms"] = int(elapsed * 1000)
 
                 # Log
-                history.append({
-                    "type": "tool_call",
-                    "tool": name,
-                    "args": args,
-                    "result": result,
-                    "elapsed_ms": int(elapsed * 1000),
-                })
+                history.append(
+                    {
+                        "type": "tool_call",
+                        "tool": name,
+                        "args": args,
+                        "result": result,
+                        "elapsed_ms": int(elapsed * 1000),
+                    }
+                )
 
                 # Feed result back to LLM
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.get("id", ""),
-                    "content": json.dumps(
-                        self._sanitize_for_json(result),
-                        ensure_ascii=False,
-                    ),
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.get("id", ""),
+                        "content": json.dumps(
+                            self._sanitize_for_json(result),
+                            ensure_ascii=False,
+                        ),
+                    }
+                )
 
         # --- Step 4: build summary ---
         elapsed = time.time() - start
@@ -262,13 +270,15 @@ class Orchestrator:
         while True:
             tick += 1
             now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  Tick #{tick}  |  {now}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             try:
                 result = self.run_tick(tick_num=tick)
-                actions = len([h for h in result.get("history", []) if h.get("type") == "tool_call"])
+                actions = len(
+                    [h for h in result.get("history", []) if h.get("type") == "tool_call"]
+                )
                 errors = result.get("errors", [])
                 print(f"  Actions: {actions}  |  Errors: {len(errors)}")
                 if errors:
@@ -322,9 +332,7 @@ class Orchestrator:
 
     def _send_telegram(self, summary: dict) -> None:
         """Send brief summary to Telegram operator."""
-        tool_calls = [
-            h for h in summary.get("history", []) if h.get("type") == "tool_call"
-        ]
+        tool_calls = [h for h in summary.get("history", []) if h.get("type") == "tool_call"]
         errors = summary.get("errors", [])
         initial = summary.get("initial_state", {})
 
@@ -338,7 +346,11 @@ class Orchestrator:
             for tc in tool_calls:
                 name = tc.get("tool", "?")
                 result = tc.get("result", {})
-                ok = "❌" if result.get("error") or any(k.startswith("error") for k in result) else "✅"
+                ok = (
+                    "❌"
+                    if result.get("error") or any(k.startswith("error") for k in result)
+                    else "✅"
+                )
                 # Compact action summary
                 brief = ""
                 if "filled_count" in result:

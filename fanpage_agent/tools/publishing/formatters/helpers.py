@@ -35,8 +35,7 @@ class _HelpersMixin:
             )
         if scores:
             compact = ", ".join(
-                f"{score.get('variant_id', '-')}: {score.get('score', '-')}"
-                for score in scores[:4]
+                f"{score.get('variant_id', '-')}: {score.get('score', '-')}" for score in scores[:4]
             )
             lines.append(f"   variant scores: {compact}")
         return lines

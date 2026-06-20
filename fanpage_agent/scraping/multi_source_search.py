@@ -18,12 +18,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SearchResult:
     """Kết quả tìm kiếm với metadata backend."""
+
     title: str
     url: str
     snippet: str = ""
-    engine: str = ""       # "searxng", "ddg", "vn_crawler"
+    engine: str = ""  # "searxng", "ddg", "vn_crawler"
     source_site: str = ""  # tên site gốc (VD: wecommit.vn)
-    score: float = 0.5     # trust score 0-1
+    score: float = 0.5  # trust score 0-1
 
 
 # ── Abstract backend ──────────────────────────────────────────
@@ -31,8 +32,7 @@ class SearchResult:
 
 class SearchBackend(ABC):
     @abstractmethod
-    def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
-        ...
+    def search(self, query: str, max_results: int = 5) -> list[SearchResult]: ...
 
     @property
     @abstractmethod
@@ -77,14 +77,16 @@ class SearXNGBackend(SearchBackend):
             url = item.get("url", "")
             if not url:
                 continue
-            results.append(SearchResult(
-                title=item.get("title", ""),
-                url=url,
-                snippet=item.get("content", ""),
-                engine="searxng",
-                source_site=urllib.parse.urlparse(url).netloc,
-                score=0.55,  # base: SearXNG aggregate
-            ))
+            results.append(
+                SearchResult(
+                    title=item.get("title", ""),
+                    url=url,
+                    snippet=item.get("content", ""),
+                    engine="searxng",
+                    source_site=urllib.parse.urlparse(url).netloc,
+                    score=0.55,  # base: SearXNG aggregate
+                )
+            )
         return results
 
 
@@ -105,11 +107,16 @@ class DDGBackend(SearchBackend):
     def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
         try:
             from ddgs import DDGS
+
             with DDGS() as ddgs:
-                raw = list(ddgs.text(
-                    query, region=self.region,
-                    safesearch="moderate", max_results=max_results,
-                ))
+                raw = list(
+                    ddgs.text(
+                        query,
+                        region=self.region,
+                        safesearch="moderate",
+                        max_results=max_results,
+                    )
+                )
         except Exception as exc:
             logger.warning("DDG backend thất bại [%s]: %s", query[:40], exc)
             return []
@@ -119,14 +126,16 @@ class DDGBackend(SearchBackend):
             url = r.get("href", "")
             if not url:
                 continue
-            results.append(SearchResult(
-                title=r.get("title", ""),
-                url=url,
-                snippet=r.get("body", ""),
-                engine="ddg",
-                source_site=urllib.parse.urlparse(url).netloc,
-                score=0.50,
-            ))
+            results.append(
+                SearchResult(
+                    title=r.get("title", ""),
+                    url=url,
+                    snippet=r.get("body", ""),
+                    engine="ddg",
+                    source_site=urllib.parse.urlparse(url).netloc,
+                    score=0.50,
+                )
+            )
         return results
 
 
@@ -176,8 +185,7 @@ class VNCrawlerBackend(SearchBackend):
     def __init__(self, timeout: int = 20):
         self.timeout = timeout
         self._sites: list[_CrawledSite] = [
-            _CrawledSite(name=s["name"], url=s["url"])
-            for s in self.SITES
+            _CrawledSite(name=s["name"], url=s["url"]) for s in self.SITES
         ]
 
     @property
@@ -196,8 +204,11 @@ class VNCrawlerBackend(SearchBackend):
                 overlap = len(keywords & title_keywords) if keywords else 0
                 if overlap > 0:
                     boosted = SearchResult(
-                        title=art.title, url=art.url, snippet=art.snippet,
-                        engine="vn_crawler", source_site=site.name,
+                        title=art.title,
+                        url=art.url,
+                        snippet=art.snippet,
+                        engine="vn_crawler",
+                        source_site=site.name,
                         score=min(1.0, art.score + overlap * 0.1),
                     )
                     candidates.append(boosted)
@@ -220,6 +231,7 @@ class VNCrawlerBackend(SearchBackend):
         """Fetch trang chủ, trích xuất link bài viết bằng BeautifulSoup."""
         try:
             from scrapling import Fetcher
+
             page = Fetcher.get(url, timeout=self.timeout)
             if page.status != 200:
                 return []
@@ -229,6 +241,7 @@ class VNCrawlerBackend(SearchBackend):
             return []
 
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(html, "html.parser")
         all_links = soup.find_all("a", href=True)
 
@@ -246,7 +259,9 @@ class VNCrawlerBackend(SearchBackend):
             if not title or len(title) < 20:
                 continue
             # Skip links với title chỉ là số/icon/emoji
-            text_len = len(re.sub(r"[\s\u2000-\u206F\uFE00-\uFE0F\U0001F300-\U0001FFFF]+", "", title))
+            text_len = len(
+                re.sub(r"[\s\u2000-\u206F\uFE00-\uFE0F\U0001F300-\U0001FFFF]+", "", title)
+            )
             if text_len < 12:
                 continue
 
@@ -255,6 +270,7 @@ class VNCrawlerBackend(SearchBackend):
                 link = "https:" + link
             elif link.startswith("/"):
                 from urllib.parse import urlparse
+
                 parsed = urlparse(url)
                 link = f"{parsed.scheme}://{parsed.netloc}{link}"
             elif not link.startswith("http"):
@@ -266,14 +282,16 @@ class VNCrawlerBackend(SearchBackend):
 
             # Normalise whitespace trong title
             title = re.sub(r"\s+", " ", title).strip()
-            results.append(SearchResult(
-                title=title,
-                url=link,
-                snippet="",
-                engine="vn_crawler",
-                source_site=urllib.parse.urlparse(url).netloc,
-                score=0.70,
-            ))
+            results.append(
+                SearchResult(
+                    title=title,
+                    url=link,
+                    snippet="",
+                    engine="vn_crawler",
+                    source_site=urllib.parse.urlparse(url).netloc,
+                    score=0.70,
+                )
+            )
 
         return results
 

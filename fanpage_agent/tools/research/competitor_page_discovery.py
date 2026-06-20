@@ -151,7 +151,9 @@ class CompetitorPageDiscoveryTool:
 
             except Exception as exc:
                 logger.warning(
-                    "Failed to search competitor '%s': %s", name, exc,
+                    "Failed to search competitor '%s': %s",
+                    name,
+                    exc,
                 )
                 continue
 
@@ -243,9 +245,7 @@ class CompetitorPageDiscoveryTool:
 
         # Content angles
         angles: list[str] = []
-        clue_count = sum(
-            1 for w in _AFFILIATE_CLUE_WORDS if w in combined_text.lower()
-        )
+        clue_count = sum(1 for w in _AFFILIATE_CLUE_WORDS if w in combined_text.lower())
         for text in texts:
             angle = self._detect_angle(text, clue_count)
             if angle and angle not in angles:
@@ -340,8 +340,7 @@ class CompetitorPageDiscoveryTool:
                 if other.name != p.name:
                     others_products.update(other.products_detected)
             unique_map[p.name] = [
-                prod for prod in p.products_detected
-                if prod not in others_products
+                prod for prod in p.products_detected if prod not in others_products
             ]
 
         # Gap products (products no competitor covers)
@@ -357,18 +356,14 @@ class CompetitorPageDiscoveryTool:
         for p in profiles:
             all_formats.extend(f.type for f in p.formats_detected)
         format_counts: OverlapCounter = OverlapCounter(all_formats)
-        underused = [
-            fmt for fmt in _FORMAT_PATTERNS
-            if fmt not in format_counts
-        ][:3]
+        underused = [fmt for fmt in _FORMAT_PATTERNS if fmt not in format_counts][:3]
 
         # Generate recommendation
         rec_parts: list[str] = []
         if shared:
             top_shared = shared[0][0]
             rec_parts.append(
-                f"Top product đối thủ đều làm: {top_shared}. "
-                "Cần góc nhìn khác biệt để cạnh tranh."
+                f"Top product đối thủ đều làm: {top_shared}. Cần góc nhìn khác biệt để cạnh tranh."
             )
         if gap_products:
             rec_parts.append(
@@ -377,12 +372,13 @@ class CompetitorPageDiscoveryTool:
             )
         if underused:
             rec_parts.append(
-                f"Format chưa ai dùng: {', '.join(underused)}. "
-                "Thử nghiệm để tạo khác biệt."
+                f"Format chưa ai dùng: {', '.join(underused)}. Thử nghiệm để tạo khác biệt."
             )
 
-        recommendation = " ".join(rec_parts) if rec_parts else (
-            "Tiếp tục theo dõi đối thủ để phát hiện cơ hội mới."
+        recommendation = (
+            " ".join(rec_parts)
+            if rec_parts
+            else ("Tiếp tục theo dõi đối thủ để phát hiện cơ hội mới.")
         )
 
         return CrossCompetitorInsight(
@@ -405,9 +401,7 @@ class CompetitorPageDiscoveryTool:
             return []
         text_lower = text.lower()
 
-        clue_count = sum(
-            1 for word in _AFFILIATE_CLUE_WORDS if word in text_lower
-        )
+        clue_count = sum(1 for word in _AFFILIATE_CLUE_WORDS if word in text_lower)
 
         candidates: list[ProductTopicCandidate] = []
         for marker in _NICHE_PRODUCT_MARKERS:

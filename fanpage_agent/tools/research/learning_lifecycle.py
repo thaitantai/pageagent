@@ -61,13 +61,15 @@ class DecayModel:
             new_avg_rate = round(record["avg_engagement_rate"] * decay_factor, 4)
             self._store.update_topic_performance_decay(topic, new_avg_rate, decay_factor)
 
-            decayed.append({
-                "topic": topic,
-                "days_since_update": days_since,
-                "decay_factor": round(decay_factor, 3),
-                "avg_eng_rate_before": record["avg_engagement_rate"],
-                "avg_eng_rate_after": new_avg_rate,
-            })
+            decayed.append(
+                {
+                    "topic": topic,
+                    "days_since_update": days_since,
+                    "decay_factor": round(decay_factor, 3),
+                    "avg_eng_rate_before": record["avg_engagement_rate"],
+                    "avg_eng_rate_after": new_avg_rate,
+                }
+            )
 
         if decayed:
             self._store.log_learning_run(
@@ -117,9 +119,7 @@ class LifecycleManager:
     def get_lifecycle_report(self) -> dict[str, Any]:
         """Get full lifecycle report for all topics."""
         records = self._store.get_all_lifecycles()
-        by_stage: dict[str, list[dict[str, Any]]] = {
-            s: [] for s in self._store.LIFE_CYCLE_STAGES
-        }
+        by_stage: dict[str, list[dict[str, Any]]] = {s: [] for s in self._store.LIFE_CYCLE_STAGES}
         for rec in records:
             s = rec["stage"]
             days_since = 0
@@ -133,7 +133,9 @@ class LifecycleManager:
                 "topic": rec["topic"],
                 "stage": rec["stage"],
                 "total_posts": rec["total_posts"],
-                "first_published": rec["first_published_at"][:10] if rec["first_published_at"] else "",
+                "first_published": rec["first_published_at"][:10]
+                if rec["first_published_at"]
+                else "",
                 "last_published": rec["last_published_at"][:10] if rec["last_published_at"] else "",
                 "days_since_publish": days_since,
                 "days_in_stage": 0,
@@ -147,8 +149,10 @@ class LifecycleManager:
             by_stage[s].append(entry)
         return {
             "total_topics": len(records),
-            "by_stage": {s: {"count": len(by_stage[s]), "topics": by_stage[s]}
-                         for s in self._store.LIFE_CYCLE_STAGES},
+            "by_stage": {
+                s: {"count": len(by_stage[s]), "topics": by_stage[s]}
+                for s in self._store.LIFE_CYCLE_STAGES
+            },
             "active_topics": len(by_stage["active"]),
             "explore_topics": len(by_stage["explore"]),
             "mature_topics": len(by_stage["mature"]),

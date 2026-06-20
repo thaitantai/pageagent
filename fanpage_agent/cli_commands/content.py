@@ -31,7 +31,11 @@ def _content_package_from_caption_item(
         "brand_id": item.get("brand_id", "skincare_genz"),
         "topic": item.get("topic", ""),
         "scheduled_date": item.get("date", item.get("scheduled_date", "")),
-        "page_context": {"pillar": item.get("pillar", ""), "objective": item.get("objective", ""), "format": item.get("format", "post_short")},
+        "page_context": {
+            "pillar": item.get("pillar", ""),
+            "objective": item.get("objective", ""),
+            "format": item.get("format", "post_short"),
+        },
     }
     # Extract variants from caption_ideas if present (CaptionItem)
     variants_data = item.get("variants", [])
@@ -45,7 +49,9 @@ def _content_package_from_caption_item(
             if isinstance(loaded_variants, list):
                 variants_data = loaded_variants
             elif isinstance(loaded_variants, dict):
-                file_variants = loaded_variants.get("variants") or loaded_variants.get("caption_ideas") or []
+                file_variants = (
+                    loaded_variants.get("variants") or loaded_variants.get("caption_ideas") or []
+                )
                 if file_variants:
                     variants_data = file_variants
 
@@ -102,7 +108,7 @@ def enrich_items_with_variant_scores(
         }
         item["variant_scores"] = list(score_map.values())
         new_variants = []
-        for v in (item.get("variants") or item.get("caption_ideas") or []):
+        for v in item.get("variants") or item.get("caption_ideas") or []:
             v = dict(v) if isinstance(v, dict) else {"text": str(v)}
             vid = v.get("variant_id", v.get("id", ""))
             if vid in score_map:
@@ -115,7 +121,14 @@ def enrich_items_with_variant_scores(
         if package.winning_variant:
             item["recommended_variant"] = {
                 "variant_id": package.winning_variant.variant_id,
-                "score": next((s.score for s in scored_variants if s.variant_id == package.winning_variant.variant_id), None),
+                "score": next(
+                    (
+                        s.score
+                        for s in scored_variants
+                        if s.variant_id == package.winning_variant.variant_id
+                    ),
+                    None,
+                ),
             }
         scored += 1
 
@@ -127,10 +140,21 @@ def cmd_write_caption(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
     writer = WriterTool(llm_client=build_llm_client(settings))
-    package = writer.write_caption(profile=profile, topic=args.topic, pillar=args.pillar, objective=args.objective, fmt=args.format)
+    package = writer.write_caption(
+        profile=profile,
+        topic=args.topic,
+        pillar=args.pillar,
+        objective=args.objective,
+        fmt=args.format,
+    )
     payload = package.model_dump(mode="json")
     if args.save:
-        dump_json(settings.artifacts_dir / "captions" / f"caption-{args.topic[:30].replace(' ', '_')}.json", payload)
+        dump_json(
+            settings.artifacts_dir
+            / "captions"
+            / f"caption-{args.topic[:30].replace(' ', '_')}.json",
+            payload,
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -138,7 +162,11 @@ def cmd_write_caption(args: argparse.Namespace) -> int:
 def cmd_generate_hashtags(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
-    llm_client = build_llm_client(settings) if settings.llm_provider != "mock-local" or not args.no_llm else None
+    llm_client = (
+        build_llm_client(settings)
+        if settings.llm_provider != "mock-local" or not args.no_llm
+        else None
+    )
     service = HashtagTool(llm_client=llm_client, settings=settings)
 
     result = service.generate(

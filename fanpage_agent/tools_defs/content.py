@@ -52,7 +52,10 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "days_back": {"type": "integer", "description": "Number of days to look back (default 14)"},
+                    "days_back": {
+                        "type": "integer",
+                        "description": "Number of days to look back (default 14)",
+                    },
                 },
             },
         },

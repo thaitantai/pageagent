@@ -93,7 +93,9 @@ class StrategistTool:
         now = datetime.now(tz=timezone.utc).isoformat()
         pillar_mix = self._compute_pillar_mix(profile, research_brief)
         trend_ideas = self._mock_trend_ideas(profile, research_brief)
-        competitor_fills = self._mock_competitor_fills(profile, research_brief) if research_brief else []
+        competitor_fills = (
+            self._mock_competitor_fills(profile, research_brief) if research_brief else []
+        )
         warnings: list[str] = []
 
         # ── Reasoning ──
@@ -119,7 +121,9 @@ class StrategistTool:
                         f"Phân tích {comp_count} đối thủ — phát hiện {len(competitor_fills)} cơ hội gap."
                     )
                 else:
-                    reasoning_parts.append("Có dữ liệu competitor analysis nhưng chưa có profile cụ thể.")
+                    reasoning_parts.append(
+                        "Có dữ liệu competitor analysis nhưng chưa có profile cụ thể."
+                    )
             if research_brief.quality_warnings:
                 warnings.extend(research_brief.quality_warnings[:3])
 
@@ -213,44 +217,56 @@ class StrategistTool:
             if ts.topic in seen_topics:
                 continue
             seen_topics.add(ts.topic)
-            priority = "high" if ts.total_score >= 7 else ("medium" if ts.total_score >= 4 else "low")
+            priority = (
+                "high" if ts.total_score >= 7 else ("medium" if ts.total_score >= 4 else "low")
+            )
             pillar = self._infer_pillar(ts.topic)
             audience = profile.target_audiences[0].segment_name if profile.target_audiences else ""
 
-            ideas.append(StrategyIdea(
-                pillar=pillar,
-                topic=ts.topic,
-                angle=f"Khám phá {ts.topic} — dựa trên dữ liệu nghiên cứu thực tế",
-                target_audience=audience,
-                rationale=f"Topic score {ts.total_score}/10 — {ts.rationale[:100]}" if ts.rationale else f"Topic score {ts.total_score}/10",
-                priority=priority,
-            ))
+            ideas.append(
+                StrategyIdea(
+                    pillar=pillar,
+                    topic=ts.topic,
+                    angle=f"Khám phá {ts.topic} — dựa trên dữ liệu nghiên cứu thực tế",
+                    target_audience=audience,
+                    rationale=f"Topic score {ts.total_score}/10 — {ts.rationale[:100]}"
+                    if ts.rationale
+                    else f"Topic score {ts.total_score}/10",
+                    priority=priority,
+                )
+            )
 
         # Ideas from external trends
         for trend in research_brief.external_trends[:3]:
             if trend.title in seen_topics:
                 continue
             seen_topics.add(trend.title)
-            ideas.append(StrategyIdea(
-                pillar=self._infer_pillar(trend.title),
-                topic=trend.title[:80],
-                angle=f"Theo xu hướng — {trend.snippet[:100]}" if trend.snippet else "Xu hướng mới — khai thác sớm",
-                rationale=f"Nguồn: {trend.source}",
-                priority="high" if trend.relevance else "medium",
-            ))
+            ideas.append(
+                StrategyIdea(
+                    pillar=self._infer_pillar(trend.title),
+                    topic=trend.title[:80],
+                    angle=f"Theo xu hướng — {trend.snippet[:100]}"
+                    if trend.snippet
+                    else "Xu hướng mới — khai thác sớm",
+                    rationale=f"Nguồn: {trend.source}",
+                    priority="high" if trend.relevance else "medium",
+                )
+            )
 
         # Ideas from frequent questions
         for q in research_brief.frequent_questions[:3]:
             if q in seen_topics:
                 continue
             seen_topics.add(q)
-            ideas.append(StrategyIdea(
-                pillar="education",
-                topic=q[:80],
-                angle=f"Giải đáp thắc mắc phổ biến: {q[:80]}",
-                rationale="Từ câu hỏi thực tế của community — đảm bảo relevance",
-                priority="high",
-            ))
+            ideas.append(
+                StrategyIdea(
+                    pillar="education",
+                    topic=q[:80],
+                    angle=f"Giải đáp thắc mắc phổ biến: {q[:80]}",
+                    rationale="Từ câu hỏi thực tế của community — đảm bảo relevance",
+                    priority="high",
+                )
+            )
 
         return ideas
 
@@ -272,13 +288,15 @@ class StrategistTool:
         cross = ca.get("cross_competitor", {})
         if isinstance(cross, dict):
             for rec in cross.get("strategic_recommendations", [])[:3]:
-                fills.append(StrategyIdea(
-                    pillar=self._infer_pillar(str(rec)),
-                    topic=str(rec)[:80],
-                    angle=f"Chiến lược đối thủ → hành động: {str(rec)[:80]}",
-                    rationale="Từ phân tích cross-competitor gap",
-                    priority="high",
-                ))
+                fills.append(
+                    StrategyIdea(
+                        pillar=self._infer_pillar(str(rec)),
+                        topic=str(rec)[:80],
+                        angle=f"Chiến lược đối thủ → hành động: {str(rec)[:80]}",
+                        rationale="Từ phân tích cross-competitor gap",
+                        priority="high",
+                    )
+                )
 
         # Unique angle from each competitor profile
         profiles = ca.get("profiles", []) if isinstance(ca, dict) else []
@@ -288,23 +306,27 @@ class StrategistTool:
                     name = prof.get("name", "?")
                     angle = prof.get("unique_angle") or prof.get("unique_selling_proposition", "")
                     if angle:
-                        fills.append(StrategyIdea(
-                            pillar=self._infer_pillar(str(angle)),
-                            topic=f"Cơ hội từ {name}: {str(angle)[:80]}",
-                            angle=f"Đối thủ {name} đang làm '{str(angle)[:80]}' — mình có thể khai thác góc nhìn khác",
-                            rationale=f"Unique angle của {name} chưa được khai thác",
-                            priority="high",
-                        ))
+                        fills.append(
+                            StrategyIdea(
+                                pillar=self._infer_pillar(str(angle)),
+                                topic=f"Cơ hội từ {name}: {str(angle)[:80]}",
+                                angle=f"Đối thủ {name} đang làm '{str(angle)[:80]}' — mình có thể khai thác góc nhìn khác",
+                                rationale=f"Unique angle của {name} chưa được khai thác",
+                                priority="high",
+                            )
+                        )
                     products = prof.get("products_detected", [])
                     if isinstance(products, list) and products:
                         gap = products[0]
-                        fills.append(StrategyIdea(
-                            pillar="product_review",
-                            topic=f"Sản phẩm đối thủ đang đẩy: {gap}",
-                            angle=f"Phân tích sản phẩm {gap} — review khách quan từ góc nhìn GenZ",
-                            rationale=f"{name} đang tập trung vào sản phẩm này — cần theo dõi",
-                            priority="medium",
-                        ))
+                        fills.append(
+                            StrategyIdea(
+                                pillar="product_review",
+                                topic=f"Sản phẩm đối thủ đang đẩy: {gap}",
+                                angle=f"Phân tích sản phẩm {gap} — review khách quan từ góc nhìn GenZ",
+                                rationale=f"{name} đang tập trung vào sản phẩm này — cần theo dõi",
+                                priority="medium",
+                            )
+                        )
 
         return fills
 
@@ -364,21 +386,27 @@ Viết reasoning bằng tiếng Việt. Phân bổ pillar phải dựa trên m�
 
         now = datetime.now(tz=timezone.utc).isoformat()
         ideas = [
-            StrategyIdea(**i) for i in data.get("trend_driven_ideas", [])
+            StrategyIdea(**i)
+            for i in data.get("trend_driven_ideas", [])
             if isinstance(i, dict) and i.get("pillar") and i.get("topic")
         ]
         fills = [
-            StrategyIdea(**i) for i in data.get("competitor_fills", [])
+            StrategyIdea(**i)
+            for i in data.get("competitor_fills", [])
             if isinstance(i, dict) and i.get("pillar") and i.get("topic")
         ]
 
         return ContentStrategy(
             brand_id=profile.brand_id,
             generated_at=now,
-            recommended_pillar_mix=data.get("recommended_pillar_mix", self._compute_pillar_mix(profile, research_brief)),
+            recommended_pillar_mix=data.get(
+                "recommended_pillar_mix", self._compute_pillar_mix(profile, research_brief)
+            ),
             trend_driven_ideas=ideas,
             competitor_fills=fills,
-            recommended_posting_times=data.get("recommended_posting_times", list(DEFAULT_POSTING_TIMES)),
+            recommended_posting_times=data.get(
+                "recommended_posting_times", list(DEFAULT_POSTING_TIMES)
+            ),
             weekly_frequency=data.get("weekly_frequency", 5),
             strategic_reasoning=data.get("strategic_reasoning", ""),
             confidence_score=round(data.get("confidence_score", 0.7), 2),
@@ -409,7 +437,10 @@ Viết reasoning bằng tiếng Việt. Phân bổ pillar phải dựa trên m�
             return "routine_guide"
         if any(w in t for w in ["việt", "cocoon", "thuần việt", "nội địa"]):
             return "viet_brand_spotlight"
-        if any(w in t for w in ["vitamin", "retinol", "niacinamide", "bha", "aha", "thành phần", "ingredient"]):
+        if any(
+            w in t
+            for w in ["vitamin", "retinol", "niacinamide", "bha", "aha", "thành phần", "ingredient"]
+        ):
             return "education"
         if any(w in t for w in ["myth", "lầm tưởng", "sai lầm", "thật"]):
             return "myth_busting"
@@ -480,6 +511,7 @@ Viết reasoning bằng tiếng Việt. Phân bổ pillar phải dựa trên m�
     def _extract_json(text: str) -> str:
         """Extract JSON from LLM response (handles markdown code fences)."""
         import re
+
         # Try ```json ... ``` first
         m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
         if m:

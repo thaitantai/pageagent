@@ -25,9 +25,11 @@ logger = logging.getLogger(__name__)
 # Data models cho output của orchestrator
 # ──────────────────────────────────────────────
 
+
 @dataclass
 class GapItem:
     """Một gap: trend đang hot nhưng chưa được khai thác."""
+
     title: str
     source: str
     url: str
@@ -40,6 +42,7 @@ class GapItem:
 @dataclass
 class DraftProposal:
     """Đề xuất content cho một gap."""
+
     gap_index: int
     gap_title: str
     pillar: str
@@ -54,6 +57,7 @@ class DraftProposal:
 @dataclass
 class AutoContentReport:
     """Báo cáo tổng hợp từ một cycle autonomous."""
+
     run_date: str
     total_trend_items: int
     trend_keywords: list[str]
@@ -80,9 +84,7 @@ class AutoContentReport:
                     "angle": p.angle,
                     "format": p.format,
                     "caption": (
-                        p.caption_package.model_dump(mode="json")
-                        if p.caption_package
-                        else None
+                        p.caption_package.model_dump(mode="json") if p.caption_package else None
                     ),
                     "draft_error": p.draft_error,
                 }
@@ -117,7 +119,7 @@ class AutoContentReport:
             lines.append(f"  {i}. [{gap.relevance_score:.0%}] {gap.title}")
             lines.append(f"     → {gap.reason}")
         if len(self.gaps) > 5:
-            lines.append(f"  ... +{len(self.gaps)-5} gaps khác")
+            lines.append(f"  ... +{len(self.gaps) - 5} gaps khác")
         lines.append("")
 
         # ── Draft proposals ──
@@ -156,14 +158,74 @@ class AutoContentReport:
 
 # Stopwords tiếng Việt đơn giản cho keyword extraction
 VIETNAMESE_STOPWORDS: set[str] = {
-    "và", "của", "có", "cho", "với", "trong", "là", "các", "được",
-    "một", "những", "không", "tại", "này", "khi", "đến", "từ", "đã",
-    "sẽ", "đang", "ra", "về", "lên", "xuống", "vào", "nên", "phải",
-    "bị", "đi", "ở", "thì", "hay", "hoặc", "cũng", "rất", "như", "sau",
-    "trước", "nếu", "thì", "mà", "qua", "lại", "thêm", "nhiều", "ít",
-    "mới", "cũ", "theo", "bằng", "để", "nữa", "vẫn", "chỉ", "tôi",
-    "bạn", "mình", "chúng", "người", "việc", "năm", "ngày", "tuổi",
-    "cách", "làm", "tập", "tìm", "hiểu",
+    "và",
+    "của",
+    "có",
+    "cho",
+    "với",
+    "trong",
+    "là",
+    "các",
+    "được",
+    "một",
+    "những",
+    "không",
+    "tại",
+    "này",
+    "khi",
+    "đến",
+    "từ",
+    "đã",
+    "sẽ",
+    "đang",
+    "ra",
+    "về",
+    "lên",
+    "xuống",
+    "vào",
+    "nên",
+    "phải",
+    "bị",
+    "đi",
+    "ở",
+    "thì",
+    "hay",
+    "hoặc",
+    "cũng",
+    "rất",
+    "như",
+    "sau",
+    "trước",
+    "nếu",
+    "thì",
+    "mà",
+    "qua",
+    "lại",
+    "thêm",
+    "nhiều",
+    "ít",
+    "mới",
+    "cũ",
+    "theo",
+    "bằng",
+    "để",
+    "nữa",
+    "vẫn",
+    "chỉ",
+    "tôi",
+    "bạn",
+    "mình",
+    "chúng",
+    "người",
+    "việc",
+    "năm",
+    "ngày",
+    "tuổi",
+    "cách",
+    "làm",
+    "tập",
+    "tìm",
+    "hiểu",
 }
 
 
@@ -171,7 +233,9 @@ def extract_keywords(text: str, max_words: int = 8) -> list[str]:
     """Trích keywords từ text: lowercase, loại stopwords, đếm tần suất."""
     text = text.lower()
     # Tách từ — simple whitespace split (tiếng Việt không dấu cách từ, nhưng đủ cho title/snippet)
-    words = re.findall(r"[a-zA-Zàáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệđìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+", text)
+    words = re.findall(
+        r"[a-zA-Zàáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệđìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+", text
+    )
     # Lọc stopwords và từ quá ngắn
     filtered = [w for w in words if w not in VIETNAMESE_STOPWORDS and len(w) > 2]
     # Count frequency
@@ -219,7 +283,9 @@ def analyze_gaps(
     logger.debug("analyze_gaps: %d raw → %d after URL dedup", len(external_trends), len(deduped))
 
     # ── 2. Filter noise ──
-    address_pattern = re.compile(r"(toà nhà|tòa nhà|star tower|số \d+|quận|huyện|phường|thành phố)", re.I)
+    address_pattern = re.compile(
+        r"(toà nhà|tòa nhà|star tower|số \d+|quận|huyện|phường|thành phố)", re.I
+    )
     filtered: list[TrendItem] = []
     for t in deduped:
         title = (t.title or "").strip()
@@ -265,15 +331,17 @@ def analyze_gaps(
             # Relevance: dựa trên keyword diversity (nhiều keywords = chủ đề phong phú)
             relevance = (len(trend_kw) / 10.0) * (1.0 - max_overlap)
 
-            raw_gaps.append(GapItem(
-                title=trend.title,
-                source=trend.source,
-                url=trend.url,
-                snippet=trend.snippet,
-                keywords=trend_kw,
-                reason=reason,
-                relevance_score=round(relevance, 2),
-            ))
+            raw_gaps.append(
+                GapItem(
+                    title=trend.title,
+                    source=trend.source,
+                    url=trend.url,
+                    snippet=trend.snippet,
+                    keywords=trend_kw,
+                    reason=reason,
+                    relevance_score=round(relevance, 2),
+                )
+            )
 
     # ── 7. Dedup by title similarity ──
     # Sort by relevance (cao → thấp) trước khi dedup
@@ -420,7 +488,22 @@ class AutoContentOrchestrator:
                         fmt=fmt,
                     )
                 except Exception as exc:
-                    proposals.append(DraftProposal(
+                    proposals.append(
+                        DraftProposal(
+                            gap_index=idx,
+                            gap_title=gap.title,
+                            pillar=pillar,
+                            objective=objective,
+                            topic=gap.title,
+                            angle=angle,
+                            format=fmt,
+                            draft_error=str(exc),
+                        )
+                    )
+                    continue
+
+                proposals.append(
+                    DraftProposal(
                         gap_index=idx,
                         gap_title=gap.title,
                         pillar=pillar,
@@ -428,20 +511,9 @@ class AutoContentOrchestrator:
                         topic=gap.title,
                         angle=angle,
                         format=fmt,
-                        draft_error=str(exc),
-                    ))
-                    continue
-
-                proposals.append(DraftProposal(
-                    gap_index=idx,
-                    gap_title=gap.title,
-                    pillar=pillar,
-                    objective=objective,
-                    topic=gap.title,
-                    angle=angle,
-                    format=fmt,
-                    caption_package=caption,
-                ))
+                        caption_package=caption,
+                    )
+                )
 
         # ── 4. Build report ──
         return AutoContentReport(
@@ -473,7 +545,9 @@ class AutoContentOrchestrator:
         best_score = 0
 
         for pillar in profile.content_pillars:
-            pillar_text = f"{pillar.pillar_name} {pillar.description} {' '.join(pillar.example_angles)}"
+            pillar_text = (
+                f"{pillar.pillar_name} {pillar.description} {' '.join(pillar.example_angles)}"
+            )
             pillar_kw = set(extract_keywords(pillar_text))
             score = len(gap_keywords & pillar_kw)
             if score > best_score:

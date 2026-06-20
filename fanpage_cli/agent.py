@@ -60,9 +60,6 @@ def cmd_agent_daemon(args: argparse.Namespace) -> int:
         )
         elapsed = result.metrics.get("elapsed_ms", 0)
         status = "✅" if result.success else "❌"
-        print(
-            f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-            f"tick #{tick_number}: {status} ({elapsed}ms)"
-        )
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] tick #{tick_number}: {status} ({elapsed}ms)")
         sys.stdout.flush()
         time.sleep(args.interval)

@@ -15,7 +15,11 @@ class SourceSearchClient(Protocol):
 class WebSourceDiscovery:
     """Discover candidate research sources from web search without trusting them by default."""
 
-    def __init__(self, search_client: SourceSearchClient | None = None, blocked_domains: set[str] | None = None):
+    def __init__(
+        self,
+        search_client: SourceSearchClient | None = None,
+        blocked_domains: set[str] | None = None,
+    ):
         self.search_client = search_client or WebSearchClient()
         self.blocked_domains = blocked_domains or set()
 

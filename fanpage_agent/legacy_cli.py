@@ -5,4 +5,5 @@ This file exists so existing imports continue to work:
 
 All real code now lives in the cli_commands/ package.
 """
+
 from fanpage_agent.cli_commands import *  # noqa: F401, F403

@@ -14,7 +14,9 @@ class _TriageMixin:
         ranked_items = sorted(
             items,
             key=lambda item: (
-                {"urgent": 0, "high": 1, "normal": 2, "low": 3}.get(item.get("priority", "normal"), 9),
+                {"urgent": 0, "high": 1, "normal": 2, "low": 3}.get(
+                    item.get("priority", "normal"), 9
+                ),
                 self._created_at_sort_key(item.get("created_at")),
                 item.get("category", ""),
             ),
@@ -42,13 +44,13 @@ class _TriageMixin:
                 age_hint = f" | age: {age:.1f}h" if age is not None else ""
                 lines.extend(
                     [
-                        f"{index}. [{item.get('priority', '-').upper()}] {item.get('category', '-')} via {item.get('source', '-')}" ,
-                        f"   triage_id: {item.get('triage_id', '-')}" ,
-                        f"   status: {item.get('status', '-')}" ,
-                        f"   assigned_to: {item.get('assigned_to', '-') or '-'}" ,
-                        f"   created_at: {item.get('created_at', '-')}{age_hint}" ,
-                        f"   message: {item.get('message', '-')}" ,
-                        f"   action: {item.get('recommended_action', '-')}" ,
+                        f"{index}. [{item.get('priority', '-').upper()}] {item.get('category', '-')} via {item.get('source', '-')}",
+                        f"   triage_id: {item.get('triage_id', '-')}",
+                        f"   status: {item.get('status', '-')}",
+                        f"   assigned_to: {item.get('assigned_to', '-') or '-'}",
+                        f"   created_at: {item.get('created_at', '-')}{age_hint}",
+                        f"   message: {item.get('message', '-')}",
+                        f"   action: {item.get('recommended_action', '-')}",
                         *self._triage_action_lines(item),
                     ]
                 )
@@ -176,7 +178,9 @@ class _TriageMixin:
         next_index = 1
         if approval_items:
             item = approval_items[0]
-            lines.append(f"{next_index}. approve {item.get('calendar_id', '-')} — {item.get('topic', '-')}")
+            lines.append(
+                f"{next_index}. approve {item.get('calendar_id', '-')} — {item.get('topic', '-')}"
+            )
             lines.extend(self._caption_action_summary_lines(item))
             next_index += 1
         if approved_reply_items:

@@ -61,13 +61,15 @@ def compute_content_stats(store: Any, days_back: int = 14) -> dict[str, Any]:
         pillar_stats[pillar]["count"] += 1
         pillar_stats[pillar]["total_reach"] += reach
         pillar_stats[pillar]["total_engagements"] += engagements
-        pillar_stats[pillar]["posts"].append({
-            "id": item.get("calendar_id", ""),
-            "topic": item.get("topic", ""),
-            "date": item.get("date", ""),
-            "reach": reach,
-            "engagements": engagements,
-        })
+        pillar_stats[pillar]["posts"].append(
+            {
+                "id": item.get("calendar_id", ""),
+                "topic": item.get("topic", ""),
+                "date": item.get("date", ""),
+                "reach": reach,
+                "engagements": engagements,
+            }
+        )
 
     # Compute averages and sort
     by_pillar = {}
@@ -118,7 +120,9 @@ def _build_summary(by_pillar: dict[str, dict], total: int) -> str:
             f"{icon}{pillar}: {data['posts']} posts, ø{data['avg_reach']} reach, ø{data['avg_engagement']} eng"
         )
     best = sorted_pillars[0]
-    return f"{total} posts | Best: {_pillar_icon(best[0])}{best[0]} (ø{best[1]['avg_engagement']} eng)"
+    return (
+        f"{total} posts | Best: {_pillar_icon(best[0])}{best[0]} (ø{best[1]['avg_engagement']} eng)"
+    )
 
 
 def _normalise_pillar(raw: str) -> str:

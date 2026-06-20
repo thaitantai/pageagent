@@ -33,7 +33,11 @@ class ConfidenceCalibrator:
         sample_count = variance.get("sample_count", 0)
 
         if sample_count < 3:
-            return {"status": "skipped", "reason": f"only {sample_count} samples", "adjustments": []}
+            return {
+                "status": "skipped",
+                "reason": f"only {sample_count} samples",
+                "adjustments": [],
+            }
 
         avg_variance = variance.get("avg_variance", 0)
         adjustments: list[dict[str, Any]] = []
@@ -46,22 +50,26 @@ class ConfidenceCalibrator:
             # Over-confident: scores too high vs actual → raise floor
             new_floor = min(0.65, current_floor + 0.03)
             self._store.update_weight(floor_name, new_floor)
-            adjustments.append({
-                "target": "evidence_confidence_floor",
-                "from": current_floor,
-                "to": new_floor,
-                "reason": f"over-confident (variance={avg_variance:.3f}) — raising floor",
-            })
+            adjustments.append(
+                {
+                    "target": "evidence_confidence_floor",
+                    "from": current_floor,
+                    "to": new_floor,
+                    "reason": f"over-confident (variance={avg_variance:.3f}) — raising floor",
+                }
+            )
         elif avg_variance > 0.05:
             # Under-confident: scores too low vs actual → lower floor
             new_floor = max(0.25, current_floor - 0.03)
             self._store.update_weight(floor_name, new_floor)
-            adjustments.append({
-                "target": "evidence_confidence_floor",
-                "from": current_floor,
-                "to": new_floor,
-                "reason": f"under-confident (variance={avg_variance:.3f}) — lowering floor",
-            })
+            adjustments.append(
+                {
+                    "target": "evidence_confidence_floor",
+                    "from": current_floor,
+                    "to": new_floor,
+                    "reason": f"under-confident (variance={avg_variance:.3f}) — lowering floor",
+                }
+            )
 
         # --- Calibrate engagement prediction baseline ---
         baseline_name = "engagement_baseline"
@@ -70,7 +78,8 @@ class ConfidenceCalibrator:
         briefs = self._store.get_brief_feedback(since_days=30)
         if briefs:
             actuals = [
-                b["engagements"] for b in briefs
+                b["engagements"]
+                for b in briefs
                 if b.get("engagements") is not None and b["engagements"] > 0
             ]
             if actuals:
@@ -79,12 +88,14 @@ class ConfidenceCalibrator:
                 smoothed = round(max(5.0, min(200.0, smoothed)), 1)
                 if abs(smoothed - current_baseline) > 1.0:
                     self._store.update_weight(baseline_name, smoothed)
-                    adjustments.append({
-                        "target": "engagement_baseline",
-                        "from": current_baseline,
-                        "to": smoothed,
-                        "reason": f"avg engagement={optimal_baseline:.1f}, smoothed from {current_baseline}",
-                    })
+                    adjustments.append(
+                        {
+                            "target": "engagement_baseline",
+                            "from": current_baseline,
+                            "to": smoothed,
+                            "reason": f"avg engagement={optimal_baseline:.1f}, smoothed from {current_baseline}",
+                        }
+                    )
 
         if adjustments:
             self._store.log_learning_run(

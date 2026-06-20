@@ -248,7 +248,11 @@ class OfferEvaluator:
         evidence: list[ResearchEvidence],
     ) -> list[EvaluationCriterion]:
         """Trả về toàn bộ criteria kèm score + rationale."""
-        offer_evidence = [e for e in evidence if "offer_search" in e.source or e.evidence_type == "external_source"]
+        offer_evidence = [
+            e
+            for e in evidence
+            if "offer_search" in e.source or e.evidence_type == "external_source"
+        ]
         all_evidence_with_url = [e for e in evidence if e.url]
         external_count = len(offer_evidence)
         url_count = len({e.url for e in all_evidence_with_url})
@@ -313,13 +317,21 @@ class OfferEvaluator:
         suggestions: list[str] = []
         if not is_ready:
             if score < 0.3:
-                suggestions.append("Cần tìm thêm nguồn tham khảo độc lập về sản phẩm này trước khi đưa vào nội dung.")
+                suggestions.append(
+                    "Cần tìm thêm nguồn tham khảo độc lập về sản phẩm này trước khi đưa vào nội dung."
+                )
             elif score < 0.4:
-                suggestions.append("Đã có một số thông tin, cần kiểm chứng thêm từ nguồn y tế/uy tín.")
+                suggestions.append(
+                    "Đã có một số thông tin, cần kiểm chứng thêm từ nguồn y tế/uy tín."
+                )
             else:
-                suggestions.append("Evidence gần đủ, nên tham khảo thêm 1-2 nguồn nữa để tăng độ tin cậy.")
+                suggestions.append(
+                    "Evidence gần đủ, nên tham khảo thêm 1-2 nguồn nữa để tăng độ tin cậy."
+                )
         if topic.risk_level == "medium":
-            suggestions.append("Sản phẩm có claim cần guardrail — không đưa ra khuyến nghị tuyệt đối.")
+            suggestions.append(
+                "Sản phẩm có claim cần guardrail — không đưa ra khuyến nghị tuyệt đối."
+            )
         if topic.is_affiliate_offer and is_ready:
             suggestions.append("Đã đủ evidence để đưa vào brief — vẫn cần affiliate disclosure.")
 

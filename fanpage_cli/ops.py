@@ -62,19 +62,53 @@ def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
     hermes_cron_parser.set_defaults(_handler=cmd_hermes_cron_status)
 
     telegram_parser = subparsers.add_parser("preview-telegram")
-    telegram_parser.add_argument("--artifact-type", required=True, choices=["plan", "caption", "report", "triage", "approved_replies", "approval", "approval_audit", "metrics", "operator", "research"])
+    telegram_parser.add_argument(
+        "--artifact-type",
+        required=True,
+        choices=[
+            "plan",
+            "caption",
+            "report",
+            "triage",
+            "approved_replies",
+            "approval",
+            "approval_audit",
+            "metrics",
+            "operator",
+            "research",
+        ],
+    )
     telegram_parser.add_argument("--input-file", required=True)
     telegram_parser.set_defaults(_handler=cmd_preview_telegram)
 
     telegram_send_parser = subparsers.add_parser("send-telegram-preview")
-    telegram_send_parser.add_argument("--artifact-type", required=True, choices=["plan", "caption", "report", "triage", "approved_replies", "approval", "approval_audit", "metrics", "operator", "research"])
+    telegram_send_parser.add_argument(
+        "--artifact-type",
+        required=True,
+        choices=[
+            "plan",
+            "caption",
+            "report",
+            "triage",
+            "approved_replies",
+            "approval",
+            "approval_audit",
+            "metrics",
+            "operator",
+            "research",
+        ],
+    )
     telegram_send_parser.add_argument("--input-file", required=True)
     telegram_send_parser.add_argument("--chat-id")
     telegram_send_parser.set_defaults(_handler=cmd_send_telegram_preview)
 
     research_trends_parser = subparsers.add_parser("research-trends")
-    research_trends_parser.add_argument("--timeout", type=int, default=30, help="Timeout per request (sec)")
-    research_trends_parser.add_argument("--tldr", action="store_true", help="Only print summary (no full report)")
+    research_trends_parser.add_argument(
+        "--timeout", type=int, default=30, help="Timeout per request (sec)"
+    )
+    research_trends_parser.add_argument(
+        "--tldr", action="store_true", help="Only print summary (no full report)"
+    )
     research_trends_parser.add_argument("--save", action="store_true", help="Save report to JSON")
     research_trends_parser.set_defaults(_handler=cmd_research_trends)
 
@@ -84,16 +118,24 @@ def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
     hashtag_parser.add_argument("--pillar", required=True)
     hashtag_parser.add_argument("--objective", default="engagement")
     hashtag_parser.add_argument("--angle", default="")
-    hashtag_parser.add_argument("--brand-id", default="", help="Override brand_id if brand file has multiple")
-    hashtag_parser.add_argument("--no-llm", action="store_true", help="Use rule-based fallback only")
-    hashtag_parser.add_argument("--json", action="store_true", help="Output raw JSON instead of formatted text")
+    hashtag_parser.add_argument(
+        "--brand-id", default="", help="Override brand_id if brand file has multiple"
+    )
+    hashtag_parser.add_argument(
+        "--no-llm", action="store_true", help="Use rule-based fallback only"
+    )
+    hashtag_parser.add_argument(
+        "--json", action="store_true", help="Output raw JSON instead of formatted text"
+    )
     hashtag_parser.set_defaults(_handler=cmd_generate_hashtags)
 
     metrics_fetch_parser = subparsers.add_parser("auto-fetch-metrics")
     metrics_fetch_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     metrics_fetch_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     metrics_fetch_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
-    metrics_fetch_parser.add_argument("--days-back", type=int, default=30, help="Process items within this many days")
+    metrics_fetch_parser.add_argument(
+        "--days-back", type=int, default=30, help="Process items within this many days"
+    )
     metrics_fetch_parser.add_argument("--json", action="store_true", help="Output raw JSON")
     add_store_backend_arg(metrics_fetch_parser)
     metrics_fetch_parser.set_defaults(_handler=cmd_auto_fetch_metrics)
@@ -102,8 +144,12 @@ def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
     fb_comment_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     fb_comment_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     fb_comment_parser.add_argument("--comment-file", default=str(DEFAULT_COMMENT_FILE))
-    fb_comment_parser.add_argument("--post-limit", type=int, default=10, help="Max recent posts to scan")
-    fb_comment_parser.add_argument("--comment-limit", type=int, default=50, help="Max comments per post")
+    fb_comment_parser.add_argument(
+        "--post-limit", type=int, default=10, help="Max recent posts to scan"
+    )
+    fb_comment_parser.add_argument(
+        "--comment-limit", type=int, default=50, help="Max comments per post"
+    )
     fb_comment_parser.add_argument("--json", action="store_true", help="Output raw JSON")
     fb_comment_parser.set_defaults(_handler=cmd_fetch_fb_comments)
 
@@ -120,17 +166,22 @@ def register_subcommand(subparsers: argparse._SubParsersAction) -> None:
     eval_parser.set_defaults(_handler=cmd_eval_all)
 
     dashboard_parser = subparsers.add_parser("generate-dashboard")
-    dashboard_parser.add_argument("--brand-file", default=str(ROOT_DIR / "data" / "brand_profile.json"))
+    dashboard_parser.add_argument(
+        "--brand-file", default=str(ROOT_DIR / "data" / "brand_profile.json")
+    )
     dashboard_parser.add_argument("--calendar-file", default=str(DEFAULT_CALENDAR_FILE))
     dashboard_parser.add_argument("--history-file", default=str(DEFAULT_HISTORY_FILE))
     dashboard_parser.add_argument("--metrics-file", default=str(DEFAULT_METRICS_FILE))
     dashboard_parser.add_argument("--days", type=int, default=7)
-    dashboard_parser.add_argument("--save", action="store_true", help="Save dashboard HTML to artifacts")
+    dashboard_parser.add_argument(
+        "--save", action="store_true", help="Save dashboard HTML to artifacts"
+    )
     add_store_backend_arg(dashboard_parser)
     dashboard_parser.set_defaults(_handler=cmd_generate_dashboard)
 
 
 # ── ops-status helpers ────────────────────────────────────────────────
+
 
 def _parse_timestamp(raw: str | None) -> float:
     if not raw:
@@ -224,7 +275,9 @@ def _latest_artifact(
                 "reason": "missing",
             },
         }
-    return _artifact_status(name, matches[0], now_timestamp=now_timestamp, max_age_hours=max_age_hours)
+    return _artifact_status(
+        name, matches[0], now_timestamp=now_timestamp, max_age_hours=max_age_hours
+    )
 
 
 def build_ops_status_payload(
@@ -276,8 +329,12 @@ def build_ops_status_payload(
         ),
     ]
     existing = sum(1 for item in artifacts if item["exists"])
-    stale = sum(1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale"))
-    fresh = sum(1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale"))
+    stale = sum(
+        1 for item in artifacts if item["exists"] and item.get("freshness", {}).get("stale")
+    )
+    fresh = sum(
+        1 for item in artifacts if item["exists"] and not item.get("freshness", {}).get("stale")
+    )
     return {
         "artifacts_dir": str(settings.artifacts_dir),
         "freshness_checked_at": now,
@@ -292,6 +349,7 @@ def build_ops_status_payload(
 
 
 # ── hermes-cron-status helpers ────────────────────────────────────────
+
 
 def _cron_schedule_display(job: dict) -> str:
     if job.get("schedule_display"):
@@ -325,7 +383,9 @@ def _check_wrapper(wrapper_path: Path, project_script: str) -> dict:
     return status
 
 
-def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expected_workdir: str) -> dict:
+def build_hermes_cron_status_payload(
+    jobs_file: Path, scripts_dir: Path, expected_workdir: str
+) -> dict:
     jobs = _load_hermes_jobs(jobs_file)
     jobs_by_name = {str(job.get("name", "")): job for job in jobs}
     checks = []
@@ -369,14 +429,16 @@ def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expecte
             errors.append("wrapper_not_executable")
         if wrapper["exists"] and not wrapper["targets_project_script"]:
             errors.append("wrapper_wrong_target")
-        checks.append({
-            "name": name,
-            "expected": expected,
-            "actual": actual,
-            "wrapper": wrapper,
-            "ok": not errors,
-            "errors": errors,
-        })
+        checks.append(
+            {
+                "name": name,
+                "expected": expected,
+                "actual": actual,
+                "wrapper": wrapper,
+                "ok": not errors,
+                "errors": errors,
+            }
+        )
     ok_count = sum(1 for item in checks if item["ok"])
     return {
         "jobs_file": str(jobs_file),
@@ -394,6 +456,7 @@ def build_hermes_cron_status_payload(jobs_file: Path, scripts_dir: Path, expecte
 
 
 # ── telegram preview helpers ──────────────────────────────────────────
+
 
 def render_telegram_preview(artifact_type: str, input_file: str) -> str:
     payload = json.loads(Path(input_file).read_text(encoding="utf-8"))
@@ -423,6 +486,7 @@ def render_telegram_preview(artifact_type: str, input_file: str) -> str:
 
 # ── command functions ─────────────────────────────────────────────────
 
+
 def cmd_ops_status(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     try:
@@ -430,7 +494,9 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
         thresholds = _parse_freshness_thresholds(args.max_age_hours)
     except ValueError as exc:
         raise SystemExit(f"ops-status: {exc}") from exc
-    payload = build_ops_status_payload(settings, now_timestamp=now_timestamp, freshness_thresholds=thresholds)
+    payload = build_ops_status_payload(
+        settings, now_timestamp=now_timestamp, freshness_thresholds=thresholds
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 1 if args.fail_on_stale and payload["summary"]["stale"] else 0
 
@@ -501,7 +567,7 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
             for t in items[:3]:
                 print(f"    - {t[:60]}")
             if len(items) > 3:
-                print(f"    ... +{len(items)-3} more")
+                print(f"    ... +{len(items) - 3} more")
 
         print("\n--- Top Relevant (skincare/healthcare) ---")
         for item in report["top_relevant"][:10]:
@@ -509,7 +575,11 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
             print(f"     [{item['source']}]")
 
     if args.save:
-        path = ROOT_DIR / "data" / f"research-trends-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        path = (
+            ROOT_DIR
+            / "data"
+            / f"research-trends-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        )
         dump_json(path, report)
         print(f"\n💾 Saved to {path}")
 
@@ -519,7 +589,11 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
 def cmd_generate_hashtags(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
-    llm_client = build_llm_client(settings) if settings.llm_provider != "mock-local" or not args.no_llm else None
+    llm_client = (
+        build_llm_client(settings)
+        if settings.llm_provider != "mock-local" or not args.no_llm
+        else None
+    )
     service = HashtagTool(llm_client=llm_client, settings=settings)
 
     result = service.generate(
@@ -628,13 +702,15 @@ def cmd_fetch_fb_comments(args: argparse.Namespace) -> int:
         cid = c.get("id", "")
         if cid and cid in existing_ids:
             continue
-        new_rows.append({
-            "id": c.get("id", ""),
-            "post_id": c.get("post_id", ""),
-            "created_at": c.get("created_time", ""),
-            "source": "facebook_comment",
-            "message": c.get("message", ""),
-        })
+        new_rows.append(
+            {
+                "id": c.get("id", ""),
+                "post_id": c.get("post_id", ""),
+                "created_at": c.get("created_time", ""),
+                "source": "facebook_comment",
+                "message": c.get("message", ""),
+            }
+        )
         if cid:
             existing_ids.add(cid)
 
@@ -669,7 +745,9 @@ def cmd_eval_all(args: argparse.Namespace) -> int:
         start_date=args.start_date,
     )
     if args.save:
-        dump_json(settings.artifacts_dir / "evals" / f"eval-summary-{args.start_date}.json", payload)
+        dump_json(
+            settings.artifacts_dir / "evals" / f"eval-summary-{args.start_date}.json", payload
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["summary"]["failed"] == 0 else 1
 
@@ -683,5 +761,7 @@ def cmd_generate_dashboard(args: argparse.Namespace) -> int:
     if args.save:
         pass  # already saved in generate()
     print(f"📊 Dashboard saved: {result['path']}")
-    print(f"   Period: {args.days}d | Posts: {result['total_posts']} | Reach: {result['total_reach']} | Eng: {result['total_engagements']}")
+    print(
+        f"   Period: {args.days}d | Posts: {result['total_posts']} | Reach: {result['total_reach']} | Eng: {result['total_engagements']}"
+    )
     return 0

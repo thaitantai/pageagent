@@ -3,6 +3,7 @@
 Provides calendar read/write, post history, and triage operations
 reusing the V1 store backend.
 """
+
 from __future__ import annotations
 
 from typing import Any

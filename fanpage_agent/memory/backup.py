@@ -173,13 +173,15 @@ class BackupMixin:
         result: list[dict[str, Any]] = []
         for idx, path in backups:
             stat = path.stat()
-            result.append({
-                "index": idx,
-                "path": str(path),
-                "size_bytes": stat.st_size,
-                "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                "created": datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc).isoformat(),
-            })
+            result.append(
+                {
+                    "index": idx,
+                    "path": str(path),
+                    "size_bytes": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                    "created": datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc).isoformat(),
+                }
+            )
         return result
 
     def _list_backups(self) -> list[tuple[int, Path]]:

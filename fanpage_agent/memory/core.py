@@ -71,13 +71,23 @@ class PerformanceMemory(BackupMixin):
                  permalink, published_at, page_id)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    package.package_id, variant_id, package.brand_id,
-                    package.scheduled_date, variant.topic, variant.pillar,
-                    variant.format, variant.hook, variant.cta,
+                    package.package_id,
+                    variant_id,
+                    package.brand_id,
+                    package.scheduled_date,
+                    variant.topic,
+                    variant.pillar,
+                    variant.format,
+                    variant.hook,
+                    variant.cta,
                     json.dumps(variant.tone_tags, ensure_ascii=False),
                     json.dumps(variant.hashtags, ensure_ascii=False),
-                    reach, engagements, round(engagement_rate, 2),
-                    permalink, now, effective_page_id,
+                    reach,
+                    engagements,
+                    round(engagement_rate, 2),
+                    permalink,
+                    now,
+                    effective_page_id,
                 ),
             )
 
@@ -116,7 +126,9 @@ class PerformanceMemory(BackupMixin):
                 (reach, engagements, round(engagement_rate, 2), package_id, variant_id),
             )
 
-    def get_top_patterns(self, pattern_type: str | None = None, limit: int = 5) -> list[PerformancePattern]:
+    def get_top_patterns(
+        self, pattern_type: str | None = None, limit: int = 5
+    ) -> list[PerformancePattern]:
         """Get best-performing patterns, optionally filtered by type."""
         rows = self._query_patterns(pattern_type, order_by="avg_engagement DESC", limit=limit)
         return [self._row_to_pattern(r) for r in rows]
@@ -308,7 +320,11 @@ class PerformanceMemory(BackupMixin):
             logger.warning("DB corrupt at init: %s — will attempt recovery", e)
 
     def _update_pattern(
-        self, pattern_type: str, value: str, reach: int, engagements: int,
+        self,
+        pattern_type: str,
+        value: str,
+        reach: int,
+        engagements: int,
         conn: sqlite3.Connection | None = None,
     ) -> None:
         now = datetime.now(timezone.utc).isoformat()
@@ -328,9 +344,20 @@ class PerformanceMemory(BackupMixin):
                       avg_engagement = (total_engagement + ?) / (sample_count + 1.0),
                       last_seen = ?
                 """,
-                (pattern_type, value, reach, engagements,
-                 float(reach), float(engagements), now,
-                 reach, engagements, reach, engagements, now),
+                (
+                    pattern_type,
+                    value,
+                    reach,
+                    engagements,
+                    float(reach),
+                    float(engagements),
+                    now,
+                    reach,
+                    engagements,
+                    reach,
+                    engagements,
+                    now,
+                ),
             )
 
     def _query_patterns(
@@ -352,7 +379,9 @@ class PerformanceMemory(BackupMixin):
 
     def _row_to_pattern(self, row: sqlite3.Row) -> PerformancePattern:
         confidence = min(1.0, row["sample_count"] / 10.0)
-        rec = self._generate_recommendation(row["pattern_type"], row["value"], row["avg_engagement"])
+        rec = self._generate_recommendation(
+            row["pattern_type"], row["value"], row["avg_engagement"]
+        )
         return PerformancePattern(
             pattern_id=f"pat-{row['pattern_type']}-{row['id']}",
             pattern_type=row["pattern_type"],

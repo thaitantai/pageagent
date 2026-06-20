@@ -108,9 +108,7 @@ def retry_on_429(
                     # Non-429 on a non-last attempt — raise immediately
                     raise
             else:
-                raise RuntimeError(
-                    f"Request failed after {max_retries} retries"
-                ) from last_exc
+                raise RuntimeError(f"Request failed after {max_retries} retries") from last_exc
 
         return wrapper
 

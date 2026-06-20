@@ -63,14 +63,16 @@ class AgentBus:
         agent = self._agents[target_role]
         result = self._harness.run(agent, task)
 
-        self._history.append({
-            "task_id": task.id,
-            "action": task.action,
-            "agent": target_role.value,
-            "success": result.success,
-            "elapsed_ms": result.metrics.get("elapsed_ms"),
-            "completed_at": result.completed_at,
-        })
+        self._history.append(
+            {
+                "task_id": task.id,
+                "action": task.action,
+                "agent": target_role.value,
+                "success": result.success,
+                "elapsed_ms": result.metrics.get("elapsed_ms"),
+                "completed_at": result.completed_at,
+            }
+        )
         return result
 
     def dispatch_batch(self, tasks: list[AgentTask]) -> list[AgentResult]:

@@ -51,22 +51,26 @@ class HarnessPolicy:
 
     allowed_actions: dict[AgentRole, set[str]] = field(default_factory=dict)
     blocked_actions: set[str] = field(default_factory=set)
-    approval_required_actions: set[str] = field(default_factory=lambda: {
-        "publish_now",
-        "force_publish",
-        "publish_post",
-        "publish_package",
-        "publish_due",
-        "delete_post",
-    })
-    require_page_context_actions: set[str] = field(default_factory=lambda: {
-        "draft_post",
-        "publish_due",
-        "publish_package",
-        "publish_post",
-        "write_post",
-        "write_variants",
-    })
+    approval_required_actions: set[str] = field(
+        default_factory=lambda: {
+            "publish_now",
+            "force_publish",
+            "publish_post",
+            "publish_package",
+            "publish_due",
+            "delete_post",
+        }
+    )
+    require_page_context_actions: set[str] = field(
+        default_factory=lambda: {
+            "draft_post",
+            "publish_due",
+            "publish_package",
+            "publish_post",
+            "write_post",
+            "write_variants",
+        }
+    )
     max_payload_chars: int = 120_000
 
     def is_action_allowed(
@@ -135,7 +139,9 @@ class RunnableAgent(Protocol):
 class AgentHarness:
     """Guarded execution wrapper used by AgentBus."""
 
-    def __init__(self, policy: HarnessPolicy | None = None, audit_manager: Any | None = None) -> None:
+    def __init__(
+        self, policy: HarnessPolicy | None = None, audit_manager: Any | None = None
+    ) -> None:
         self.policy = policy or HarnessPolicy()
         self._audit_manager = audit_manager
         self._events: list[HarnessEvent] = []
@@ -162,15 +168,17 @@ class AgentHarness:
         result = agent.process(task)
         status = "success" if result.success else "failed"
         elapsed_ms = result.metrics.get("elapsed_ms") if result.metrics else None
-        self._record_event(HarnessEvent(
-            task_id=task.id,
-            action=task.action,
-            agent=agent.role.value,
-            status=status,
-            reason=result.error,
-            page_id=_task_page_id(task),
-            elapsed_ms=elapsed_ms,
-        ))
+        self._record_event(
+            HarnessEvent(
+                task_id=task.id,
+                action=task.action,
+                agent=agent.role.value,
+                status=status,
+                reason=result.error,
+                page_id=_task_page_id(task),
+                elapsed_ms=elapsed_ms,
+            )
+        )
         result.metrics["harness_status"] = status
         return result
 
@@ -181,13 +189,15 @@ class AgentHarness:
         self._audit_manager.record(
             event_type=f"harness.{event.status}",
             source="AgentHarness",
-            event_data=_redact_sensitive({
-                "task_id": event.task_id,
-                "action": event.action,
-                "agent": event.agent,
-                "reason": event.reason,
-                "page_id": event.page_id,
-            }),
+            event_data=_redact_sensitive(
+                {
+                    "task_id": event.task_id,
+                    "action": event.action,
+                    "agent": event.agent,
+                    "reason": event.reason,
+                    "page_id": event.page_id,
+                }
+            ),
             success=event.status == "success",
             duration_ms=event.elapsed_ms,
             error=event.reason if event.status != "success" else None,

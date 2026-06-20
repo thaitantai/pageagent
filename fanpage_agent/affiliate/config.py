@@ -127,40 +127,28 @@ class AffiliateSettings:
             enabled=shopee_raw.get("enabled", bool(shopee_app_id)),
             app_id=shopee_app_id or shopee_raw.get("app_id", ""),
             secret_key=shopee_secret or shopee_raw.get("secret_key", ""),
-            base_url=shopee_raw.get(
-                "base_url", ShopeeConfig.base_url
-            ),
+            base_url=shopee_raw.get("base_url", ShopeeConfig.base_url),
         )
 
         mas_raw = providers_raw.get("masoffer", {})
         mas_config = MasOfferConfig(
             enabled=mas_raw.get("enabled", bool(masoffer_key)),
             api_key=masoffer_key or mas_raw.get("api_key", ""),
-            base_url=mas_raw.get(
-                "base_url", MasOfferConfig.base_url
-            ),
+            base_url=mas_raw.get("base_url", MasOfferConfig.base_url),
         )
 
         custom_providers = {
-            k: v
-            for k, v in providers_raw.items()
-            if k not in {"accesstrade", "shopee", "masoffer"}
+            k: v for k, v in providers_raw.items() if k not in {"accesstrade", "shopee", "masoffer"}
         }
 
         enabled = affiliate_raw.get("enabled", True)
 
         return cls(
             enabled=enabled,
-            auto_discover=affiliate_raw.get(
-                "auto_discover", True
-            ),
+            auto_discover=affiliate_raw.get("auto_discover", True),
             search_keywords=affiliate_raw.get("search_keywords"),
-            max_products_per_provider=affiliate_raw.get(
-                "max_products_per_provider", 10
-            ),
-            min_commission_rate=affiliate_raw.get(
-                "min_commission_rate", 0.05
-            ),
+            max_products_per_provider=affiliate_raw.get("max_products_per_provider", 10),
+            min_commission_rate=affiliate_raw.get("min_commission_rate", 0.05),
             access_trade=at_config,
             shopee=shopee_config,
             mas_offer=mas_config,
@@ -176,15 +164,11 @@ class AffiliateSettings:
             try:
                 import tomli as tomllib  # type: ignore[no-redef]
             except ImportError:
-                logger.warning(
-                    "tomllib/tomli not available; affiliate config disabled"
-                )
+                logger.warning("tomllib/tomli not available; affiliate config disabled")
                 return {}
 
         if not path.exists():
-            logger.debug(
-                "Affiliate config file not found: %s", path
-            )
+            logger.debug("Affiliate config file not found: %s", path)
             return {}
 
         try:

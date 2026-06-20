@@ -3,6 +3,7 @@
 Uses LLM (via LLMAdapter) to write real captions in GenZ skincare voice.
 Falls back to empty variants if no LLM is configured.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -22,7 +23,9 @@ from fanpage_agent.core.types import (
 from fanpage_agent.prompts._loader import PromptLoader
 
 
-def _extract_research_grounding(research_packet: dict[str, Any] | None) -> tuple[str, list[dict[str, Any]], str]:
+def _extract_research_grounding(
+    research_packet: dict[str, Any] | None,
+) -> tuple[str, list[dict[str, Any]], str]:
     """Return concise writer grounding from a ResearchPacket-shaped dict."""
     if not research_packet:
         return "", [], ""
@@ -32,13 +35,17 @@ def _extract_research_grounding(research_packet: dict[str, Any] | None) -> tuple
     for item in evidence[:3]:
         if not isinstance(item, dict):
             continue
-        refs.append({
-            "claim": item.get("claim", ""),
-            "source": item.get("source", ""),
-            "url": item.get("url", ""),
-            "confidence": item.get("confidence", 0.0),
-        })
-    packet_id = str(research_packet.get("packet_id", "")) if isinstance(research_packet, dict) else ""
+        refs.append(
+            {
+                "claim": item.get("claim", ""),
+                "source": item.get("source", ""),
+                "url": item.get("url", ""),
+                "confidence": item.get("confidence", 0.0),
+            }
+        )
+    packet_id = (
+        str(research_packet.get("packet_id", "")) if isinstance(research_packet, dict) else ""
+    )
     lines = [f"- {ref['claim']} (source: {ref['source']})" for ref in refs if ref.get("claim")]
     return "\n".join(lines), refs, packet_id
 
@@ -47,10 +54,17 @@ def _normalise_page_context(page_context: dict[str, Any] | None) -> dict[str, An
     if not isinstance(page_context, dict):
         return {}
     allowed = {
-        "page_id", "name", "topic_focus", "community_value", "target_audience",
-        "content_tone", "quality_standards", "posting_frequency",
+        "page_id",
+        "name",
+        "topic_focus",
+        "community_value",
+        "target_audience",
+        "content_tone",
+        "quality_standards",
+        "posting_frequency",
     }
     return {key: value for key, value in page_context.items() if key in allowed and value}
+
 
 # ── 5 tone personas for GenZ skincare ──
 # Each persona has distinct voice, energy, and structure - variants cycle through these.
@@ -69,7 +83,7 @@ _TONE_PERSONAS: dict[str, dict[str, str]] = {
     },
     "hai_huoc_meme": {
         "label": "😆 Hài hước / Meme",
-        "description": "GenZ humor, meme energy, exaggeration hài hước. Dùng từ lóng nhẹ (\"thảo nào\", \"xỉu up xỉu down\", \"chắc gì\"). KHÔNG nhảm, vẫn có giá trị.",
+        "description": 'GenZ humor, meme energy, exaggeration hài hước. Dùng từ lóng nhẹ ("thảo nào", "xỉu up xỉu down", "chắc gì"). KHÔNG nhảm, vẫn có giá trị.',
         "hook_example": "POV: Bạn tưởng toner là 'thần dược' cho da dầu, nhưng sự thật thì… 💀",
         "cta_example": "Ai từng 'thả thính' toner như mình thì vote 1 phát nào 🤣",
     },
@@ -86,6 +100,7 @@ _TONE_PERSONAS: dict[str, dict[str, str]] = {
         "cta_example": "Bạn đã dùng sản phẩm nào tương tự chưa? Review cho mình với 🌸",
     },
 }
+
 
 def _writer_system_prompt() -> str:
     return PromptLoader.load("writer_system.md")
@@ -168,11 +183,17 @@ class WriterAgent(BaseAgent):
             if schedule:
                 # Pick first scheduled item
                 item = schedule[0]
-                proposals.append(("write_variants", {
-                    "topic": item.get("topic_template", "Chăm sóc da GenZ"),
-                    "pillar": item.get("pillar", "skincare_routine"),
-                    "variants": 2,
-                }, ActionPriority.MEDIUM))
+                proposals.append(
+                    (
+                        "write_variants",
+                        {
+                            "topic": item.get("topic_template", "Chăm sóc da GenZ"),
+                            "pillar": item.get("pillar", "skincare_routine"),
+                            "variants": 2,
+                        },
+                        ActionPriority.MEDIUM,
+                    )
+                )
             else:
                 proposals.append(("write_variants", {"variants": 2}, ActionPriority.MEDIUM))
         elif self._should_act("write_variants", 21600):
@@ -197,29 +218,33 @@ class WriterAgent(BaseAgent):
         date = scheduled_date or now[:10]
         # ── Smart scheduling: different pillars perform best at different times ──
         pillar_time_map: dict[str, str] = {
-            "education": "07:30",    # sáng sớm - tâm lý học hỏi
-            "trust": "08:00",        # sáng - xây dựng niềm tin
-            "review": "12:00",       # trưa - giờ nghỉ, đọc review
-            "entertainment": "19:00",# tối - giải trí, thư giãn
-            "engagement": "20:30",   # tối muộn - tương tác cao
+            "education": "07:30",  # sáng sớm - tâm lý học hỏi
+            "trust": "08:00",  # sáng - xây dựng niềm tin
+            "review": "12:00",  # trưa - giờ nghỉ, đọc review
+            "entertainment": "19:00",  # tối - giải trí, thư giãn
+            "engagement": "20:30",  # tối muộn - tương tác cao
         }
         time = scheduled_time or pillar_time_map.get(pillar.strip().lower(), "09:00")
         page_context = _normalise_page_context(page_context)
-        evidence_text, evidence_refs, research_packet_id = _extract_research_grounding(research_packet)
+        evidence_text, evidence_refs, research_packet_id = _extract_research_grounding(
+            research_packet
+        )
         if isinstance(research_packet, dict):
             policy = research_packet.get("handoff_policy") or {}
             if isinstance(policy, dict) and policy.get("max_safe_use") == "draft_questions_only":
-                reasons = research_packet.get("gate_reasons") or ["research evidence gate blocked writer claims"]
+                reasons = research_packet.get("gate_reasons") or [
+                    "research evidence gate blocked writer claims"
+                ]
                 return AgentResult(
                     task_id=f"write-{package_id}",
                     success=False,
-                    error="Evidence gate blocked writer claims: " + "; ".join(str(item) for item in reasons),
+                    error="Evidence gate blocked writer claims: "
+                    + "; ".join(str(item) for item in reasons),
                 )
         page_id = str(page_context.get("page_id", ""))
 
         # ── Tick offset for format rotation across days ──
         tick_offset = sum(int(part) for part in date.split("-"))
-
 
         # ── Assign tone personas round-robin ──
         persona_keys = list(_TONE_PERSONAS.keys())
@@ -231,12 +256,14 @@ class WriterAgent(BaseAgent):
         # ── Try LLM ──
         if self._llm and topic:
             persona_section = "\n".join(
-                            f"  Variant {i+1}: TONE = \"{label}\""
-                for i, (_, label) in enumerate(assigned)
+                f'  Variant {i + 1}: TONE = "{label}"' for i, (_, label) in enumerate(assigned)
             )
             brand_id = self._brand_id
-            page_context_str = str(page_context or 'khong co')
-            evidence_text_val = evidence_text or '- Khong co evidence; viet can trong va noi ro la goc nhin tong hop.'
+            page_context_str = str(page_context or "khong co")
+            evidence_text_val = (
+                evidence_text
+                or "- Khong co evidence; viet can trong va noi ro la goc nhin tong hop."
+            )
             prompt = PromptLoader.format(
                 "writer_user_variants.md",
                 count=count,
@@ -249,7 +276,8 @@ class WriterAgent(BaseAgent):
             )
 
             data = self._llm.generate_json(
-                _writer_system_prompt(), prompt,
+                _writer_system_prompt(),
+                prompt,
                 max_tokens=3000,
                 temperature=0.7,
             )
@@ -277,9 +305,13 @@ class WriterAgent(BaseAgent):
                     low = [v for v in scored if v.get("score", 5) < 3.0]
                     if low and self._llm:
                         # regenerate low scorers with higher temperature
-                        retry_prompt = prompt + f"\n\n⚠️ {len(low)} variant(s) failed quality check (score < 3.0). Regenerate specifically variant #{[scored.index(v)+1 for v in low]} with stronger hook, clearer value, and a more engaging CTA. BE MORE CREATIVE."
+                        retry_prompt = (
+                            prompt
+                            + f"\n\n⚠️ {len(low)} variant(s) failed quality check (score < 3.0). Regenerate specifically variant #{[scored.index(v) + 1 for v in low]} with stronger hook, clearer value, and a more engaging CTA. BE MORE CREATIVE."
+                        )
                         retry_data = self._llm.generate_json(
-                            _writer_system_prompt(), retry_prompt,
+                            _writer_system_prompt(),
+                            retry_prompt,
                             max_tokens=3000,
                             temperature=0.85,
                         )
@@ -296,7 +328,9 @@ class WriterAgent(BaseAgent):
                                         cta=rv.get("cta", variants[ri].cta),
                                         format=rv.get("format", self._pick_format(ri, tick_offset)),
                                         tone_tags=rv.get("tone_tags", variants[ri].tone_tags),
-                                        hashtags=rv.get("hashtags", self._base_hashtags(pillar, tick_offset)),
+                                        hashtags=rv.get(
+                                            "hashtags", self._base_hashtags(pillar, tick_offset)
+                                        ),
                                     )
                 except Exception:
                     pass  # scoring is best-effort, never block publishing
@@ -494,24 +528,42 @@ class WriterAgent(BaseAgent):
             if evidence_refs:
                 caption = f"{caption} Mình dựa trên nguồn: {evidence_refs[0].get('source', 'research')} - {evidence_refs[0].get('claim', '')}."
             if page_context.get("community_value"):
-                caption = f"{caption} Gắn với mục tiêu cộng đồng: {page_context['community_value']}."
+                caption = (
+                    f"{caption} Gắn với mục tiêu cộng đồng: {page_context['community_value']}."
+                )
             cta = templates["ctas"][(tick_offset + i) % len(templates["ctas"])]
             # Rotate visual briefs
             brief_pool = _VISUAL_BRIEFS.get(persona_key, {}).get(fmt, [""])
             visual_brief = brief_pool[(tick_offset + i) % len(brief_pool)] if brief_pool else None
-            variants.append(ContentVariant(
-                variant_id=variant_id,
-                topic=topic,
-                pillar=pillar,
-                caption=caption,
-                hook=hook,
-                cta=cta,
-                format=fmt,
-                visual_brief=visual_brief or None,
-                tone_tags=[persona_key.replace("_", "_thật" if persona_key == "chia_se_that" else "_nhẹ" if persona_key == "chuyen_mon_nhe" else "_meme" if persona_key == "hai_huoc_meme" else "_tương_tác" if persona_key == "hoi_dap_tuong_tac" else "_thực_tế"), "chia_sẻ"],
-                hashtags=self._base_hashtags(pillar, tick_offset),
-                evidence_refs=evidence_refs,
-            ))
+            variants.append(
+                ContentVariant(
+                    variant_id=variant_id,
+                    topic=topic,
+                    pillar=pillar,
+                    caption=caption,
+                    hook=hook,
+                    cta=cta,
+                    format=fmt,
+                    visual_brief=visual_brief or None,
+                    tone_tags=[
+                        persona_key.replace(
+                            "_",
+                            "_thật"
+                            if persona_key == "chia_se_that"
+                            else "_nhẹ"
+                            if persona_key == "chuyen_mon_nhe"
+                            else "_meme"
+                            if persona_key == "hai_huoc_meme"
+                            else "_tương_tác"
+                            if persona_key == "hoi_dap_tuong_tac"
+                            else "_thực_tế",
+                        ),
+                        "chia_sẻ",
+                    ],
+                    hashtags=self._base_hashtags(pillar, tick_offset),
+                    evidence_refs=evidence_refs,
+                )
+            )
 
         return AgentResult(
             task_id=f"write-{package_id}",
@@ -538,7 +590,8 @@ class WriterAgent(BaseAgent):
                 topic=topic,
             )
             data = self._llm.generate_json(
-                _writer_system_prompt(), prompt,
+                _writer_system_prompt(),
+                prompt,
                 max_tokens=1500,
                 temperature=0.8,
             )
@@ -564,7 +617,11 @@ class WriterAgent(BaseAgent):
         return AgentResult(
             task_id=f"hooks-{topic[:20]}",
             success=True,
-            data={"hooks": hooks[:count], "count": min(len(hooks), count), "generated_by": "template"},
+            data={
+                "hooks": hooks[:count],
+                "count": min(len(hooks), count),
+                "generated_by": "template",
+            },
         )
 
     def _rewrite_variant(self, variant_id: str, feedback: str) -> AgentResult:
@@ -576,7 +633,8 @@ class WriterAgent(BaseAgent):
                 feedback=feedback,
             )
             data = self._llm.generate_json(
-                _writer_system_prompt(), prompt,
+                _writer_system_prompt(),
+                prompt,
                 max_tokens=2000,
                 temperature=0.6,
             )
@@ -590,7 +648,12 @@ class WriterAgent(BaseAgent):
         return AgentResult(
             task_id=f"rewrite-{variant_id}",
             success=True,
-            data={"variant_id": variant_id, "feedback": feedback, "revised": True, "generated_by": "template"},
+            data={
+                "variant_id": variant_id,
+                "feedback": feedback,
+                "revised": True,
+                "generated_by": "template",
+            },
         )
 
     @staticmethod
@@ -637,12 +700,14 @@ class WriterAgent(BaseAgent):
                 reasons.append("hook_repeated_in_caption")
 
             score = max(1.0, min(5.0, score))
-            results.append({
-                "variant_id": v.variant_id,
-                "score": score,
-                "reasons": reasons,
-                "persona": (v.tone_tags or ["unknown"])[0],
-            })
+            results.append(
+                {
+                    "variant_id": v.variant_id,
+                    "score": score,
+                    "reasons": reasons,
+                    "persona": (v.tone_tags or ["unknown"])[0],
+                }
+            )
         return results
 
     @staticmethod
@@ -660,24 +725,44 @@ class WriterAgent(BaseAgent):
 
         pillar_pool: dict[str, list[str]] = {
             "education": [
-                "skincaretips", "hocskincare", "chamsocdatainha",
-                "bikipchamsocda", "skincarechongenz", "hoclamsong",
+                "skincaretips",
+                "hocskincare",
+                "chamsocdatainha",
+                "bikipchamsocda",
+                "skincarechongenz",
+                "hoclamsong",
             ],
             "review": [
-                "reviewthat", "reviewmypham", "dungthu",
-                "reviewchamsocda", "myphamtot", "thatnghiemthat",
+                "reviewthat",
+                "reviewmypham",
+                "dungthu",
+                "reviewchamsocda",
+                "myphamtot",
+                "thatnghiemthat",
             ],
             "trust": [
-                "skincaretips", "myphamchatluong", "damatdep",
-                "chamsocdathat", "lammetda", "genzskincaredep",
+                "skincaretips",
+                "myphamchatluong",
+                "damatdep",
+                "chamsocdathat",
+                "lammetda",
+                "genzskincaredep",
             ],
             "engagement": [
-                "hoctap", "cunghocskincare", "genzlife",
-                "cungnhaulamsong", "chiaSeKinhNghiem", "genzdep",
+                "hoctap",
+                "cunghocskincare",
+                "genzlife",
+                "cungnhaulamsong",
+                "chiaSeKinhNghiem",
+                "genzdep",
             ],
             "entertainment": [
-                "genzhumor", "skincarefunny", "trending",
-                "skincarevui", "genzfun", "trendskincare",
+                "genzhumor",
+                "skincarefunny",
+                "trending",
+                "skincarevui",
+                "genzfun",
+                "trendskincare",
             ],
         }
 

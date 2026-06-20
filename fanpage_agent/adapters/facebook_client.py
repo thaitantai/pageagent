@@ -205,15 +205,11 @@ class FacebookClient:
 
         # Recalculate engagement_rate if reach is now real
         if result.get("reach", 0) > 0:
-            result["engagement_rate"] = round(
-                result["engagements"] / result["reach"], 4
-            )
+            result["engagement_rate"] = round(result["engagements"] / result["reach"], 4)
 
         return result
 
-    def get_page_posts(
-        self, limit: int = 25
-    ) -> list[dict]:
+    def get_page_posts(self, limit: int = 25) -> list[dict]:
         """Fetch recent posts from the page with insight fields.
 
         Auto-paginates internally to collect up to *limit* posts.
@@ -258,9 +254,7 @@ class FacebookClient:
 
         return all_posts[:limit]
 
-    def get_comments(
-        self, post_id: str, limit: int = 25
-    ) -> list[dict]:
+    def get_comments(self, post_id: str, limit: int = 25) -> list[dict]:
         """Fetch comments on a post.
 
         Each comment dict: {id, message, from_name, created_time}.
@@ -273,12 +267,14 @@ class FacebookClient:
         )
         results = []
         for c in raw.get("data", []):
-            results.append({
-                "id": c.get("id", ""),
-                "message": c.get("message", ""),
-                "from_name": c.get("from", {}).get("name", ""),
-                "created_time": c.get("created_time", ""),
-            })
+            results.append(
+                {
+                    "id": c.get("id", ""),
+                    "message": c.get("message", ""),
+                    "from_name": c.get("from", {}).get("name", ""),
+                    "created_time": c.get("created_time", ""),
+                }
+            )
         return results
 
     def get_conversations(self, limit: int = 10) -> list[dict]:
@@ -316,9 +312,7 @@ class FacebookClient:
             },
         )
 
-    def get_public_page_posts(
-        self, page_id: str, limit: int = 25
-    ) -> list[dict]:
+    def get_public_page_posts(self, page_id: str, limit: int = 25) -> list[dict]:
         """Fetch recent posts from any public Facebook page.
 
         Returns the same insight-shaped dicts as :meth:`get_page_posts`,
@@ -391,7 +385,10 @@ class FacebookClient:
                         delay *= 1.0 + random.random() * 0.5
                         logger.warning(
                             "429 detected, retry %d/%d in %.1fs: %s",
-                            attempt + 1, _retries, delay, msg[:120],
+                            attempt + 1,
+                            _retries,
+                            delay,
+                            msg[:120],
                         )
                         time.sleep(delay)
                         continue
@@ -443,18 +440,14 @@ class FacebookClient:
                 body_bytes = response.read()
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"Facebook HTTP error {exc.code}: {detail[:500]}"
-            ) from exc
+            raise RuntimeError(f"Facebook HTTP error {exc.code}: {detail[:500]}") from exc
         except URLError as exc:
             raise RuntimeError(f"Facebook connection error: {exc}") from exc
 
         try:
             parsed = json.loads(body_bytes.decode("utf-8"))
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"Facebook returned non-JSON body: {body_bytes[:500]}"
-            ) from exc
+            raise RuntimeError(f"Facebook returned non-JSON body: {body_bytes[:500]}") from exc
 
         # Graph API wraps errors in {"error": {...}}
         if "error" in parsed:
@@ -472,8 +465,16 @@ class FacebookClient:
         comments_data = raw.get("comments", {}) or {}
         shares_data = raw.get("shares", {}) or {}
 
-        likes = likes_data.get("summary", {}).get("total_count", 0) if isinstance(likes_data, dict) else 0
-        comments = comments_data.get("summary", {}).get("total_count", 0) if isinstance(comments_data, dict) else 0
+        likes = (
+            likes_data.get("summary", {}).get("total_count", 0)
+            if isinstance(likes_data, dict)
+            else 0
+        )
+        comments = (
+            comments_data.get("summary", {}).get("total_count", 0)
+            if isinstance(comments_data, dict)
+            else 0
+        )
         shares = shares_data.get("count", 0) if isinstance(shares_data, dict) else 0
         engagements = likes + comments + shares
 

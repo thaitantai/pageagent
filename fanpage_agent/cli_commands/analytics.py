@@ -27,10 +27,15 @@ def cmd_analytics_review(args: argparse.Namespace) -> int:
     profile = load_brand_profile(args.brand_file)
     store = build_store(settings=settings, args=args)
     tool = AnalyticsReviewer(store=store, profile=profile, settings=settings)
-    review = tool.review(days=args.days, now=getattr(args, "now", None), record=getattr(args, "record", False))
+    review = tool.review(
+        days=args.days, now=getattr(args, "now", None), record=getattr(args, "record", False)
+    )
     payload = review.model_dump(mode="json")
     if args.save:
-        dump_json(settings.artifacts_dir / "analytics" / f"analytics-review-{review.period_start}.json", payload)
+        dump_json(
+            settings.artifacts_dir / "analytics" / f"analytics-review-{review.period_start}.json",
+            payload,
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -40,11 +45,18 @@ def cmd_deliver_analytics_review(args: argparse.Namespace) -> int:
     store = build_store(settings=settings, args=args)
     profile = load_brand_profile(args.brand_file)
     tool = AnalyticsReviewer(store=store, profile=profile, settings=settings)
-    review = tool.review(days=args.days, now=getattr(args, "now", None), record=getattr(args, "record", False))
+    review = tool.review(
+        days=args.days, now=getattr(args, "now", None), record=getattr(args, "record", False)
+    )
     payload = review.model_dump(mode="json")
-    payload["delivery"] = DeliveryTool(settings).deliver_analytics_review(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_analytics_review(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
-        dump_json(settings.artifacts_dir / "analytics" / f"analytics-review-{review.period_start}.json", payload)
+        dump_json(
+            settings.artifacts_dir / "analytics" / f"analytics-review-{review.period_start}.json",
+            payload,
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -102,7 +114,9 @@ def cmd_eval_all(args: argparse.Namespace) -> int:
         start_date=args.start_date,
     )
     if args.save:
-        dump_json(settings.artifacts_dir / "evals" / f"eval-summary-{args.start_date}.json", payload)
+        dump_json(
+            settings.artifacts_dir / "evals" / f"eval-summary-{args.start_date}.json", payload
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["summary"]["failed"] == 0 else 1
 
@@ -180,13 +194,15 @@ def cmd_fetch_fb_comments(args: argparse.Namespace) -> int:
         cid = c.get("id", "")
         if cid and cid in existing_ids:
             continue
-        new_rows.append({
-            "id": c.get("id", ""),
-            "post_id": c.get("post_id", ""),
-            "created_at": c.get("created_time", ""),
-            "source": "facebook_comment",
-            "message": c.get("message", ""),
-        })
+        new_rows.append(
+            {
+                "id": c.get("id", ""),
+                "post_id": c.get("post_id", ""),
+                "created_at": c.get("created_time", ""),
+                "source": "facebook_comment",
+                "message": c.get("message", ""),
+            }
+        )
         if cid:
             existing_ids.add(cid)
 

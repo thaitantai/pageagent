@@ -32,11 +32,15 @@ class DailyOpsTool:
         research_brief: ResearchBrief | None = None,
         research_packet: Any | None = None,
     ) -> dict:
-        plan = self.planner.plan_week(profile=profile, start_date=run_date, days=days, research_brief=research_brief)
+        plan = self.planner.plan_week(
+            profile=profile, start_date=run_date, days=days, research_brief=research_brief
+        )
         history = store.read_post_history(limit=30)
         plan_verification = self.verifier.verify_plan(profile, plan, history=history)
         handoff_policy = getattr(research_packet, "handoff_policy", {}) or {}
-        max_safe_use = handoff_policy.get("max_safe_use") if isinstance(handoff_policy, dict) else None
+        max_safe_use = (
+            handoff_policy.get("max_safe_use") if isinstance(handoff_policy, dict) else None
+        )
         gate_blocks_writer = max_safe_use == "draft_questions_only"
 
         if write_calendar:
@@ -45,7 +49,9 @@ class DailyOpsTool:
         primary_day = plan.days[0]
         if gate_blocks_writer:
             reasons = getattr(research_packet, "gate_reasons", []) or []
-            reason_text = "; ".join(str(reason) for reason in reasons) or "Research chưa đủ an toàn."
+            reason_text = (
+                "; ".join(str(reason) for reason in reasons) or "Research chưa đủ an toàn."
+            )
             caption_package = CaptionPackage(
                 topic=f"Research blocked: {primary_day.topic}",
                 variants=[
@@ -62,7 +68,9 @@ class DailyOpsTool:
                     )
                 ],
                 dos=["Bổ sung tối thiểu 2 URL/source độc lập trước khi Writer viết claim."],
-                donts=["Không publish hoặc đưa affiliate recommendation khi ResearchPacket bị blocked."],
+                donts=[
+                    "Không publish hoặc đưa affiliate recommendation khi ResearchPacket bị blocked."
+                ],
             )
             caption_verification = self.verifier.verify_caption_package(profile, caption_package)
             caption_verification.passed = False

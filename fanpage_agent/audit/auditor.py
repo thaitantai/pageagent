@@ -64,6 +64,7 @@ DELETE FROM audit_log WHERE timestamp < datetime('now', ?)
 
 # ── Data class ────────────────────────────────────────────────────────
 
+
 @dataclass
 class AuditEntry:
     """One row from the audit log."""
@@ -79,6 +80,7 @@ class AuditEntry:
 
 
 # ── Manager ───────────────────────────────────────────────────────────
+
 
 class AuditManager:
     """SQLite-backed append-only audit log.
@@ -223,7 +225,9 @@ class AuditManager:
             after = after_row[0] if after_row else 0
         removed = before - after
         if removed:
-            logger.info("Audit: purged %d entries older than %d days", removed, self._retention_days)
+            logger.info(
+                "Audit: purged %d entries older than %d days", removed, self._retention_days
+            )
         return removed
 
     # ── Internals ─────────────────────────────────────────────────────
@@ -264,6 +268,7 @@ class AuditManager:
 
 
 # ── Convenience helpers ──────────────────────────────────────────────
+
 
 @contextmanager
 def audit(

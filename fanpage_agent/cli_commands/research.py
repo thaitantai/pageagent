@@ -61,6 +61,7 @@ def build_research_brief(args: argparse.Namespace):
         if not competitor_names:
             try:
                 from fanpage_agent.loaders.brand_loader import load_brand_profile
+
                 brand_path = ROOT_DIR / "brand_profiles" / "skincare_genz.json"
                 if brand_path.exists():
                     profile = load_brand_profile(brand_path)
@@ -71,9 +72,7 @@ def build_research_brief(args: argparse.Namespace):
         # CLI override: --competitor-pages name1 name2 (vẫn dùng tên, ko phải FB ID)
         cli_pages = getattr(args, "competitor_pages", None)
         if cli_pages:
-            competitor_names = [
-                p.strip() for p in cli_pages if p.strip()
-            ]
+            competitor_names = [p.strip() for p in cli_pages if p.strip()]
 
     rt = _build_research_service()
     return rt.build_brief(
@@ -235,7 +234,7 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
             for t in items[:3]:
                 print(f"    - {t[:60]}")
             if len(items) > 3:
-                print(f"    ... +{len(items)-3} more")
+                print(f"    ... +{len(items) - 3} more")
 
         print("\n--- Top Relevant (skincare/healthcare) ---")
         for item in report["top_relevant"][:10]:
@@ -243,7 +242,11 @@ def cmd_research_trends(args: argparse.Namespace) -> int:
             print(f"     [{item['source']}]")
 
     if args.save:
-        path = ROOT_DIR / "data" / f"research-trends-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        path = (
+            ROOT_DIR
+            / "data"
+            / f"research-trends-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+        )
         dump_json(path, report)
         print(f"\n💾 Saved to {path}")
 
@@ -265,6 +268,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     if args.lifecycle:
         from fanpage_agent.tools.research.learning_optimizer import LifecycleManager
+
         report = LifecycleManager(store).get_lifecycle_report()
         print("=== 🔄 Topic Lifecycle Report ===\n")
         print(f"Total topics tracked: {report['total_topics']}\n")
@@ -276,12 +280,15 @@ def cmd_learn(args: argparse.Namespace) -> int:
                 posts = t["total_posts"]
                 days_post = t["days_since_publish"]
                 last = t["last_published"] or "never"
-                print(f"      {t['topic'][:40]:40s} | {posts} posts | last {last} ({days_post}d ago)")
+                print(
+                    f"      {t['topic'][:40]:40s} | {posts} posts | last {last} ({days_post}d ago)"
+                )
         return 0
 
     if args.set_lifecycle:
         topic, stage = args.set_lifecycle
         from fanpage_agent.adapters.sqlite_store import UnifiedStore
+
         try:
             result = store.set_topic_stage(topic, stage)
             print(f"✅ Topic '{result['topic']}' set to stage '{result['stage']}'")
@@ -292,6 +299,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     if args.auto_lifecycle:
         from fanpage_agent.tools.research.learning_optimizer import LifecycleManager
+
         result = LifecycleManager(store).run()
         if result["transitions"]:
             print("=== 🔄 Auto Lifecycle Transitions ===\n")
@@ -331,8 +339,10 @@ def cmd_learn(args: argparse.Namespace) -> int:
                             profile = p
                             break
                     if profile:
-                        print(f"   {name}: {len(profile.get('products_detected', []))} products, "
-                              f"angle={profile.get('unique_angle', '?')}")
+                        print(
+                            f"   {name}: {len(profile.get('products_detected', []))} products, "
+                            f"angle={profile.get('unique_angle', '?')}"
+                        )
         return 0
 
     if args.status:
@@ -347,10 +357,18 @@ def cmd_learn(args: argparse.Namespace) -> int:
         for gt in goal_types:
             gw = store.get_weights_for_goal(gt)
             print(f"  [{gt}]")
-            for name in ("brand_relevance", "novelty", "content_potential",
-                         "source_confidence", "fanpage_fit", "customer_value"):
+            for name in (
+                "brand_relevance",
+                "novelty",
+                "content_potential",
+                "source_confidence",
+                "fanpage_fit",
+                "customer_value",
+            ):
                 print(f"    {name:30s} {gw.get(name, 0):.4f}")
-            print(f"    {'evidence_confidence_floor':30s} {gw.get('evidence_confidence_floor', 0.45)}")
+            print(
+                f"    {'evidence_confidence_floor':30s} {gw.get('evidence_confidence_floor', 0.45)}"
+            )
 
         # Show predictor quality
         predictor = PerformancePredictor(store)
@@ -381,8 +399,10 @@ def cmd_learn(args: argparse.Namespace) -> int:
         print(f"=== 🎯 Registered Goal Types ({len(goal_types)}) ===")
         for gt in goal_types:
             gw = store.get_weights_for_goal(gt)
-            print(f"  [{gt}] novelty={gw.get('novelty', 0):.2f} brand={gw.get('brand_relevance', 0):.2f} "
-                  f"content={gw.get('content_potential', 0):.2f} conv={gw.get('customer_value', 0):.2f}")
+            print(
+                f"  [{gt}] novelty={gw.get('novelty', 0):.2f} brand={gw.get('brand_relevance', 0):.2f} "
+                f"content={gw.get('content_potential', 0):.2f} conv={gw.get('customer_value', 0):.2f}"
+            )
         return 0
 
     if args.list_goals:
@@ -392,7 +412,9 @@ def cmd_learn(args: argparse.Namespace) -> int:
             return 0
         print(f"=== 🎯 Topic → Goal Assignments ({len(goals)}) ===")
         for g in goals:
-            print(f"  {g['topic'][:40]:40s} → {g['goal_type']:15s} (updated {g['updated_at'][:19]})")
+            print(
+                f"  {g['topic'][:40]:40s} → {g['goal_type']:15s} (updated {g['updated_at'][:19]})"
+            )
         return 0
 
     if args.set_goal:
@@ -422,7 +444,9 @@ def cmd_learn(args: argparse.Namespace) -> int:
                 for c in changes[:5]:
                     d = c.get("delta", 0)
                     arrow = "▲" if d > 0 else "▼"
-                    print(f"         {c['weight_name']}: {c['from']} → {c['to']} ({arrow}{abs(d):.4f})")
+                    print(
+                        f"         {c['weight_name']}: {c['from']} → {c['to']} ({arrow}{abs(d):.4f})"
+                    )
             if decayed:
                 print(f"       Decayed: {decayed} topics")
         return 0
@@ -440,7 +464,14 @@ def cmd_learn(args: argparse.Namespace) -> int:
             results["optimize"] = optimizer.run()
 
     # If --goal was used alone (without --optimize), make sure we print results
-    if args.goal and not args.optimize and not args.all and not args.calibrate and not args.decay and not args.predict:
+    if (
+        args.goal
+        and not args.optimize
+        and not args.all
+        and not args.calibrate
+        and not args.decay
+        and not args.predict
+    ):
         pass  # results will be printed below
 
     if args.calibrate or args.all:
@@ -456,6 +487,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
         from fanpage_agent.tools.research.learning_optimizer import (
             LifecycleManager as _LifecycleManager,
         )
+
         results["lifecycle"] = _LifecycleManager(store).run()
 
     if args.predict:
@@ -467,20 +499,26 @@ def cmd_learn(args: argparse.Namespace) -> int:
     if "optimize" in results:
         opt = results["optimize"]
         goal_label = f" [{opt.get('goal_type', 'global')}]" if opt.get("goal_type") else ""
-        status_icon = "✅" if opt["status"] == "ok" else ("⏭" if opt["status"] == "no_change" else "⚠")
+        status_icon = (
+            "✅" if opt["status"] == "ok" else ("⏭" if opt["status"] == "no_change" else "⚠")
+        )
         print(f"{status_icon} WeightOptimizer{goal_label}: {opt['status']}")
         if opt.get("changes"):
             for c in opt["changes"]:
                 d = c.get("delta", 0)
                 arrow = "▲" if d > 0 else "▼"
-                print(f"   {c['weight_name']:30s} {c['from']} → {c['to']} ({arrow}{abs(d):.4f}) corr={c['correlation']:.3f}")
+                print(
+                    f"   {c['weight_name']:30s} {c['from']} → {c['to']} ({arrow}{abs(d):.4f}) corr={c['correlation']:.3f}"
+                )
         if "analysis_summary" in opt:
             s = opt["analysis_summary"]
             print(f"   ({s['total_weights_analyzed']} analyzed, {s['weights_adjusted']} adjusted)")
 
     if "calibrate" in results:
         cal = results["calibrate"]
-        status_icon = "✅" if cal["status"] == "ok" else ("⏭" if cal["status"] == "no_change" else "⚠")
+        status_icon = (
+            "✅" if cal["status"] == "ok" else ("⏭" if cal["status"] == "no_change" else "⚠")
+        )
         print(f"{status_icon} ConfidenceCalibrator: {cal['status']}")
         if cal.get("adjustments"):
             for a in cal["adjustments"]:
@@ -488,19 +526,29 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     if "decay" in results:
         dc = results["decay"]
-        status_icon = "✅" if dc["status"] == "ok" else ("⏭" if dc["status"] == "no_decay_needed" else "⚠")
-        print(f"{status_icon} DecayModel: {dc['status']} — {dc.get('decayed_topics', 0)}/{dc.get('total_topics', 0)} topics decayed")
+        status_icon = (
+            "✅" if dc["status"] == "ok" else ("⏭" if dc["status"] == "no_decay_needed" else "⚠")
+        )
+        print(
+            f"{status_icon} DecayModel: {dc['status']} — {dc.get('decayed_topics', 0)}/{dc.get('total_topics', 0)} topics decayed"
+        )
         if dc.get("details"):
             for d_ in dc["details"][:10]:
-                print(f"   {d_['topic'][:35]:35s} {d_['days_since_update']:3d}d ago → factor {d_['decay_factor']}")
+                print(
+                    f"   {d_['topic'][:35]:35s} {d_['days_since_update']:3d}d ago → factor {d_['decay_factor']}"
+                )
 
     if "predict" in results:
         pr = results["predict"]
         if pr["status"] == "ok":
             drift_warn = " ⚠️ DRIFT DETECTED" if pr.get("drift") else ""
             print(f"✅ PerformancePredictor: trained ✓{drift_warn}")
-            print(f"   Model: log(eng+1) = {pr['params']['slope']} × score + {pr['params']['intercept']}")
-            print(f"   MAE: {pr['metrics']['mae']} eng  |  MAPE: {pr['metrics']['mape']:.1%}  |  R²: {pr['metrics']['r2']}")
+            print(
+                f"   Model: log(eng+1) = {pr['params']['slope']} × score + {pr['params']['intercept']}"
+            )
+            print(
+                f"   MAE: {pr['metrics']['mae']} eng  |  MAPE: {pr['metrics']['mape']:.1%}  |  R²: {pr['metrics']['r2']}"
+            )
             print(f"   Samples: {pr['sample_count']}")
             if pr.get("drift_message"):
                 print(f"   ⚠ {pr['drift_message']}")

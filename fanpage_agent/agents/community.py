@@ -21,10 +21,18 @@ _MIN_REPLY_LENGTH = 10
 _MAX_REPLY_LENGTH = 200
 _QUALITY_SCORE_THRESHOLD = 0.4
 _GENERIC_REPLY_MODELS = [
-    "cảm ơn bạn", "cảm ơn em", "cảm ơn chị", "cảm ơn anh",
-    "thanks bạn", "ok bạn", "ok em", "ok chị", "ok anh",
+    "cảm ơn bạn",
+    "cảm ơn em",
+    "cảm ơn chị",
+    "cảm ơn anh",
+    "thanks bạn",
+    "ok bạn",
+    "ok em",
+    "ok chị",
+    "ok anh",
 ]
 _REPLY_TIMESTAMPS_FILE = "data/agent/reply_timestamps.json"
+
 
 def _community_system_prompt() -> str:
     return PromptLoader.load("community_system.md")
@@ -92,8 +100,12 @@ class CommunityAgent(BaseAgent):
     @property
     def capabilities(self) -> list[str]:
         return [
-            "fetch_and_triage", "triage_comments", "suggest_reply",
-            "sentiment_summary", "auto_reply", "self_reply_post",
+            "fetch_and_triage",
+            "triage_comments",
+            "suggest_reply",
+            "sentiment_summary",
+            "auto_reply",
+            "self_reply_post",
         ]
 
     def _resolve_page_id(self, params: dict) -> str | None:
@@ -153,10 +165,16 @@ class CommunityAgent(BaseAgent):
         # Check for new publisher data (choreography chain)
         if self._has_upstream_data("publisher", "processed_publisher_version"):
             publisher_data = self._get_shared("publisher", {})
-            proposals.append(("self_reply_post", {
-                "fb_post_id": publisher_data.get("fb_post_id", ""),
-                "topic": "",
-            }, ActionPriority.MEDIUM))
+            proposals.append(
+                (
+                    "self_reply_post",
+                    {
+                        "fb_post_id": publisher_data.get("fb_post_id", ""),
+                        "topic": "",
+                    },
+                    ActionPriority.MEDIUM,
+                )
+            )
 
         if self._should_act("fetch_and_triage", 21600):
             proposals.append(("fetch_and_triage", {"limit": 50}, ActionPriority.HIGH))
@@ -169,7 +187,9 @@ class CommunityAgent(BaseAgent):
     # ── Self-reply on own post (early engagement boost) ──────────
 
     def _self_reply_post(
-        self, fb_post_id: str, post_topic: str = "",
+        self,
+        fb_post_id: str,
+        post_topic: str = "",
         page_id: str | None = None,
     ) -> AgentResult:
         """Post a natural comment on the page's own new post to boost early engagement.
@@ -179,7 +199,8 @@ class CommunityAgent(BaseAgent):
         """
         if not self._fb:
             return AgentResult(
-                task_id="self-reply", success=True,
+                task_id="self-reply",
+                success=True,
                 data={"replied": 0, "note": "No FacebookAdapter — skip self-reply"},
             )
 
@@ -192,6 +213,7 @@ class CommunityAgent(BaseAgent):
         ]
 
         import random
+
         comment = random.choice(self_replies)
         if post_topic:
             short_topic = post_topic[:30]
@@ -288,7 +310,7 @@ class CommunityAgent(BaseAgent):
 
     def _suggest_reply(self, comment_text: str, sentiment: str) -> AgentResult:
         """Generate a reply suggestion — LLM or template fallback.
-        
+
         Adds quality checks: minimum length, generic reply detection.
         """
         # ── Try LLM ──
@@ -412,9 +434,9 @@ Output JSON:
         # LLM enhancement for summary
         if self._llm and n > 5:
             prompt = f"""Tóm tắt cảm xúc cộng đồng từ {n} comments:
-- Tích cực: {cats['positive']}
-- Tiêu cực: {cats['negative']}
-- Trung tính: {cats['neutral']}
+- Tích cực: {cats["positive"]}
+- Tiêu cực: {cats["negative"]}
+- Trung tính: {cats["neutral"]}
 
 Output JSON:
 {{
@@ -453,8 +475,9 @@ Output JSON:
 
     # ── Auto-reply (with scheduling + quality gate) ──────────────
 
-    def _auto_reply(self, comments: list[dict], limit: int = 5, max_replies: int = 3,
-                     page_id: str | None = None) -> AgentResult:
+    def _auto_reply(
+        self, comments: list[dict], limit: int = 5, max_replies: int = 3, page_id: str | None = None
+    ) -> AgentResult:
         """Auto-reply to comments that qualify (praise, simple questions).
 
         Respects ``max_replies`` cap per tick. Uses replied-IDs cache to
@@ -465,7 +488,8 @@ Output JSON:
         """
         if not self._fb:
             return AgentResult(
-                task_id="auto-reply", success=True,
+                task_id="auto-reply",
+                success=True,
                 data={"replied": 0, "note": "No FacebookAdapter — skip auto-reply"},
             )
 
@@ -514,12 +538,14 @@ Output JSON:
                 self._fb.reply_to_comment(comment_id=cid, message=reply_text, page_id=page_id)
                 replied += 1
                 self._mark_replied(cid)
-                replies.append({
-                    "comment_id": cid,
-                    "sentiment": sentiment,
-                    "reply_preview": reply_text[:60],
-                    "quality_score": quality,
-                })
+                replies.append(
+                    {
+                        "comment_id": cid,
+                        "sentiment": sentiment,
+                        "reply_preview": reply_text[:60],
+                        "quality_score": quality,
+                    }
+                )
             except Exception:
                 errors += 1
 
@@ -549,30 +575,83 @@ Output JSON:
 
         # Spam — only actual spam patterns
         spam_words = [
-            "http://", "https://", "bit.ly", "tặng quà", "trúng thưởng",
-            "spam", "lừa đảo",
+            "http://",
+            "https://",
+            "bit.ly",
+            "tặng quà",
+            "trúng thưởng",
+            "spam",
+            "lừa đảo",
         ]
 
         # Complaint — negative experiences
         complaint_words = [
-            "tệ", "kém", "thất vọng", "lừa", "giả", "không hiệu quả",
-            "phí tiền", "kích ứng", "dị ứng", "mụn thêm", "bỏng rát",
-            "không đúng", "hàng fake", "hàng giả", "tiền mất",
+            "tệ",
+            "kém",
+            "thất vọng",
+            "lừa",
+            "giả",
+            "không hiệu quả",
+            "phí tiền",
+            "kích ứng",
+            "dị ứng",
+            "mụn thêm",
+            "bỏng rát",
+            "không đúng",
+            "hàng fake",
+            "hàng giả",
+            "tiền mất",
         ]
 
         # Praise — positive feedback
         praise_words = [
-            "tốt", "hay", "cảm ơn", "thích", "đẹp", "tuyệt", "hiệu quả",
-            "👍", "❤️", "😍", "🥰", "xoá mụn", "giảm mụn", "cải thiện",
+            "tốt",
+            "hay",
+            "cảm ơn",
+            "thích",
+            "đẹp",
+            "tuyệt",
+            "hiệu quả",
+            "👍",
+            "❤️",
+            "😍",
+            "🥰",
+            "xoá mụn",
+            "giảm mụn",
+            "cải thiện",
         ]
 
         # Question — inquiries, buying intent, advice seeking
         question_words = [
-            "?", "có", "không", "sao", "thế nào", "bao nhiêu", "gì",
-            "tại sao", "mua", "giá", "ở đâu", "khi nào", "loại nào",
-            "còn không", "có tốt", "dùng được", "phù hợp", "nên dùng",
-            "bôi", "uống", "dùng", "cần", "tư vấn", "inbox",
-            "spf", "retinol", "aha", "bha", "niacinamide",
+            "?",
+            "có",
+            "không",
+            "sao",
+            "thế nào",
+            "bao nhiêu",
+            "gì",
+            "tại sao",
+            "mua",
+            "giá",
+            "ở đâu",
+            "khi nào",
+            "loại nào",
+            "còn không",
+            "có tốt",
+            "dùng được",
+            "phù hợp",
+            "nên dùng",
+            "bôi",
+            "uống",
+            "dùng",
+            "cần",
+            "tư vấn",
+            "inbox",
+            "spf",
+            "retinol",
+            "aha",
+            "bha",
+            "niacinamide",
         ]
 
         if any(w in text_lower for w in spam_words):

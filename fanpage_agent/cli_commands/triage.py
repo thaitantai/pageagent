@@ -18,7 +18,9 @@ from .research import build_triage_store_payload, summarize_calendar_items, summ
 
 def build_calendar_store_payload(args: argparse.Namespace) -> dict:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    items = build_store(settings=settings, args=with_default_store_backend(args)).list_calendar_items(
+    items = build_store(
+        settings=settings, args=with_default_store_backend(args)
+    ).list_calendar_items(
         status=getattr(args, "status", None),
         approval_status=getattr(args, "approval_status", None),
         date=getattr(args, "date", None),
@@ -62,7 +64,9 @@ def build_approval_audit_payload(args: argparse.Namespace) -> dict:
         "summary": {
             "total_audited": len(rows),
             "pending": len(pending),
-            "overdue_pending": len([item for item in pending if item.get("days_pending", 0) > args.sla_days]),
+            "overdue_pending": len(
+                [item for item in pending if item.get("days_pending", 0) > args.sla_days]
+            ),
             "approved": len(approved),
             "rejected": len(rejected),
             "sla_days": args.sla_days,
@@ -85,12 +89,14 @@ def _publish_blockers_for_operator(calendar_items: list[dict]) -> list[dict]:
         if not item.get("approved_by"):
             issues.append("no_approver")
         if issues:
-            blockers.append({
-                "calendar_id": item.get("calendar_id"),
-                "date": item.get("date"),
-                "pillar": item.get("pillar"),
-                "reason_codes": issues,
-            })
+            blockers.append(
+                {
+                    "calendar_id": item.get("calendar_id"),
+                    "date": item.get("date"),
+                    "pillar": item.get("pillar"),
+                    "reason_codes": issues,
+                }
+            )
     return blockers
 
 
@@ -167,12 +173,16 @@ def cmd_deliver_triage_community(args: argparse.Namespace) -> int:
     else:
         # Triage comments first, write to store, then deliver
         profile = load_brand_profile(args.brand_file)
-        result = CommunityTriageTool().triage_from_csv(profile=profile, comment_csv=args.comment_file)
+        result = CommunityTriageTool().triage_from_csv(
+            profile=profile, comment_csv=args.comment_file
+        )
         payload = result.model_dump(mode="json")
         store = build_store(settings=settings, args=with_default_store_backend(args))
         store.upsert_triage_items(brand_id=profile.brand_id, items=result.items)
 
-    payload["delivery"] = DeliveryTool(settings).deliver_community_triage(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_community_triage(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "community-triage.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -188,7 +198,9 @@ def cmd_deliver_approved_triage_replies(args: argparse.Namespace) -> int:
         limit=getattr(args, "limit", None),
     )
     payload = {"items": items, "summary": {"total_items": len(items)}}
-    payload["delivery"] = DeliveryTool(settings).deliver_approved_triage_replies(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approved_triage_replies(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
         dump_json(settings.artifacts_dir / "community" / "approved-triage-replies.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -196,6 +208,7 @@ def cmd_deliver_approved_triage_replies(args: argparse.Namespace) -> int:
 
 
 # ── list + resolve/reopen ──────────────────────────
+
 
 def cmd_list_triage_items(args: argparse.Namespace) -> int:
     payload = build_triage_store_payload(args)
@@ -211,9 +224,12 @@ def cmd_list_calendar_items(args: argparse.Namespace) -> int:
 
 # ── approval queue + audit ─────────────────────────
 
+
 def cmd_deliver_approval_queue(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    items = build_store(settings=settings, args=with_default_store_backend(args)).list_calendar_items(
+    items = build_store(
+        settings=settings, args=with_default_store_backend(args)
+    ).list_calendar_items(
         status=getattr(args, "status", None),
         approval_status=args.approval_status or "pending",
         date=getattr(args, "date", None),
@@ -222,9 +238,16 @@ def cmd_deliver_approval_queue(args: argparse.Namespace) -> int:
     if getattr(args, "score_variants", False):
         items = enrich_items_with_variant_scores(items, memory_db=args.memory_db)
     payload: dict[str, Any] = {"items": items, "summary": summarize_calendar_items(items)}
-    payload["delivery"] = DeliveryTool(settings).deliver_approval_queue(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approval_queue(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
-        dump_json(settings.artifacts_dir / "approvals" / f"approval-queue-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json", payload)
+        dump_json(
+            settings.artifacts_dir
+            / "approvals"
+            / f"approval-queue-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json",
+            payload,
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -241,7 +264,9 @@ def cmd_approval_audit(args: argparse.Namespace) -> int:
 def cmd_deliver_approval_audit(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
     payload = build_approval_audit_payload(args)
-    payload["delivery"] = DeliveryTool(settings).deliver_approval_audit(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_approval_audit(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
         dump_json(settings.artifacts_dir / "approvals" / "approval-audit.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -250,7 +275,9 @@ def cmd_deliver_approval_audit(args: argparse.Namespace) -> int:
 
 def cmd_deliver_metrics_backlog(args: argparse.Namespace) -> int:
     settings = Settings.from_env(root_dir=ROOT_DIR)
-    items = build_store(settings=settings, args=with_default_store_backend(args)).list_calendar_items(
+    items = build_store(
+        settings=settings, args=with_default_store_backend(args)
+    ).list_calendar_items(
         status=getattr(args, "status", "published"),
         approval_status=getattr(args, "approval_status", None),
         date=getattr(args, "date", None),
@@ -258,9 +285,16 @@ def cmd_deliver_metrics_backlog(args: argparse.Namespace) -> int:
         limit=getattr(args, "limit", None),
     )
     payload: dict[str, Any] = {"items": items, "summary": summarize_calendar_items(items)}
-    payload["delivery"] = DeliveryTool(settings).deliver_metrics_backlog(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_metrics_backlog(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
-        dump_json(settings.artifacts_dir / "metrics" / f"metrics-backlog-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json", payload)
+        dump_json(
+            settings.artifacts_dir
+            / "metrics"
+            / f"metrics-backlog-{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}.json",
+            payload,
+        )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -289,7 +323,9 @@ def cmd_deliver_operator_digest(args: argparse.Namespace) -> int:
             print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 0
     payload = build_operator_digest_payload(args)
-    payload["delivery"] = DeliveryTool(settings).deliver_operator_digest(payload, chat_id=args.chat_id)
+    payload["delivery"] = DeliveryTool(settings).deliver_operator_digest(
+        payload, chat_id=args.chat_id
+    )
     if args.save:
         dump_json(settings.artifacts_dir / "ops" / "operator-digest.json", payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -298,8 +334,11 @@ def cmd_deliver_operator_digest(args: argparse.Namespace) -> int:
 
 # ── resolve / reopen / approve / reject ─────────────
 
+
 def cmd_resolve_triage_item(args: argparse.Namespace) -> int:
-    resolved = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).resolve_triage_item(
+    resolved = build_store(
+        settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)
+    ).resolve_triage_item(
         triage_id=args.triage_id,
         resolved_at=args.resolved_at,
         assigned_to=args.assigned_to,
@@ -309,7 +348,9 @@ def cmd_resolve_triage_item(args: argparse.Namespace) -> int:
 
 
 def cmd_reopen_triage_item(args: argparse.Namespace) -> int:
-    reopened = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).reopen_triage_item(
+    reopened = build_store(
+        settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)
+    ).reopen_triage_item(
         triage_id=args.triage_id,
         reopened_at=args.reopened_at,
         assigned_to=args.assigned_to,
@@ -319,7 +360,9 @@ def cmd_reopen_triage_item(args: argparse.Namespace) -> int:
 
 
 def cmd_approve_triage_reply(args: argparse.Namespace) -> int:
-    approved = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).approve_triage_reply(
+    approved = build_store(
+        settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)
+    ).approve_triage_reply(
         triage_id=args.triage_id,
         approved_by=args.approved_by,
         approved_at=args.approved_at,
@@ -330,7 +373,9 @@ def cmd_approve_triage_reply(args: argparse.Namespace) -> int:
 
 
 def cmd_reject_triage_reply(args: argparse.Namespace) -> int:
-    rejected = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).reject_triage_reply(
+    rejected = build_store(
+        settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)
+    ).reject_triage_reply(
         triage_id=args.triage_id,
         reason=args.reason,
         rejected_at=args.rejected_at,
@@ -341,7 +386,9 @@ def cmd_reject_triage_reply(args: argparse.Namespace) -> int:
 
 
 def cmd_mark_triage_reply_sent(args: argparse.Namespace) -> int:
-    sent = build_store(settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)).mark_triage_reply_sent(
+    sent = build_store(
+        settings=Settings.from_env(root_dir=ROOT_DIR), args=with_default_store_backend(args)
+    ).mark_triage_reply_sent(
         triage_id=args.triage_id,
         sent_at=args.sent_at,
         reply_permalink=args.reply_permalink,
@@ -376,7 +423,9 @@ def cmd_reject_caption(args: argparse.Namespace) -> int:
     return 0
 
 
-def _find_calendar_item_for_publish(store: Any, calendar_id: str, allow_unapproved: bool = False) -> dict | None:
+def _find_calendar_item_for_publish(
+    store: Any, calendar_id: str, allow_unapproved: bool = False
+) -> dict | None:
     items = store.list_calendar_items()
     for item in items:
         if str(item.get("calendar_id", "")) == calendar_id:

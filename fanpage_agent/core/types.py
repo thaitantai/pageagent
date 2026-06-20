@@ -21,14 +21,15 @@ class AgentRole(str, Enum):
 
 class ActionPriority(int, Enum):
     CRITICAL = 0  # publishing due
-    HIGH = 1     # calendar gaps, urgent comments
-    MEDIUM = 2   # content prep, triage
-    LOW = 3      # analytics, learning
+    HIGH = 1  # calendar gaps, urgent comments
+    MEDIUM = 2  # content prep, triage
+    LOW = 3  # analytics, learning
 
 
 @dataclass
 class AgentTask:
     """A task assigned to an agent by the orchestrator."""
+
     id: str
     target: AgentRole
     action: str
@@ -41,6 +42,7 @@ class AgentTask:
 @dataclass
 class AgentResult:
     """Result returned by an agent after processing a task."""
+
     task_id: str
     success: bool
     data: Any = None  # dict | ContentPackage | list | str
@@ -52,6 +54,7 @@ class AgentResult:
 @dataclass
 class PipelineState:
     """Snapshot of the entire pipeline state — what the orchestrator sees."""
+
     # Calendar
     pending_approval: int = 0
     approved_ready: int = 0
@@ -104,6 +107,7 @@ class PipelineState:
 @dataclass
 class ContentVariant:
     """A single content variant with performance tracking."""
+
     variant_id: str
     topic: str
     pillar: str
@@ -129,6 +133,7 @@ class ContentVariant:
 @dataclass
 class ContentPackage:
     """A content package with multiple variants for A/B testing."""
+
     package_id: str
     brand_id: str
     scheduled_date: str
@@ -152,6 +157,7 @@ class ContentPackage:
 @dataclass
 class PerformancePattern:
     """A learned pattern about what content performs well."""
+
     pattern_id: str
     pattern_type: str  # hook_style | pillar | format | time | tone
     value: str

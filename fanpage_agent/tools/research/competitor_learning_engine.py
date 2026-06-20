@@ -219,7 +219,8 @@ class CompetitorLearningEngine:
         3. Scan các competitor mới đó
         """
         candidates = self._store.list_competitor_candidates(
-            min_score=min_score, limit=max_new,
+            min_score=min_score,
+            limit=max_new,
         )
         if not candidates:
             return {"status": "no_candidates", "promoted": [], "scan": None}
@@ -257,14 +258,16 @@ class CompetitorLearningEngine:
         trends: list[dict[str, Any]] = []
         for c in competitors[:10]:
             trend = self._store.get_competitor_trend(c["name"])
-            trends.append({
-                "name": c["name"],
-                "scan_count": trend["scan_count"],
-                "auto_discovered": trend["auto_discovered"],
-                "products_tracked": trend["products_tracked"],
-                "new_products": trend["new_products"],
-                "last_scanned": trend["last_scanned"],
-            })
+            trends.append(
+                {
+                    "name": c["name"],
+                    "scan_count": trend["scan_count"],
+                    "auto_discovered": trend["auto_discovered"],
+                    "products_tracked": trend["products_tracked"],
+                    "new_products": trend["new_products"],
+                    "last_scanned": trend["last_scanned"],
+                }
+            )
 
         return {
             "total_competitors": len(competitors),
@@ -315,7 +318,8 @@ class CompetitorLearningEngine:
     # ── Trend detection ─────────────────────────────────────
 
     def _detect_trends(
-        self, profile_names: list[str],
+        self,
+        profile_names: list[str],
     ) -> dict[str, Any]:
         """So sánh snapshot mới nhất vs trước đó → phát hiện thay đổi."""
         new_products_all: dict[str, list[str]] = {}
@@ -328,23 +332,19 @@ class CompetitorLearningEngine:
             if len(snapshots) < 2:
                 # First scan — no trend
                 current = snapshots[0] if snapshots else {}
-                new_products_all[name] = current.get("products_json", []) if isinstance(current, dict) else []
+                new_products_all[name] = (
+                    current.get("products_json", []) if isinstance(current, dict) else []
+                )
                 continue
 
             current = snapshots[0]
             previous = snapshots[1]
 
             cur_products = set(
-                p.lower() for p in (
-                    current["products_json"]
-                    if isinstance(current, dict) else []
-                )
+                p.lower() for p in (current["products_json"] if isinstance(current, dict) else [])
             )
             prev_products = set(
-                p.lower() for p in (
-                    previous["products_json"]
-                    if isinstance(previous, dict) else []
-                )
+                p.lower() for p in (previous["products_json"] if isinstance(previous, dict) else [])
             )
 
             new_products = cur_products - prev_products
@@ -377,9 +377,9 @@ class CompetitorLearningEngine:
             "angle_changes": angle_changes,
             "format_changes": format_changes,
             "rising_products": sorted(
-                product_trends.items(), key=lambda x: x[1], reverse=True,
+                product_trends.items(),
+                key=lambda x: x[1],
+                reverse=True,
             )[:10],
-            "competitors_with_new_products": [
-                n for n, ps in new_products_all.items() if ps
-            ],
+            "competitors_with_new_products": [n for n, ps in new_products_all.items() if ps],
         }

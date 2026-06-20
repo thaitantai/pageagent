@@ -112,7 +112,9 @@ class Settings(BaseModel):
         sources: dict[str, str] = {}
         env_source = env if env is not None else os.environ
         dotenv_disabled = env_source.get("FANPAGE_AGENT_DISABLE_DOTENV", "").lower() in (
-            "1", "true", "yes"
+            "1",
+            "true",
+            "yes",
         )
 
         # 1. .env file (optional, only if root_dir is provided)
@@ -148,6 +150,7 @@ class Settings(BaseModel):
             if field_name == "pages":
                 # JSON env var: FB_PAGES='[{"page_id":"...","page_token":"...","name":"..."}]'
                 import json as _json
+
                 try:
                     parsed = _json.loads(raw)
                     if isinstance(parsed, list):
@@ -253,24 +256,26 @@ class AgentConfig:
     deliver_telegram: bool = True
     system_prompt_prefix: str = ""
 
-    allowed_actions: list[str] = field(default_factory=lambda: [
-        "ops_status",
-        "fill_calendar_gaps",
-        "list_calendar_items",
-        "list_triage_items",
-        "triage_community",
-        "approve_triage_reply",
-        "reject_triage_reply",
-        "approve_calendar_item",
-        "reject_calendar_item",
-        "write_caption",
-        "run_daily",
-        "scheduled_publish",
-        "record_post_metrics",
-        "fetch_fb_comments",
-        "send_telegram_message",
-        "content_stats",
-    ])
+    allowed_actions: list[str] = field(
+        default_factory=lambda: [
+            "ops_status",
+            "fill_calendar_gaps",
+            "list_calendar_items",
+            "list_triage_items",
+            "triage_community",
+            "approve_triage_reply",
+            "reject_triage_reply",
+            "approve_calendar_item",
+            "reject_calendar_item",
+            "write_caption",
+            "run_daily",
+            "scheduled_publish",
+            "record_post_metrics",
+            "fetch_fb_comments",
+            "send_telegram_message",
+            "content_stats",
+        ]
+    )
 
     @classmethod
     def default(cls) -> AgentConfig:
