@@ -104,7 +104,12 @@ class BackupMixin:
             new_idx = current_idx + 1
             # Drop if beyond keep limit
             if new_idx <= keep:
-                p.rename(self._extract_backup_path(new_idx))
+                target = self._extract_backup_path(new_idx)
+                if target.exists():
+                    target.unlink()
+                p.rename(target)
+            else:
+                p.unlink()
 
         # Create new .bak.1 as copy of current DB
         backup_path = self._extract_backup_path(1)

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from scrapling.fetchers import Fetcher
-
 from fanpage_agent.models import TrendItem
 from fanpage_agent.scraping.multi_source_search import MultiSourceSearchClient
 
@@ -153,6 +151,9 @@ class TrendScraper:
             if len(trends) >= max_total:
                 break
             try:
+                # Lazy import để tránh ModuleNotFoundError khi scrapling không installed
+                from scrapling.fetchers import Fetcher
+
                 # Dùng Fetcher tải trang + get_all_text()
                 page = Fetcher.get(sr.url, timeout=self.timeout)
                 if page.status != 200:
@@ -220,6 +221,9 @@ class TrendScraper:
 
         if not url:
             return []
+
+        # Lazy import để tránh ModuleNotFoundError khi scrapling không installed
+        from scrapling.fetchers import Fetcher
 
         page = Fetcher.get(url, timeout=self.timeout)
         if page.status != 200:

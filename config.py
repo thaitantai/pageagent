@@ -167,9 +167,12 @@ class Settings(BaseModel):
             kwargs.setdefault("artifacts_dir", root_dir / "artifacts")
             for key in ("google_service_account_file",):
                 if key in kwargs:
-                    p = Path(kwargs[key])
-                    if not p.is_absolute():
-                        kwargs[key] = root_dir / p
+                    raw_path = str(kwargs[key])
+                    p = Path(raw_path)
+                    if not p.is_absolute() and not raw_path.startswith(("/", "\\")):
+                        kwargs[key] = str(root_dir / p)
+                    else:
+                        kwargs[key] = raw_path
 
         return cls(**kwargs)
 
