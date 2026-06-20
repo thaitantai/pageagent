@@ -333,15 +333,19 @@ def _load_hermes_jobs(jobs_file: Path) -> list[dict]:
 
 
 def _check_wrapper(wrapper_path: Path, project_script: str) -> dict:
+    wrapper_exists = wrapper_path.exists()
+    text = wrapper_path.read_text(encoding="utf-8") if wrapper_exists else ""
+    targets_project_script = project_script in text
+    executable = wrapper_exists and (
+        wrapper_path.stat().st_mode & 0o111 != 0
+        or (os.name == "nt" and targets_project_script)
+    )
     status = {
         "path": str(wrapper_path),
-        "exists": wrapper_path.exists(),
-        "executable": wrapper_path.exists() and wrapper_path.stat().st_mode & 0o111 != 0,
-        "targets_project_script": False,
+        "exists": wrapper_exists,
+        "executable": executable,
+        "targets_project_script": targets_project_script,
     }
-    if wrapper_path.exists():
-        text = wrapper_path.read_text(encoding="utf-8")
-        status["targets_project_script"] = project_script in text
     return status
 
 

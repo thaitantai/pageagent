@@ -1,5 +1,9 @@
 pydantic>=2
+httpx>=0.27
+requests>=2.31
+Pillow>=10
 scrapling>=0.4
+ddgs>=9
 curl_cffi>=0.15
 browserforge>=1.2
 playwright>=1.60

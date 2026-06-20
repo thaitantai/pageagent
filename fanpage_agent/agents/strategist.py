@@ -264,6 +264,7 @@ Yêu cầu output JSON:
             item["selected_variant"] = item["strategy_variants"][0]
             schedule.append(item)
 
+        strategy_packet = self._build_strategy_packet(schedule, research_context, feedback_context)
         return AgentResult(
             task_id=f"plan-{days}d",
             success=True,
@@ -280,6 +281,7 @@ Yêu cầu output JSON:
                 "research_confidence": research_context["confidence_score"],
                 "page_context": research_context.get("page_context", {}),
                 "feedback_context": feedback_context,
+                "strategy_packet": strategy_packet,
                 "generated_by": "template",
             },
         )
@@ -409,6 +411,44 @@ Yêu cầu output JSON:
         if any(word in text for word in ["review", "top", "sản phẩm", "san pham"]):
             return "fair_comparison"
         return "education"
+
+    def _build_strategy_packet(
+        self,
+        schedule: list[dict[str, Any]],
+        research_context: dict[str, Any],
+        feedback_context: dict[str, Any],
+    ) -> dict[str, Any]:
+        approval_items = []
+        for item in schedule:
+            needs_review = bool(item.get("review_required")) or item.get("safe_use") != "public_draft"
+            approval_items.append({
+                "day_offset": item.get("day_offset"),
+                "topic": item.get("topic_template"),
+                "pillar": item.get("pillar"),
+                "content_angle": item.get("content_angle"),
+                "selected_variant": item.get("selected_variant", {}),
+                "safe_use": item.get("safe_use"),
+                "strategy_action": item.get("strategy_action"),
+                "needs_human_review": needs_review,
+                "writer_brief": {
+                    "topic": item.get("topic_template"),
+                    "angle": item.get("content_angle"),
+                    "format": item.get("selected_variant", {}).get("format"),
+                    "cta_policy": item.get("cta_policy"),
+                    "promise_boundaries": item.get("promise_boundaries", []),
+                    "evidence_status": research_context.get("evidence_status", {}),
+                },
+            })
+        return {
+            "schema_version": "strategy_packet.v1",
+            "brand_id": self._brand_id,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "overall_status": research_context.get("evidence_status", {}).get("status", "unknown"),
+            "requires_human_review": any(item["needs_human_review"] for item in approval_items),
+            "approval_items": approval_items,
+            "research_gate": research_context.get("evidence_status", {}),
+            "feedback_used": feedback_context.get("available", False),
+        }
 
     def _feedback_context(self) -> dict[str, Any]:
         if not self._memory:
