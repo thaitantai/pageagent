@@ -49,6 +49,31 @@ from fanpage_agent.legacy_cli import (
 )
 from fanpage_agent.memory import PerformanceMemory
 
+__all__ = [
+    "DEFAULT_CALENDAR_FILE",
+    "DEFAULT_CAMPAIGN_FILE",
+    "DEFAULT_COMMENT_FILE",
+    "DEFAULT_HERMES_CRON_JOBS_FILE",
+    "DEFAULT_HERMES_SCRIPTS_DIR",
+    "DEFAULT_HISTORY_FILE",
+    "DEFAULT_METRICS_FILE",
+    "DEFAULT_TRIAGE_FILE",
+    "EXPECTED_HERMES_CRON_JOBS",
+    "OPS_ARTIFACT_FRESHNESS_HOURS",
+    "ROOT_DIR",
+    "add_store_backend_arg",
+    "build_approval_audit_payload",
+    "build_calendar_store_payload",
+    "build_daily_artifacts",
+    "build_operator_digest_payload",
+    "build_research_brief",
+    "build_triage_store_payload",
+    "cli",
+    "create_pipeline",
+    "run_status",
+    "run_tick",
+]
+
 
 def _load_pages() -> list[dict[str, Any]]:
     """Load page configs from Settings if available."""
@@ -484,7 +509,10 @@ def _run_research_standalone(
 ) -> None:
     from config import Settings
     from fanpage_agent.adapters.page_registry import PageRegistry
-    from fanpage_agent.tools.research.research_packet import build_research_packet, save_research_packet
+    from fanpage_agent.tools.research.research_packet import (
+        build_research_packet,
+        save_research_packet,
+    )
 
     page_context = PageRegistry(Settings.from_env()).page_context(page_id)
     packet = build_research_packet(
@@ -625,7 +653,6 @@ def _run_competitor_learn(
     data_dir: str = "data/agent",
 ) -> None:
     """competitor-learn CLI handler."""
-    import os
 
     from fanpage_agent.adapters.sqlite_store import UnifiedStore
     from fanpage_agent.tools.research.competitor_learning_engine import (

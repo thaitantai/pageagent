@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fanpage_agent.tools.research.competitor_helpers import (
     _AFFILIATE_CLUE_WORDS,
@@ -30,11 +30,11 @@ from fanpage_agent.tools.research.competitor_helpers import (
     _MIN_CLUE_WORDS,
     _NICHE_PRODUCT_MARKERS,
     _QUERY_TEMPLATES,
-    is_noise_url,
-    has_skincare_context,
     detect_content_format,
-    estimate_price_positioning,
     estimate_content_tone,
+    estimate_price_positioning,
+    has_skincare_context,
+    is_noise_url,
 )
 from fanpage_agent.tools.research.competitor_models import (
     CompetitorProfile,
@@ -111,7 +111,6 @@ class CompetitorPageDiscoveryTool:
         """
         existing = set(existing_offers or [])
         discovered_pages: list[str] = []
-        seen_pages: set[str] = set()
         candidates: list[ProductTopicCandidate] = []
 
         names_to_scan = competitor_names[:max_pages_to_scan]
@@ -167,7 +166,6 @@ class CompetitorPageDiscoveryTool:
 
         Đây là API mới, sịn sò hơn discover().
         """
-        from collections import Counter
 
         now = datetime.now(timezone.utc).isoformat(timespec="minutes")
         profiles: list[CompetitorProfile] = []

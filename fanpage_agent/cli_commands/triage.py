@@ -3,20 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import date, datetime, timezone
-
-from typing import Any, cast
+from typing import Any
 
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
-from fanpage_agent.tools.publishing.delivery import DeliveryTool
-from fanpage_agent.core.types import ContentPackage, ContentVariant
-from fanpage_agent.tools.publishing.telegram_formatter import TelegramFormatterTool
-from fanpage_agent.utils import dump_json
 from fanpage_agent.loaders.brand_loader import load_brand_profile
+from fanpage_agent.tools.publishing.delivery import DeliveryTool
+from fanpage_agent.utils import dump_json
 
-from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
-from .content import _content_package_from_caption_item, enrich_items_with_variant_scores
-from .research import summarize_calendar_items, summarize_triage_items, build_triage_store_payload
+from .content import enrich_items_with_variant_scores
+from .parser import ROOT_DIR, with_default_store_backend
+from .research import build_triage_store_payload, summarize_calendar_items, summarize_triage_items
 
 
 def build_calendar_store_payload(args: argparse.Namespace) -> dict:

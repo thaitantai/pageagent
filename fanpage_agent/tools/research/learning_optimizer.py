@@ -20,8 +20,6 @@ NOTE: ConfidenceCalibrator → learning_calibrator.py
 from __future__ import annotations
 
 import logging
-import math
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from fanpage_agent.tools.research.learning_calibrator import ConfidenceCalibrator

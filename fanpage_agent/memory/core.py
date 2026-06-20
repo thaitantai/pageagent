@@ -14,7 +14,6 @@ import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from fanpage_agent.core.types import ContentPackage, PerformancePattern
 from fanpage_agent.memory.backup import BackupMixin

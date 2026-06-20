@@ -9,6 +9,8 @@ from typing import Any, Protocol
 
 from fanpage_agent.models import ResearchSource, SourceDocument
 
+logger = logging.getLogger(__name__)
+
 try:
     from scrapling.fetchers import Fetcher
 except ImportError:

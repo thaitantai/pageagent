@@ -18,19 +18,15 @@ from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.tools.analytics.analytics import AnalyticsTool
-from fanpage_agent.tools.content.image_gen import build_image_service
-from fanpage_agent.tools.publishing.delivery import DeliveryTool
-from fanpage_agent.tools.publishing.planner import PlannerTool
-from fanpage_agent.tools.content.verifier import VerifierTool
-from fanpage_agent.tools.content.writer import WriterTool
-from fanpage_agent.tools.content.auto_approval import AutoApprovalConfig, AutoApprovalEngine
-from fanpage_agent.tools.content.auto_content import AutoContentOrchestrator
-from fanpage_agent.tools.publishing.calendar_gap_service import CalendarGapTool
-from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool
-from fanpage_agent.tools.publishing.scheduled_publish import ScheduledPublishTool
+from fanpage_agent.models import ResearchBrief
 from fanpage_agent.scraping.trend_scraper import TrendScraper
 from fanpage_agent.scraping.web_search import WebSearchClient
+from fanpage_agent.tools.analytics.analytics import AnalyticsTool
+from fanpage_agent.tools.content.auto_approval import AutoApprovalConfig, AutoApprovalEngine
+from fanpage_agent.tools.content.auto_content import AutoContentOrchestrator
+from fanpage_agent.tools.content.verifier import VerifierTool
+from fanpage_agent.tools.publishing.delivery import DeliveryTool
+from fanpage_agent.tools.publishing.planner import PlannerTool
 from fanpage_agent.tools.research.research import ResearchTool
 from fanpage_agent.tools.research.research_packet import (
     build_research_packet,
@@ -38,10 +34,8 @@ from fanpage_agent.tools.research.research_packet import (
     save_research_packet,
 )
 from fanpage_agent.utils import dump_json
-from fanpage_agent.models import ResearchBrief
 
-from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
-
+from .parser import ROOT_DIR
 
 # ── helpers ─────────────────────────────────────────────────────────────
 
@@ -129,13 +123,10 @@ def cmd_deliver_research_brief(args: argparse.Namespace) -> int:
 
 
 def cmd_auto_content_cycle(args: argparse.Namespace) -> int:
-    from fanpage_agent.tools.content.auto_content import AutoContentOrchestrator
     from fanpage_agent.tools.content.writer import WriterTool as WriterService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=args)
-
-    research_tool = _build_research_tool()
 
     brand_profile = None
     if args.brand_file:
@@ -179,14 +170,10 @@ def cmd_auto_content_cycle(args: argparse.Namespace) -> int:
 
 
 def cmd_run_daily(args: argparse.Namespace) -> int:
+    from fanpage_agent.tools.content.writer import WriterTool as WriterService
     from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool as DailyOpsService
     from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
-    from fanpage_agent.tools.research.research_packet import (
-        build_research_packet,
-        packet_to_brief_payload,
-        save_research_packet,
-    )
-    from fanpage_agent.tools.content.writer import WriterTool as WriterService
+
     from .research import build_daily_artifacts
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -244,14 +231,10 @@ def cmd_run_daily(args: argparse.Namespace) -> int:
 
 
 def cmd_deliver_daily_packet(args: argparse.Namespace) -> int:
+    from fanpage_agent.tools.content.writer import WriterTool as WriterService
     from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool as DailyOpsService
     from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
-    from fanpage_agent.tools.research.research_packet import (
-        build_research_packet,
-        packet_to_brief_payload,
-        save_research_packet,
-    )
-    from fanpage_agent.tools.content.writer import WriterTool as WriterService
+
     from .research import build_daily_artifacts
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
@@ -336,7 +319,6 @@ def cmd_publish_post(args: argparse.Namespace) -> int:
 
 
 def cmd_process_pending(args: argparse.Namespace) -> int:
-    from fanpage_agent.tools.content.auto_approval import AutoApprovalConfig, AutoApprovalEngine
     from fanpage_agent.tools.content.verifier import VerifierTool as VerifierService
 
     profile = load_brand_profile(args.brand_file)
@@ -364,8 +346,10 @@ def cmd_process_pending(args: argparse.Namespace) -> int:
 
 
 def cmd_scheduled_publish(args: argparse.Namespace) -> int:
-    from fanpage_agent.tools.publishing.scheduled_publish import ScheduledPublishTool as ScheduledPublishService
     from fanpage_agent.tools.content.verifier import VerifierTool as VerifierService
+    from fanpage_agent.tools.publishing.scheduled_publish import (
+        ScheduledPublishTool as ScheduledPublishService,
+    )
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
@@ -510,9 +494,11 @@ def cmd_check_calendar_gaps(args: argparse.Namespace) -> int:
 
 def cmd_fill_calendar_gaps(args: argparse.Namespace) -> int:
     """Auto-detect and fill gaps in the content calendar."""
-    from fanpage_agent.tools.publishing.calendar_gap_service import CalendarGapTool as CalendarGapService
-    from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
     from fanpage_agent.tools.content.writer import WriterTool as WriterService
+    from fanpage_agent.tools.publishing.calendar_gap_service import (
+        CalendarGapTool as CalendarGapService,
+    )
+    from fanpage_agent.tools.publishing.planner import PlannerTool as PlannerService
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     profile = load_brand_profile(args.brand_file)
@@ -674,8 +660,8 @@ def cmd_queue_reject(args: argparse.Namespace) -> int:
 
 def cmd_queue_publish(args: argparse.Namespace) -> int:
     """Publish approved queue items to Facebook."""
-    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
     from fanpage_agent.adapters.facebook_client import FacebookClient
+    from fanpage_agent.tools.publishing.content_queue import ContentQueueTool
 
     settings = Settings.from_env(root_dir=ROOT_DIR)
     store = build_store(settings=settings, args=args)
@@ -790,7 +776,6 @@ def cmd_build_strategy(args: argparse.Namespace) -> int:
         # Build fresh research brief
         from .research import build_research_brief
 
-        store = build_store(settings=settings, args=args)
         # We create dummy args to call build_research_brief
         dummy_args = argparse.Namespace(
             comment_file=None,

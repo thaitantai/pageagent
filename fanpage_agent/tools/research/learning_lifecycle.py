@@ -36,7 +36,6 @@ class DecayModel:
 
     def run(self, force_decay: bool = False) -> dict[str, Any]:
         """Apply decay to topic_performance records. Returns decay summary."""
-        from fanpage_agent.tools.research.topic_performance import TopicPerformanceStore
 
         tp = self._store.get_topic_performance()
         if not tp:

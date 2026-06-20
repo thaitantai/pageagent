@@ -9,9 +9,9 @@ from pathlib import Path
 from fanpage_agent.adapters.sheet_store import LocalSheetStore as Store
 from fanpage_agent.models import BrandProfile, WeeklyPlan
 from fanpage_agent.tools.content.auto_approval import AutoApprovalConfig, AutoApprovalEngine
-from fanpage_agent.tools.publishing.planner import PlannerTool
 from fanpage_agent.tools.content.verifier import VerifierTool
 from fanpage_agent.tools.content.writer import WriterTool
+from fanpage_agent.tools.publishing.planner import PlannerTool
 
 
 @dataclass

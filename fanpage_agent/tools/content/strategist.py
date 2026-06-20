@@ -469,7 +469,7 @@ Viết reasoning bằng tiếng Việt. Phân bổ pillar phải dựa trên m�
                 parts.append(f"  - {q}")
 
         if research_brief.competitor_analysis:
-            parts.append(f"\nCOMPETITOR ANALYSIS: available")
+            parts.append("\nCOMPETITOR ANALYSIS: available")
 
         if research_brief.overused_topics:
             parts.append(f"\nTRÁNH (overused): {', '.join(research_brief.overused_topics[:5])}")
