@@ -15,9 +15,9 @@ from fanpage_agent.models import (
     ResearchBrief,
     TrendItem,
 )
+from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.tools.publishing.planner import PlannerTool
 from fanpage_agent.tools.research.research import ResearchTool
-from fanpage_agent.tools.content.writer import WriterTool
 
 logger = logging.getLogger(__name__)
 

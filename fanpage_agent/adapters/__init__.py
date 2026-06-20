@@ -5,3 +5,9 @@ from fanpage_agent.adapters.llm import (
     OpenAICompatibleClient,
     build_llm_client,
 )
+
+__all__ = [
+    "MockLLMClient",
+    "OpenAICompatibleClient",
+    "build_llm_client",
+]

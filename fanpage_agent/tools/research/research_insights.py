@@ -182,7 +182,6 @@ class ResearchQualityGate:
         external_trends = external_trends or []
         warnings: list[str] = []
 
-        source_names = {item.source for item in evidence if item.source}
         url_count = sum(1 for item in evidence if item.url)
         sourced_claims = [item for item in evidence if item.evidence_type in {"source_claim", "external_source"}]
         corroborated_claims = [item for item in sourced_claims if item.support_count >= 2]

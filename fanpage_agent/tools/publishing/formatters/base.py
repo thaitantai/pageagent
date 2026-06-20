@@ -12,8 +12,8 @@ Each mixin lives in its own module under formatters/:
 from fanpage_agent.tools.publishing.formatters.helpers import _HelpersMixin
 from fanpage_agent.tools.publishing.formatters.plan import _PlanMixin
 from fanpage_agent.tools.publishing.formatters.report import _ReportMixin
-from fanpage_agent.tools.publishing.formatters.triage import _TriageMixin
 from fanpage_agent.tools.publishing.formatters.research import _ResearchMixin
+from fanpage_agent.tools.publishing.formatters.triage import _TriageMixin
 
 
 class TelegramFormatterTool(

@@ -1,68 +1,66 @@
 from __future__ import annotations
 
-import sys
-
-from .parser import build_parser
-from .research import cmd_research_brief, cmd_search_trends, cmd_research_trends, cmd_learn
-from .content import cmd_write_caption, cmd_generate_hashtags
-from .publishing import (
-    cmd_plan_week,
-    cmd_deliver_research_brief,
-    cmd_auto_content_cycle,
-    cmd_build_strategy,
-    cmd_run_daily,
-    cmd_deliver_daily_packet,
-    cmd_publish_post,
-    cmd_process_pending,
-    cmd_scheduled_publish,
-    cmd_generate_image,
-    cmd_list_calendar,
-    cmd_approve_calendar_item,
-    cmd_reject_calendar_item,
-    cmd_check_calendar_gaps,
-    cmd_fill_calendar_gaps,
-    cmd_record_post_metrics,
-    cmd_weekly_report,
-    cmd_deliver_weekly_report,
-    # Phase 4: Content Queue
-    cmd_queue_show,
-    cmd_queue_enqueue,
-    cmd_queue_approve,
-    cmd_queue_reject,
-    cmd_queue_publish,
-    cmd_queue_stats,
-)
-from .triage import (
-    cmd_triage_community,
-    cmd_deliver_triage_community,
-    cmd_deliver_approved_triage_replies,
-    cmd_list_triage_items,
-    cmd_list_calendar_items,
-    cmd_deliver_approval_queue,
-    cmd_approval_audit,
-    cmd_deliver_approval_audit,
-    cmd_deliver_metrics_backlog,
-    cmd_deliver_operator_digest,
-    cmd_resolve_triage_item,
-    cmd_reopen_triage_item,
-    cmd_approve_triage_reply,
-    cmd_reject_triage_reply,
-    cmd_mark_triage_reply_sent,
-    cmd_approve_caption,
-    cmd_reject_caption,
-)
 from .analytics import (
     cmd_analytics_review,
+    cmd_auto_fetch_metrics,
     cmd_deliver_analytics_review,
-    cmd_generate_dashboard,
     cmd_deliver_dashboard,
     cmd_eval_all,
-    cmd_auto_fetch_metrics,
     cmd_fetch_fb_comments,
     cmd_fetch_fb_data,
+    cmd_generate_dashboard,
 )
-from .ops import cmd_ops_status, cmd_hermes_cron_status
+from .content import cmd_generate_hashtags, cmd_write_caption
+from .ops import cmd_hermes_cron_status, cmd_ops_status
+from .parser import build_parser
 from .preview import cmd_preview_telegram, cmd_send_telegram_preview
+from .publishing import (
+    cmd_approve_calendar_item,
+    cmd_auto_content_cycle,
+    cmd_build_strategy,
+    cmd_check_calendar_gaps,
+    cmd_deliver_daily_packet,
+    cmd_deliver_research_brief,
+    cmd_deliver_weekly_report,
+    cmd_fill_calendar_gaps,
+    cmd_generate_image,
+    cmd_list_calendar,
+    cmd_plan_week,
+    cmd_process_pending,
+    cmd_publish_post,
+    cmd_queue_approve,
+    cmd_queue_enqueue,
+    cmd_queue_publish,
+    cmd_queue_reject,
+    # Phase 4: Content Queue
+    cmd_queue_show,
+    cmd_queue_stats,
+    cmd_record_post_metrics,
+    cmd_reject_calendar_item,
+    cmd_run_daily,
+    cmd_scheduled_publish,
+    cmd_weekly_report,
+)
+from .research import cmd_learn, cmd_research_brief, cmd_research_trends, cmd_search_trends
+from .triage import (
+    cmd_approval_audit,
+    cmd_approve_caption,
+    cmd_approve_triage_reply,
+    cmd_deliver_approval_audit,
+    cmd_deliver_approval_queue,
+    cmd_deliver_approved_triage_replies,
+    cmd_deliver_metrics_backlog,
+    cmd_deliver_operator_digest,
+    cmd_deliver_triage_community,
+    cmd_list_calendar_items,
+    cmd_list_triage_items,
+    cmd_mark_triage_reply_sent,
+    cmd_reject_caption,
+    cmd_reject_triage_reply,
+    cmd_reopen_triage_item,
+    cmd_resolve_triage_item,
+    cmd_triage_community,
+)
 
 
 def main() -> int:

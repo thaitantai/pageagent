@@ -4,7 +4,6 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from fanpage_agent.adapters.store_factory import build_store
@@ -18,7 +17,7 @@ from fanpage_agent.tools.research.competitor_page_discovery import (
 from fanpage_agent.tools.research.research import ResearchTool
 from fanpage_agent.utils import dump_json
 
-from .parser import ROOT_DIR, add_store_backend_arg, with_default_store_backend
+from .parser import ROOT_DIR, with_default_store_backend
 
 
 def _build_research_service(
@@ -276,7 +275,6 @@ def cmd_learn(args: argparse.Namespace) -> int:
             for t in entry["topics"]:
                 posts = t["total_posts"]
                 days_post = t["days_since_publish"]
-                days_stage = t["days_in_stage"]
                 last = t["last_published"] or "never"
                 print(f"      {t['topic'][:40]:40s} | {posts} posts | last {last} ({days_post}d ago)")
         return 0
@@ -307,7 +305,9 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     if args.auto_discover:
         from fanpage_agent.tools.research.competitor_learning_engine import CompetitorLearningEngine
-        from fanpage_agent.tools.research.competitor_page_discovery import CompetitorPageDiscoveryTool
+        from fanpage_agent.tools.research.competitor_page_discovery import (
+            CompetitorPageDiscoveryTool,
+        )
 
         discovery_tool = CompetitorPageDiscoveryTool()
         engine = CompetitorLearningEngine(
@@ -366,7 +366,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
             if pq.get("drift_message"):
                 print(f"  ⚠ {pq['drift_message']}")
         else:
-            print(f"\n=== 🔮 Performance Predictor ===")
+            print("\n=== 🔮 Performance Predictor ===")
             print(f"  {pq.get('message', 'Not trained yet.')}")
 
         runs = store.get_learning_runs(limit=5)
@@ -453,7 +453,9 @@ def cmd_learn(args: argparse.Namespace) -> int:
 
     # Lifecycle transition is always run as part of --all
     if args.all:
-        from fanpage_agent.tools.research.learning_optimizer import LifecycleManager as _LifecycleManager
+        from fanpage_agent.tools.research.learning_optimizer import (
+            LifecycleManager as _LifecycleManager,
+        )
         results["lifecycle"] = _LifecycleManager(store).run()
 
     if args.predict:

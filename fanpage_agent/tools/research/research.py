@@ -20,10 +20,10 @@ from fanpage_agent.models import (
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import TrendScraper
+from fanpage_agent.tools.research.competitor_learning_engine import CompetitorLearningEngine
 from fanpage_agent.tools.research.competitor_page_discovery import (
     CompetitorPageDiscoveryTool,
 )
-from fanpage_agent.tools.research.competitor_learning_engine import CompetitorLearningEngine
 from fanpage_agent.tools.research.offer_discovery import OfferDiscoveryTool
 from fanpage_agent.tools.research.offer_evaluator import OfferEvaluator
 from fanpage_agent.tools.research.product_topic_discovery import (
@@ -31,15 +31,27 @@ from fanpage_agent.tools.research.product_topic_discovery import (
     ProductTopicCandidate,
 )
 from fanpage_agent.tools.research.research_helpers import (
-    read_comments as _read_comments,
-    read_campaign_notes as _read_campaign_notes,
-    dedupe as _dedupe,
-    keyword_overlap_score as _keyword_overlap_score,
     confidence_score as _confidence_score,
+)
+from fanpage_agent.tools.research.research_helpers import (
+    dedupe as _dedupe,
+)
+from fanpage_agent.tools.research.research_helpers import (
+    keyword_overlap_score as _keyword_overlap_score,
+)
+from fanpage_agent.tools.research.research_helpers import (
     quality_warnings as _quality_warnings,
 )
+from fanpage_agent.tools.research.research_helpers import (
+    read_campaign_notes as _read_campaign_notes,
+)
+from fanpage_agent.tools.research.research_helpers import (
+    read_comments as _read_comments,
+)
 from fanpage_agent.tools.research.research_insights import EvidenceExtractor, ResearchQualityGate
-from fanpage_agent.tools.research.search_query_builder import build_search_queries as _build_queries_smart
+from fanpage_agent.tools.research.search_query_builder import (
+    build_search_queries as _build_queries_smart,
+)
 
 logger = logging.getLogger(__name__)
 

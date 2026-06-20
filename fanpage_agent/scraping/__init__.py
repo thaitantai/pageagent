@@ -1,10 +1,10 @@
 from fanpage_agent.scraping.multi_source_search import (
-    MultiSourceSearchClient,
-    SearchResult,
-    SearchBackend,
-    VNCrawlerBackend,
-    SearXNGBackend,
     DDGBackend,
+    MultiSourceSearchClient,
+    SearchBackend,
+    SearchResult,
+    SearXNGBackend,
+    VNCrawlerBackend,
 )
 from fanpage_agent.scraping.trend_analyzer import TrendAnalyzer
 from fanpage_agent.scraping.trend_scraper import DEFAULT_TREND_SOURCES, TrendScraper

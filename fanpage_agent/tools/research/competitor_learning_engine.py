@@ -14,16 +14,13 @@ NOTE: Helper functions đã chuyển sang competitor_learning_store.py.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from fanpage_agent.tools.research.competitor_learning_store import (
     _AUTO_PROMOTE_MIN_SCORE,
     _DISCOVERY_QUERIES,
-    _CANDIDATE_MENTION_SCORE,
     extract_brand_names,
     extract_next_topics,
     insight_to_gaps,
@@ -351,7 +348,6 @@ class CompetitorLearningEngine:
             )
 
             new_products = cur_products - prev_products
-            dropped_products = prev_products - cur_products
 
             if new_products:
                 new_products_all[name] = sorted(new_products)[:5]

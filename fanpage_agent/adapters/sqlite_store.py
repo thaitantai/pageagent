@@ -2091,7 +2091,6 @@ class UnifiedStore:
     ) -> list[dict[str, Any]]:
         """List all competitors."""
         conditions: list[str] = []
-        params: list[Any] = []
         if active_only:
             conditions.append("is_active = 1")
         if auto_only:

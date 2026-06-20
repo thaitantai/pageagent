@@ -5,10 +5,8 @@ Extracted from competitor_learning_engine.py for cleaner separation.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -88,7 +86,6 @@ def extract_brand_names(
     Heuristic-based: tìm uppercase phrases, brand-like patterns.
     """
     candidates: list[tuple[str, float]] = []
-    text_lower = text.lower()
 
     # Pattern: "X vs Y" / "X hay Y" / "X và Y"
     comparison_matches = re.findall(

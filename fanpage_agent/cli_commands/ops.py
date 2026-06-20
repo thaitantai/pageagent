@@ -11,11 +11,11 @@ from typing import Any
 from fanpage_agent.config import Settings
 
 from .parser import (
-    ROOT_DIR,
     DEFAULT_HERMES_CRON_JOBS_FILE,
     DEFAULT_HERMES_SCRIPTS_DIR,
     EXPECTED_HERMES_CRON_JOBS,
     OPS_ARTIFACT_FRESHNESS_HOURS,
+    ROOT_DIR,
 )
 
 

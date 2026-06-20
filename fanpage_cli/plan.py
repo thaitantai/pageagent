@@ -19,12 +19,12 @@ from fanpage_agent.main import (
     build_research_brief,
 )
 from fanpage_agent.tools.analytics.analytics import AnalyticsTool
+from fanpage_agent.tools.content.verifier import VerifierTool
+from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.tools.publishing.daily_ops import DailyOpsTool
 from fanpage_agent.tools.publishing.delivery import DeliveryTool
 from fanpage_agent.tools.publishing.planner import PlannerTool
 from fanpage_agent.tools.research.research import ResearchTool
-from fanpage_agent.tools.content.verifier import VerifierTool
-from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.utils import dump_json
 
 
