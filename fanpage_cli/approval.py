@@ -4,22 +4,22 @@ import argparse
 import json
 
 from fanpage_agent.config import Settings
-from fanpage_agent.main import (
+from fanpage_agent.cli_commands import (
+    build_approval_audit_payload,
+    build_calendar_store_payload,
+    build_operator_digest_payload,
+)
+from fanpage_agent.cli_common import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
     DEFAULT_TRIAGE_FILE,
     ROOT_DIR,
-    build_approval_audit_payload,
-    build_calendar_store_payload,
-    build_operator_digest_payload,
+    add_store_backend_arg,
 )
 from fanpage_agent.tools.publishing.delivery import DeliveryTool
 from fanpage_agent.utils import dump_json
 
-
-def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--store-backend", choices=["local", "google"])
 
 
 def register_subcommand(subparsers) -> None:

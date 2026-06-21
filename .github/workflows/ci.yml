@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Run lint
+        run: uv run ruff check .
+
+      - name: Smoke test CLI
+        run: |
+          uv run fanpage-agent --help
+          uv run python -m fanpage_agent.main roadmap-status
+
+      - name: Run tests
+        run: uv run python -m pytest -q --basetemp .pytest-tmp

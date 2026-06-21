@@ -372,6 +372,32 @@ class TestWriterAgent:
         assert "AAD" in package.variants[0].caption
         assert "giúp cộng đồng" in package.variants[0].caption
 
+    def test_write_variants_blocks_draft_questions_only_packets(self, agent):
+        task = AgentTask(
+            id="w-blocked",
+            target=AgentRole.WRITER,
+            action="write_variants",
+            params={
+                "topic": "Review serum đang hot",
+                "pillar": "product_review",
+                "variants": 1,
+                "research_packet": {
+                    "packet_id": "rpkt-blocked",
+                    "status": "blocked",
+                    "gate_reasons": ["chưa có source_documents đã kiểm chứng"],
+                    "handoff_policy": {"max_safe_use": "draft_questions_only"},
+                    "brief": {
+                        "topic_scores": [{"topic": "Review serum đang hot", "total_score": 0.7}]
+                    },
+                },
+            },
+        )
+
+        result = agent.process(task)
+
+        assert not result.success
+        assert "Evidence gate blocked writer claims" in result.error
+
     def test_generate_hooks(self, agent):
         task = AgentTask(id="h1", target=AgentRole.WRITER, action="generate_hooks",
                         params={"topic": "Chống nắng", "count": 3})

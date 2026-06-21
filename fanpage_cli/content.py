@@ -11,7 +11,7 @@ from fanpage_agent.adapters.sheet_store import LocalSheetStore
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.main import (
+from fanpage_agent.cli_common import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,

@@ -21,6 +21,7 @@ from fanpage_agent.core.types import (
     ContentVariant,
 )
 from fanpage_agent.prompts._loader import PromptLoader
+from fanpage_agent.research_handoff import normalize_research_handoff
 
 
 def _extract_research_grounding(
@@ -29,23 +30,11 @@ def _extract_research_grounding(
     """Return concise writer grounding from a ResearchPacket-shaped dict."""
     if not research_packet:
         return "", [], ""
-    brief = research_packet.get("brief", {}) if isinstance(research_packet, dict) else {}
-    evidence = brief.get("evidence", []) if isinstance(brief, dict) else []
-    refs: list[dict[str, Any]] = []
-    for item in evidence[:3]:
-        if not isinstance(item, dict):
-            continue
-        refs.append(
-            {
-                "claim": item.get("claim", ""),
-                "source": item.get("source", ""),
-                "url": item.get("url", ""),
-                "confidence": item.get("confidence", 0.0),
-            }
-        )
-    packet_id = (
-        str(research_packet.get("packet_id", "")) if isinstance(research_packet, dict) else ""
-    )
+    handoff = normalize_research_handoff(research_packet)
+    refs = [
+        item for item in handoff.get("evidence_refs", []) if isinstance(item, dict)
+    ]
+    packet_id = str(handoff.get("packet_id", ""))
     lines = [f"- {ref['claim']} (source: {ref['source']})" for ref in refs if ref.get("claim")]
     return "\n".join(lines), refs, packet_id
 
@@ -229,18 +218,15 @@ class WriterAgent(BaseAgent):
         evidence_text, evidence_refs, research_packet_id = _extract_research_grounding(
             research_packet
         )
-        if isinstance(research_packet, dict):
-            policy = research_packet.get("handoff_policy") or {}
-            if isinstance(policy, dict) and policy.get("max_safe_use") == "draft_questions_only":
-                reasons = research_packet.get("gate_reasons") or [
-                    "research evidence gate blocked writer claims"
-                ]
-                return AgentResult(
-                    task_id=f"write-{package_id}",
-                    success=False,
-                    error="Evidence gate blocked writer claims: "
-                    + "; ".join(str(item) for item in reasons),
-                )
+        handoff = normalize_research_handoff(research_packet)
+        if handoff.get("safe_use") == "draft_questions_only":
+            reasons = handoff.get("gate_reasons") or ["research evidence gate blocked writer claims"]
+            return AgentResult(
+                task_id=f"write-{package_id}",
+                success=False,
+                error="Evidence gate blocked writer claims: "
+                + "; ".join(str(item) for item in reasons),
+            )
         page_id = str(page_context.get("page_id", ""))
 
         # ── Tick offset for format rotation across days ──

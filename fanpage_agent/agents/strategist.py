@@ -18,6 +18,7 @@ from fanpage_agent.core.types import (
     AgentTask,
 )
 from fanpage_agent.prompts._loader import PromptLoader
+from fanpage_agent.research_handoff import normalize_research_handoff
 
 
 def _strategist_system_prompt() -> str:
@@ -301,13 +302,11 @@ Yêu cầu output JSON:
 
     def _normalise_research_context(self, research_brief: dict | None) -> dict[str, Any]:
         packet = research_brief or {}
-        brief = packet
-        if "brief" in brief and isinstance(brief.get("brief"), dict):
-            brief = brief["brief"]
-
+        handoff = normalize_research_handoff(packet)
         evidence_status = self._evidence_status(packet)
         priority_topics = []
-        for item in brief.get("topic_scores", [])[:10]:
+        raw_topics = list(handoff.get("priority_topics", [])) + list(handoff.get("blocked_topics", []))
+        for item in raw_topics[:10]:
             if isinstance(item, dict) and item.get("topic"):
                 topic_guard = self._topic_guardrails(item, evidence_status)
                 priority_topics.append(
@@ -330,7 +329,7 @@ Yêu cầu output JSON:
         if not priority_topics:
             priority_topics = [
                 {"topic": t, "total_score": 0, "duplication_risk": 0}
-                for t in brief.get("next_angles", [])[:10]
+                for t in handoff.get("findings", [])[:10]
             ]
 
         writable_topics = [
@@ -339,9 +338,7 @@ Yêu cầu output JSON:
             if topic.get("strategy_action") != "research_follow_up"
         ]
 
-        findings = []
-        for finding in brief.get("findings", [])[:10]:
-            findings.append(str(finding))
+        findings = [str(finding) for finding in handoff.get("findings", [])[:10]]
 
         return {
             "priority_topics": writable_topics,
@@ -351,9 +348,9 @@ Yêu cầu output JSON:
                 if topic.get("strategy_action") == "research_follow_up"
             ],
             "findings": findings,
-            "confidence_score": brief.get("confidence_score", 0),
+            "confidence_score": handoff.get("confidence_score", 0),
             "evidence_status": evidence_status,
-            "page_context": packet.get("page_context", {}) if isinstance(packet, dict) else {},
+            "page_context": handoff.get("page_context", {}),
         }
 
     @staticmethod

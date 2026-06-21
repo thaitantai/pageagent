@@ -1,4 +1,4 @@
-# Fanpage Agent Next Steps Implementation Plan
+# Fanpage Agent Operational Next Steps Plan
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task when doing larger follow-up rounds.
 
