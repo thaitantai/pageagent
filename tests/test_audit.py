@@ -6,6 +6,8 @@ import contextlib
 import io
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -14,6 +16,7 @@ from pathlib import Path
 from fanpage_agent.audit import AuditManager, audit, audit_sync
 from fanpage_agent.audit.auditor import AuditEntry
 from fanpage_agent.main import _run_harness_status, _run_roadmap_status
+from tests.test_env import isolated_subprocess_env
 
 
 class AuditManagerTest(unittest.TestCase):
@@ -248,6 +251,7 @@ class AuditHelpersTest(unittest.TestCase):
         # This writes to the real data/agent/audit.db — use a small tmp
         with tempfile.TemporaryDirectory() as td:
             import os
+
             old = os.environ.get("AUDIT_DB_DIR", "")
             from fanpage_agent.audit.auditor import _DEFAULT_DATA_DIR
 
@@ -354,6 +358,20 @@ class HarnessStatusCliTest(unittest.TestCase):
 
 
 class RoadmapStatusCliTest(unittest.TestCase):
+    def test_roadmap_status_cli_runs_through_runtime_dispatcher(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        completed = subprocess.run(
+            [sys.executable, "-m", "fanpage_agent.main", "roadmap-status"],
+            cwd=root,
+            env=isolated_subprocess_env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["status"], "ok")
+        self.assertTrue(payload["roadmap"].endswith("docs/roadmaps/roadmap-next.md"))
+
     def test_roadmap_status_reads_next_roadmap(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -361,7 +379,7 @@ class RoadmapStatusCliTest(unittest.TestCase):
 
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["status"], "ok")
-        self.assertTrue(payload["roadmap"].endswith("docs/roadmap-next.md"))
+        self.assertTrue(payload["roadmap"].endswith("docs/roadmaps/roadmap-next.md"))
         self.assertGreaterEqual(payload["phases_total"], 5)
         self.assertIn("Phase 1", payload["current_phase"])
         self.assertGreaterEqual(len(payload["immediate_priorities"]), 1)
@@ -369,6 +387,15 @@ class RoadmapStatusCliTest(unittest.TestCase):
         self.assertIn("progress_entries", payload)
         self.assertIn("next_recommended_actions", payload)
         self.assertIn("remaining_tasks", payload["phase_statuses"][0])
+
+    def test_roadmap_status_parses_accented_roadmap_sections(self) -> None:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            _run_roadmap_status()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertGreater(payload["phase_statuses"][0]["tasks_total"], 0)
+        self.assertGreater(len(payload["progress_entries"]), 0)
 
 
 if __name__ == "__main__":
