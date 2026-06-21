@@ -8,6 +8,7 @@
 - [Quick Start](#quick-start)
 - [Usage](#usage)
 - [Architecture](#architecture)
+- [Architecture Decisions](#architecture-decisions)
 - [Deployment](#deployment)
 - [Development](#development)
 - [Ghi chú](#ghi-chu)
@@ -34,8 +35,31 @@
 | ✅ | Settings auto-load từ .env |
 | ✅ | replied_comments.json dedup tracking |
 
+## Documentation Entry Points
+
+Khi cần phát triển hoặc chỉnh sửa hệ thống, dùng entrypoint tài liệu theo thứ tự này:
+
+1. `docs/roadmaps/roadmap-next.md`
+   Dùng để xác định phase ưu tiên của sản phẩm.
+2. `docs/roadmaps/agents/README.md`
+   Dùng để chọn roadmap theo agent khi workstream gắn với một agent cụ thể.
+3. `docs/specs/.../active/`
+   Dùng để đọc source of truth hiện hành cho behavior và boundaries của capability đang sửa.
+4. `docs/plans/.../active/`
+   Dùng để xác định module/file cần sửa, task và verification.
+5. `docs/operations/doc-taxonomy.md`
+   Dùng để hiểu taxonomy tài liệu và rule `active/archive`.
+
+Rule ngắn:
+- Không implement trực tiếp từ roadmap.
+- Lấy behavior từ spec active.
+- Lấy module/file cần sửa từ plan active.
+- Nếu spec hoặc plan chưa tồn tại, tạo chúng trước khi mở rộng capability đáng kể.
+
 ## Quick Start
+
 1. Copy env template:
+
 ```bash
 cp .env.example .env
 ```
@@ -67,7 +91,7 @@ python3 -m unittest discover -s tests -v
 
 ### Roadmap và trạng thái phát triển
 
-Roadmap giai đoạn tiếp theo nằm tại `docs/roadmap-next.md`.
+Roadmap giai đoạn tiếp theo nằm tại `docs/roadmaps/roadmap-next.md`.
 Package boundary notes nằm tại `fanpage_agent/README.md`.
 
 ```bash
@@ -269,6 +293,16 @@ python3 -m fanpage_agent.main deliver-operator-digest \
 
 Fanpage Agent is a multi-agent orchestrator that runs as a Docker daemon and auto-generates content for Facebook.
 
+### Architecture Decisions
+
+Formal architectural decisions live in [`docs/adr/`](docs/adr/README.md).
+Start there when you need the current rules for:
+
+- external provider integration through adapters
+- approval boundaries before live publishing
+- durable state versus audit or artifact outputs
+- root compatibility surfaces versus package-owned logic
+
 ### Pipeline
 
 ```text
@@ -411,7 +445,7 @@ Project releases use git-cliff to generate `CHANGELOG.md` from Git history.
 ./scripts/changelog.sh v0.2.0 --write
 ```
 
-The command uses `cliff.toml` and should run as part of the deployment checklist before creating the Git tag. See `docs/deploy.md` for the full deploy checklist.
+The command uses `cliff.toml` and should run as part of the deployment checklist before creating the Git tag. See `docs/operations/deploy.md` for the full deploy checklist.
 
 ### Next implementation tasks
 

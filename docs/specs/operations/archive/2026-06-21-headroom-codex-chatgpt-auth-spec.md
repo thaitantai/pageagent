@@ -1,4 +1,4 @@
-# Headroom proxy for Codex ChatGPT authentication
+# Headroom Proxy For Codex ChatGPT Authentication Spec
 
 ## Goal
 

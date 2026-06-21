@@ -45,7 +45,7 @@ If you need an explicit range:
 ## 4. Commit release notes
 
 ```bash
-git add cliff.toml CHANGELOG.md scripts/changelog.sh docs/deploy.md README.md
+git add cliff.toml CHANGELOG.md scripts/changelog.sh docs/operations/deploy.md README.md
 git commit -m "docs: add release notes workflow"
 ```
 
