@@ -1,4 +1,4 @@
-"""CLI status helpers extracted from the main runtime entrypoint."""
+"""CLI status helpers extracted from the runtime entrypoint."""
 
 from __future__ import annotations
 
@@ -44,46 +44,93 @@ def _run_harness_status(data_dir: str, limit: int = 20) -> None:
 def _normalize_roadmap_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKD", text)
     ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
-    ascii_text = ascii_text.replace("đ", "d").replace("Đ", "d")
+    ascii_text = ascii_text.replace("đ", "d").replace("Đ", "D")
     return ascii_text.casefold()
 
 
-def _run_roadmap_status() -> None:
-    roadmap_path = ROOT_DIR / "docs" / "roadmaps" / "roadmap-next.md"
+def _resolve_roadmap_path(roadmap_target: str | None = None) -> Path:
+    target = (roadmap_target or "product").strip().casefold()
+    if target == "research":
+        return ROOT_DIR / "docs" / "roadmaps" / "agents" / "research-agent-roadmap.md"
+    return ROOT_DIR / "docs" / "roadmaps" / "roadmap-next.md"
+
+
+def _clean_phase_heading(heading: str) -> str:
+    cleaned = heading.strip()
+    for marker in (" — Done", " - Done", " — done", " - done"):
+        if cleaned.endswith(marker):
+            return cleaned[: -len(marker)].strip()
+    return cleaned
+
+
+def _phase_is_explicitly_done(raw_heading: str) -> bool:
+    normalized = _normalize_roadmap_text(raw_heading)
+    return normalized.endswith(" done")
+
+
+def _run_roadmap_status(roadmap_target: str | None = None) -> None:
+    roadmap_path = _resolve_roadmap_path(roadmap_target)
     phases: list[str] = []
+    explicit_done_phases: set[str] = set()
     priority_items: list[str] = []
     progress_entries: list[str] = []
     phase_tasks: dict[str, list[str]] = {}
+    title = roadmap_path.stem
     section: str | None = None
     current_phase: str | None = None
 
     if roadmap_path.exists():
         for raw_line in roadmap_path.read_text(encoding="utf-8").splitlines():
             line = raw_line.strip()
+            if not line:
+                continue
+
             normalized_line = _normalize_roadmap_text(line)
+            if line.startswith("# "):
+                title = line.removeprefix("# ").strip()
+                continue
+
             if normalized_line.startswith("## phase "):
-                current_phase = line.removeprefix("## ").strip()
+                current_phase = _clean_phase_heading(line.removeprefix("## ").strip())
                 phases.append(current_phase)
                 phase_tasks.setdefault(current_phase, [])
                 section = "phase"
-            elif normalized_line == "viec can lam:":
+                if _phase_is_explicitly_done(line.removeprefix("## ").strip()):
+                    explicit_done_phases.add(current_phase)
+                continue
+
+            if normalized_line == "viec can lam:":
                 section = "phase_tasks"
-            elif normalized_line == "## uu tien thuc thi ngay":
+                continue
+
+            if normalized_line in {
+                "## uu tien thuc thi ngay",
+                "## completion status",
+                "## trang thai hoan tat",
+                "## next recommended focus",
+                "## huong tiep theo duoc khuyen nghi",
+            }:
                 current_phase = None
                 section = "priority"
-            elif normalized_line == "## tien do thuc thi":
+                continue
+
+            if normalized_line in {"## tien do thuc thi", "## current state"}:
                 current_phase = None
                 section = "progress"
-            elif section == "phase_tasks" and current_phase and normalized_line.startswith("- "):
+                continue
+
+            if section == "phase_tasks" and current_phase and line.startswith("- "):
                 phase_tasks[current_phase].append(line.removeprefix("- ").strip())
-            elif (
-                section == "priority"
-                and len(normalized_line) >= 2
-                and normalized_line[0].isdigit()
-                and normalized_line[1] == "."
-            ):
-                priority_items.append(line)
-            elif section == "progress" and normalized_line.startswith("- "):
+                continue
+
+            if section == "priority":
+                if line.startswith("- "):
+                    priority_items.append(line.removeprefix("- ").strip())
+                elif len(normalized_line) >= 2 and normalized_line[0].isdigit() and normalized_line[1] == ".":
+                    priority_items.append(line)
+                continue
+
+            if section == "progress" and line.startswith("- "):
                 progress_entries.append(line.removeprefix("- ").strip())
 
     completed_text = _normalize_roadmap_text(" ".join(progress_entries))
@@ -93,13 +140,14 @@ def _run_roadmap_status() -> None:
         completed_tasks = [
             task for task in tasks if _normalize_roadmap_text(task) in completed_text
         ]
+        is_done = phase in explicit_done_phases or (tasks and len(completed_tasks) == len(tasks))
         phase_statuses.append(
             {
                 "phase": phase,
                 "tasks_total": len(tasks),
                 "tasks_confirmed_done": len(completed_tasks),
-                "status": "done" if tasks and len(completed_tasks) == len(tasks) else "active",
-                "remaining_tasks": [task for task in tasks if task not in completed_tasks],
+                "status": "done" if is_done else "active",
+                "remaining_tasks": [] if is_done else [task for task in tasks if task not in completed_tasks],
             }
         )
 
@@ -108,14 +156,16 @@ def _run_roadmap_status() -> None:
         active_phase = phase_statuses[-1]
 
     next_phase = None
-    if active_phase:
+    if active_phase and active_phase["phase"] in phases:
         current_index = phases.index(active_phase["phase"])
-        next_phase = next((phase for phase in phases[current_index + 1 :]), None)
+        next_phase = next((phase for phase in phases[current_index + 1 :] if phase), None)
 
     print(
         json.dumps(
             {
                 "status": "ok",
+                "title": title,
+                "roadmap_target": (roadmap_target or "product").strip().casefold(),
                 "roadmap": roadmap_path.as_posix(),
                 "current_phase": (
                     active_phase["phase"]

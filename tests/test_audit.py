@@ -388,6 +388,30 @@ class RoadmapStatusCliTest(unittest.TestCase):
         self.assertIn("next_recommended_actions", payload)
         self.assertIn("remaining_tasks", payload["phase_statuses"][0])
 
+    def test_roadmap_status_reads_research_agent_roadmap(self) -> None:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            _run_roadmap_status(roadmap_target="research")
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["roadmap_target"], "research")
+        self.assertTrue(
+            payload["roadmap"].endswith("docs/roadmaps/agents/research-agent-roadmap.md")
+        )
+        self.assertEqual(payload["title"], "Research Agent Roadmap")
+        self.assertGreaterEqual(payload["phases_total"], 5)
+
+    def test_roadmap_status_research_reports_completed_phases(self) -> None:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            _run_roadmap_status(roadmap_target="research")
+
+        payload = json.loads(stdout.getvalue())
+        done_phases = [item["phase"] for item in payload["phase_statuses"] if item["status"] == "done"]
+        self.assertIn("Phase 1: Contract Stabilization", done_phases)
+        self.assertIn("Phase 5: Multi-Page Governance", done_phases)
+
     def test_roadmap_status_parses_accented_roadmap_sections(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
