@@ -7,7 +7,11 @@ from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.main import (
+from fanpage_agent.cli_commands import (
+    build_daily_artifacts,
+    build_triage_store_payload,
+)
+from fanpage_agent.cli_common import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_CAMPAIGN_FILE,
     DEFAULT_COMMENT_FILE,
@@ -16,8 +20,6 @@ from fanpage_agent.main import (
     DEFAULT_TRIAGE_FILE,
     ROOT_DIR,
     add_store_backend_arg,
-    build_daily_artifacts,
-    build_triage_store_payload,
 )
 from fanpage_agent.tools.content.writer import WriterTool
 from fanpage_agent.tools.publishing.community_triage import CommunityTriageTool

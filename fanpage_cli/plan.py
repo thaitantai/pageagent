@@ -8,15 +8,18 @@ from fanpage_agent.adapters.llm_client import build_llm_client
 from fanpage_agent.adapters.store_factory import build_store
 from fanpage_agent.config import Settings
 from fanpage_agent.loaders.brand_loader import load_brand_profile
-from fanpage_agent.main import (
+from fanpage_agent.cli_commands import (
+    build_daily_artifacts,
+    build_research_brief,
+)
+from fanpage_agent.cli_common import (
     DEFAULT_CALENDAR_FILE,
     DEFAULT_CAMPAIGN_FILE,
     DEFAULT_COMMENT_FILE,
     DEFAULT_HISTORY_FILE,
     DEFAULT_METRICS_FILE,
     ROOT_DIR,
-    build_daily_artifacts,
-    build_research_brief,
+    add_store_backend_arg,
 )
 from fanpage_agent.tools.analytics.analytics import AnalyticsTool
 from fanpage_agent.tools.content.verifier import VerifierTool
@@ -27,9 +30,6 @@ from fanpage_agent.tools.publishing.planner import PlannerTool
 from fanpage_agent.tools.research.research import ResearchTool
 from fanpage_agent.utils import dump_json
 
-
-def add_store_backend_arg(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--store-backend", choices=["local", "google"])
 
 
 def register_subcommand(subparsers) -> None:
